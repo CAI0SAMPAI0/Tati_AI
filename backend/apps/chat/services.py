@@ -228,26 +228,31 @@ def get_tati_system_prompt(
     accent_instruction = ""
     if accent:
         norm = accent.upper().replace("_", "-")
+        accent_key = "US"
         if "GB" in norm or "UK" in norm or "BRITISH" in norm:
-            accent_instruction = "\n   O aluno escolheu Inglês Britânico (UK). Use vocabulário e grafia britânica natural quando aplicável (ex: flat, holiday, colour, favour, brilliant)."
+            accent_key = "UK"
         elif "AU" in norm or "AUSTRALIAN" in norm:
-            accent_instruction = "\n   O aluno escolheu Inglês Australiano (AU). Traga a energia e o calor do inglês da Austrália com naturalidade."
+            accent_key = "AU"
         elif "CA" in norm or "CANADIAN" in norm:
-            accent_instruction = "\n   O aluno escolheu Inglês Canadense (CA)."
+            accent_key = "CA"
         elif "IE" in norm or "IRISH" in norm:
-            accent_instruction = "\n   O aluno escolheu Inglês Irlandês (IE)."
+            accent_key = "IE"
         elif "IN" in norm or "INDIAN" in norm:
-            accent_instruction = "\n   O aluno escolheu Inglês Indiano (IN)."
+            accent_key = "IN"
         elif "ZA" in norm or "SOUTH" in norm:
-            accent_instruction = "\n   O aluno escolheu Inglês Sul-Africano (ZA)."
+            accent_key = "ZA"
         elif "NZ" in norm or "ZEALAND" in norm:
-            accent_instruction = "\n   O aluno escolheu Inglês Neozelandês (NZ)."
+            accent_key = "NZ"
         elif "CN" in norm or "CHINESE" in norm:
-            accent_instruction = "\n   O aluno escolheu prática de Inglês Internacional com sotaque Chinês (Asian International Business English). Foque em clareza, ritmo cadenciado e expressões comuns na comunicação global com a Ásia."
+            accent_key = "CN"
         elif "JP" in norm or "JAPANESE" in norm:
-            accent_instruction = "\n   O aluno escolheu prática de Inglês com sotaque Japonês (Japanese English Context). Mantenha tom polido e cortês, dicção nítida e vocabulário claro para comunicação internacional com parceiros do Japão."
+            accent_key = "JP"
         elif "US" in norm or "AMERICAN" in norm:
-            accent_instruction = "\n   O aluno escolheu Inglês Americano (US). Use expressões cotidianas e naturais dos EUA."
+            accent_key = "US"
+
+        raw_accent = PromptManager.get_prompt("accent_instructions", section=accent_key)
+        if raw_accent:
+            accent_instruction = f"\n   {raw_accent}"
 
     is_voice = str(origin).lower() == "voice"
 
@@ -275,45 +280,9 @@ def get_tati_system_prompt(
     except Exception:
         time_instruction = ""
 
-    correction_guidelines = (
-        "4. CORREÇÃO PEDAGÓGICA ATIVA, GENTIL E OBRIGATÓRIA (PRIORIDADE MÁXIMA):\n"
-        "   - Como Teacher Tati, sua missão indispensável é ensinar o aluno e ajudá-lo a aprender com os erros. NUNCA deixe passar batido um erro de gramática, vocabulário, tempo verbal, preposição, conjugação ou estrutura!\n"
-        "   - SEMPRE que o aluno errar ou falar de forma inadequada:\n"
-        "     a) Aponte o erro com gentileza, discrição e educação sempre ao final da resposta, explicando que soa mais natural de outra forma (ex: ao final da resposta dizer: \"By the way, it sounds more natural to say 'I am 25 years old' instead of 'I have 25 years'!\"). NUNCA use termos como 'Quick Tip' ou 'Dica rápida'.\n"
-        "     b) Em seguida, responda naturalmente ao assunto que ele falou e termine com a sua pergunta única para manter a conversa fluindo."
-        + voice_clause
-        + time_instruction
-        + "\n     c) Se o aluno usar palavras em português (como 'oi', 'tchau', 'obrigado', 'de nada', 'por favor', 'porque', 'como', 'coriza', 'dor de cabeça', 'remédio', 'azia') ou perguntar como se diz algo: ensine o termo correto em inglês com carinho logo no início (ex: \"In English, 'coriza' is called a 'runny nose'!\") e utilize o vocabulário novo na resposta para ele praticar."
-        + "\n     d) PRONÚNCIA E COMPARAÇÃO DE ÁUDIO: Quando o aluno enviar áudio/falar por voz ou cometer um deslize de pronúncia ou fonema, ensine a articulação correta e pergunte calorosamente se ele quer ouvir a sua pronúncia para comparar com a dele (ex: 'Quer ouvir como eu pronuncio para comparar com a sua voz?' ou 'Would you like to hear how I pronounce it and compare with your recording?')."
-    )
-
-    level_guidelines = {
-        "A1": (
-            "Use very simple, friendly English with short sentences (5 to 10 words). "
-            "Stick to present simple, common everyday words, and basic questions. "
-            "If introducing a key new phrase, you may provide a brief 2-3 word Portuguese translation in parentheses. "
-            "Never overwhelm the student."
-        ),
-        "A2": (
-            "Speak clearly in simple everyday English. Practice past simple, basic future plans, and daily routines. "
-            "Keep sentences straightforward. Only use Portuguese if explaining a tricky false cognate."
-        ),
-        "B1": (
-            "Speak 100% in natural, conversational English. Help the student connect ideas (using because, although, however) "
-            "and practice natural phrasal verbs. Encourage them to give their opinion."
-        ),
-        "B2": (
-            "Speak in fluid, nuanced native-like English. Introduce natural idioms, conditional phrases, and abstract topics. "
-            "Ask thought-provoking questions that require more detailed answers."
-        ),
-        "C1": (
-            "Speak with advanced fluency, sophisticated vocabulary, subtle humor, and deep idiomatic expressions. "
-            "Discuss complex and professional themes naturally."
-        ),
-        "C2": (
-            "Engage in native-level mastery with complete spontaneity, cultural references, and intellectual depth."
-        ),
-    }.get(level, "Speak in clear, natural, level-appropriate English.")
+    level_guidelines = PromptManager.get_prompt("cefr_level_guidelines", section=level)
+    if not level_guidelines:
+        level_guidelines = "Speak in clear, natural, level-appropriate English."
 
     memory_section = ""
     if memory_summary:
@@ -341,7 +310,9 @@ Fatos e tópicos anteriores que você lembra sobre este aluno (use naturalmente 
         level=level,
         level_guidelines=level_guidelines,
         accent_instruction=accent_instruction,
-        correction_guidelines=correction_guidelines,
+        voice_clause=voice_clause,
+        time_instruction=time_instruction,
+        correction_guidelines="",
         rag_context_section=rag_context_section,
         memory_section=memory_section,
         url=frontend_host,
@@ -350,6 +321,7 @@ Fatos e tópicos anteriores que você lembra sobre este aluno (use naturalmente 
         prompt = f"You are Tatiana Duarte (Teacher Tati) talking with {name} at CEFR Level {level}. {level_guidelines}\n{memory_section}"
 
     return prompt.strip()
+
 
 
 
@@ -561,11 +533,20 @@ class ConversationService:
             }
 
         history_text = "\n".join([f"{m.role.upper()}: {m.content}" for m in msgs])
-        prompt = (
-            f"Please generate a structured, encouraging summary of this English practice session between Teacher Tatiana and student {user.name or user.username}. "
-            f"Highlight key vocabulary/expressions learned, main grammar concepts practiced, and 2 helpful tips for further study. "
-            f"Write the response in {lang}.\n\nConversation:\n{history_text}"
+        prompt = PromptManager.get_prompt(
+            "chat_summary",
+            section="Summary Prompt",
+            student_name=user.name or user.username,
+            lang=lang,
+            history_text=history_text,
         )
+        if not prompt:
+            prompt = (
+                f"Please generate a structured, encouraging summary of this English practice session between Teacher Tatiana and student {user.name or user.username}. "
+                f"Highlight key vocabulary/expressions learned, main grammar concepts practiced, and 2 helpful tips for further study. "
+                f"Write the response in {lang}.\n\nConversation:\n{history_text}"
+            )
+
 
         keys = get_groq_keys()
         summary_text = ""
@@ -1088,13 +1069,20 @@ class AIService:
             keys = get_groq_keys()
 
             if keys and user_text and len(user_text.strip()) > 3:
-                prompt = (
-                    "You are Teacher Tatiana Duarte's pedagogical assistant. "
-                    "Generate a natural, encouraging conversation title (4 to 8 words, educational English, "
-                    "no quotes, no emojis, no trailing punctuation) summarizing the topic of this student message:\n\n"
-                    f"Student message: {user_text[:250]}\n\n"
-                    "Title:"
+                prompt = PromptManager.get_prompt(
+                    "chat_title",
+                    section="Title Prompt",
+                    user_text=user_text[:250],
                 )
+                if not prompt:
+                    prompt = (
+                        "You are Teacher Tatiana Duarte's pedagogical assistant. "
+                        "Generate a natural, encouraging conversation title (4 to 8 words, educational English, "
+                        "no quotes, no emojis, no trailing punctuation) summarizing the topic of this student message:\n\n"
+                        f"Student message: {user_text[:250]}\n\n"
+                        "Title:"
+                    )
+
                 groq_model = getattr(settings, "GROQ_MODEL", os.getenv("GROQ_MODEL", "openai/gpt-oss-120b"))
                 for key in keys:
                     try:

@@ -122,46 +122,12 @@ def _clean_complete_reply(text: str) -> str:
 
 def _get_level_prompt_rules(level: Optional[str]) -> str:
     lvl = (level or "A2").strip().upper()
-    if lvl == "A1":
-        return (
-            "STUDENT CEFR LEVEL: A1 (Complete Beginner)\n"
-            "- Speak in very simple English. Use basic, everyday vocabulary only.\n"
-            "- Keep your response short: maximum 2 simple sentences (under 30 words).\n"
-            "- Do NOT use idioms, phrasal verbs, or complex grammatical structures.\n"
-            "- Be warm, patient, and ask exactly ONE very simple question at the end."
-        )
-    elif lvl == "A2":
-        return (
-            "STUDENT CEFR LEVEL: A2 (Elementary)\n"
-            "- Use simple, clear vocabulary and common sentence structures.\n"
-            "- Keep your response concise: 2 to 3 sentences (under 50 words).\n"
-            "- Keep questions straightforward and easy to understand.\n"
-            "- Be encouraging and ask exactly ONE clear question at the end."
-        )
-    elif lvl == "B1":
-        return (
-            "STUDENT CEFR LEVEL: B1 (Intermediate)\n"
-            "- Use natural conversational English with everyday expressions.\n"
-            "- Length: 2 to 3 sentences (under 60 words).\n"
-            "- Ask questions that invite the student to share opinions or describe experiences.\n"
-            "- End with exactly ONE clear question."
-        )
-    elif lvl == "B2":
-        return (
-            "STUDENT CEFR LEVEL: B2 (Upper Intermediate)\n"
-            "- Use natural, expressive conversational English with varied vocabulary and idioms.\n"
-            "- Length: 3 to 4 sentences (under 75 words).\n"
-            "- Engage the student with interesting, open-ended questions.\n"
-            "- End with exactly ONE engaging question."
-        )
-    else:  # C1 / C2
-        return (
-            f"STUDENT CEFR LEVEL: {lvl} (Advanced/Proficient)\n"
-            "- Speak naturally as an educated native speaker with nuanced vocabulary and idiomatic fluency.\n"
-            "- Challenge the student with thought-provoking dialogue.\n"
-            "- Length: 3 to 4 sentences (under 80 words).\n"
-            "- End with ONE relevant, high-level question."
-        )
+    section_name = f"Level Rules {lvl}"
+    rules = PromptManager.get_prompt("chat_simulation", section=section_name)
+    if not rules and lvl in ("C1", "C2"):
+        rules = PromptManager.get_prompt("chat_simulation", section="Level Rules C1")
+    return rules or f"STUDENT CEFR LEVEL: {lvl}\n- Speak in clear, natural, level-appropriate English."
+
 
 
 
@@ -329,30 +295,28 @@ async def start_simulation(request: HttpRequest, payload: SimStartInput):
     keys = get_groq_keys()
     for key in keys:
         try:
+            greeting_prompt = PromptManager.get_prompt(
+                "chat_simulation",
+                section="Simulation Initial Greeting",
+                sys_prompt=sys_prompt,
+                level_rules=level_rules,
+                time_instruction=time_instruction,
+                greeting=time_ctx["greeting"],
+            )
             async with AsyncGroq(api_key=key) as client:
                 res = await client.chat.completions.create(
                     model=groq_model,
                     messages=[
                         {
                             "role": "system",
-                            "content": (
-                                f"{sys_prompt}\n\n"
-                                f"{level_rules}\n\n"
-                                f"{time_instruction}\n\n"
-                                "CRITICAL INSTRUCTIONS:\n"
-                                "- Respond ENTIRELY in English.\n"
-                                "- Introduce yourself in character and greet the student warmly to begin.\n"
-                                f"- Use the accurate time of day greeting ({time_ctx['greeting']}).\n"
-                                "- Keep your greeting CONCISE (2 to 3 sentences max, under 50 words).\n"
-                                "- ALWAYS complete your thoughts and every sentence you start. NEVER leave a sentence unfinished or cut off mid-thought.\n"
-                                "- Ask exactly ONE simple, direct question to start the conversation."
-                            ),
+                            "content": greeting_prompt,
                         },
                         {
                             "role": "user",
                             "content": "Hello! I am ready to start the scenario.",
                         },
                     ],
+
                     max_tokens=400,
                     temperature=0.6,
                 )
@@ -463,23 +427,26 @@ async def send_simulation_message(request: HttpRequest, payload: SimMessageInput
     period = time_ctx["period"]
     time_instruction = time_ctx["instruction"]
 
+    turn_prompt = PromptManager.get_prompt(
+        "chat_simulation",
+        section="Simulation Turn Prompt",
+        sys_prompt=sys_prompt,
+        level_rules=level_rules,
+        time_instruction=time_instruction,
+    )
+    if not turn_prompt:
+        turn_prompt = (
+            f"{sys_prompt}\n\n{level_rules}\n\n{time_instruction}\n\n"
+            "Respond entirely in natural English, stay strictly in character, and end with one question."
+        )
+
     messages_payload = [
         {
             "role": "system",
-            "content": (
-                f"{sys_prompt}\n\n"
-                f"{level_rules}\n\n"
-                f"{time_instruction}\n\n"
-                "CRITICAL INSTRUCTIONS:\n"
-                "- Respond ENTIRELY in natural English, stay strictly in character.\n"
-                "- Keep answers engaging and concise (2 to 3 sentences, under 65 words).\n"
-                "- ALWAYS complete every sentence you start. NEVER leave a sentence unfinished or cut off mid-thought.\n"
-                "- Encourage the student and end with ONE clear question to pass the turn.\n"
-                "- Punctual, discreet pedagogical feedback: If the student makes a clear grammar, agreement, verb tense, preposition, or vocabulary error, politely and discreetly point it out AT THE VERY END of your response. NEVER use terms like 'Quick Tip' or formal correction labels. Instead, naturally mention that it sounds more natural in another way (e.g., 'By the way, it sounds more natural to say \"...\" instead of \"...\"').\n"
-                "- Pronunciation comparison: If you notice a pronunciation, phonetic or phrasing issue, explain the natural articulation and invite the student to compare with your voice (e.g., 'Would you like to hear how I pronounce it and compare with your recording?')."
-            ),
+            "content": turn_prompt,
         }
     ]
+
     for m in history:
         messages_payload.append({"role": m.role, "content": m.content})
 

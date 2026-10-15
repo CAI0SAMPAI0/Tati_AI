@@ -94,7 +94,24 @@ class PromptManager:
         return text.strip()
 
     @classmethod
+    def get_list(cls, prompt_name: str, section: Optional[str] = None) -> list:
+        """
+        Carrega uma lista de itens de um arquivo .md (linhas iniciadas com '-' ou '*').
+        Útil para carregar listas temáticas como DYNAMIC_THEMES.
+        """
+        raw = cls.get_prompt(prompt_name, section=section)
+        items = []
+        for line in raw.splitlines():
+            line = line.strip()
+            if line.startswith(("-", "*")):
+                cleaned = line.lstrip("-* ").strip()
+                if cleaned:
+                    items.append(cleaned)
+        return items
+
+    @classmethod
     def clear_cache(cls):
         """Limpa o cache em memória para forçar releitura dos arquivos."""
         cls._CACHE.clear()
         cls._MTIMES.clear()
+

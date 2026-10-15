@@ -123,18 +123,17 @@ class WordLookupService:
         is_sentence = len(word.split()) > 1
 
         if is_sentence:
-            system_instruction = (
-                "You are an expert English-to-Portuguese translator for language learners. "
-                "Translate the given English sentence or expression into natural, idiomatic Brazilian Portuguese. "
-                "Return a JSON object with keys: "
-                "'word' (the exact sentence), "
-                "'translation' (natural Brazilian Portuguese translation of the whole sentence), "
-                "'portuguese_explanation' (optional short usage/grammar tip in Portuguese or empty string), "
-                "'partOfSpeech' ('sentence'), "
-                "'phonetic' (''). "
-                "Respond with valid JSON ONLY. No markdown ticks, no emojis."
-            )
-            user_content = f"Translate to Brazilian Portuguese: \"{word}\""
+            system_instruction = PromptManager.get_prompt("word_analysis", section="Sentence Translation System Instruction")
+            if not system_instruction:
+                system_instruction = (
+                    "You are an expert English-to-Portuguese translator for language learners. "
+                    "Translate the given English sentence or expression into natural, idiomatic Brazilian Portuguese. "
+                    "Return a JSON object with keys: 'word', 'translation', 'portuguese_explanation', 'partOfSpeech', 'phonetic'. "
+                    "Respond with valid JSON ONLY. No markdown ticks, no emojis."
+                )
+            user_content = PromptManager.get_prompt("word_analysis", section="Sentence Translation User Content", word=word)
+            if not user_content:
+                user_content = f"Translate to Brazilian Portuguese: \"{word}\""
         else:
             system_instruction = PromptManager.get_prompt("word_analysis", section="System Instruction")
             if not system_instruction:
@@ -142,7 +141,10 @@ class WordLookupService:
                     "You are an expert English-Portuguese linguistic dictionary for English learners. "
                     "Respond with valid JSON ONLY with keys: 'word', 'lemma', 'partOfSpeech', 'phonetic', 'translation', 'portuguese_explanation'."
                 )
-            user_content = f"Define and translate the English word: \"{word}\""
+            user_content = PromptManager.get_prompt("word_analysis", section="User Content", word=word)
+            if not user_content:
+                user_content = f"Define and translate the English word: \"{word}\""
+
 
         # 1. Tentativa via Groq
         groq_models = [

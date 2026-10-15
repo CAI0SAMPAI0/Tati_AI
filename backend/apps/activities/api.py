@@ -1959,6 +1959,19 @@ def get_trimestral_history(request: HttpRequest):
     return TrimestralExamService.get_history(request.auth)
 
 
+@exams_router.get("/trimestral/{exam_id}", auth=auth_required)
+@exams_router.get("/exams/trimestral/{exam_id}", auth=auth_required)
+def get_trimestral_exam_detail(request: HttpRequest, exam_id: str):
+    """
+    Retorna os detalhes completos de um exame trimestral para revisão pedagógica.
+    """
+    from .trimestral_exams import TrimestralExamService
+    detail = TrimestralExamService.get_exam_detail(request.auth, exam_id)
+    if not detail:
+        raise HttpError(404, "Exame não encontrado.")
+    return detail
+
+
 @exams_router.post("/trimestral/reset", auth=auth_required)
 @exams_router.post("/exams/trimestral/reset", auth=auth_required)
 def reset_trimestral_exam(request: HttpRequest):
