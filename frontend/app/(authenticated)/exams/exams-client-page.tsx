@@ -8,7 +8,7 @@ import { useSidebarState } from '@/hooks/useSidebarState';
 import { useAuth } from '@/hooks/useAuth';
 import { apiGet, apiPost } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
-import { canAccessExams, cn } from '@/lib/utils';
+import { canAccessExams, isStaff, cn } from '@/lib/utils';
 import { getStoredAccent } from '@/lib/constants/accents';
 import toast from 'react-hot-toast';
 import {
@@ -1182,15 +1182,17 @@ export default function ExamsClientPage() {
                   <strong className="text-primary text-sm">{status.current_level}</strong>
                 </span>
 
-                {/* Reset Dev Button */}
-                <button
-                  type="button"
-                  onClick={handleResetDev}
-                  title="Reset exam cycle to test again immediately (Dev)"
-                  className="px-3 py-1.5 rounded-xl border border-border text-xs font-bold text-text-muted hover:text-primary hover:border-primary/40 flex items-center gap-1.5 transition-all"
-                >
-                  <RotateCcw size={13} /> Reset (Dev)
-                </button>
+                {/* Reset Dev Button (Staff only) */}
+                {isStaff(user) && (
+                  <button
+                    type="button"
+                    onClick={handleResetDev}
+                    title="Reset exam cycle to test again immediately (Dev)"
+                    className="px-3 py-1.5 rounded-xl border border-border text-xs font-bold text-text-muted hover:text-primary hover:border-primary/40 flex items-center gap-1.5 transition-all"
+                  >
+                    <RotateCcw size={13} /> Reset (Dev)
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -1261,23 +1263,25 @@ export default function ExamsClientPage() {
                     Expected unlock date: <strong>{formatDate(status?.next_available_date)}</strong>. Continue practicing your daily activities and building your streak!
                   </p>
 
-                  <div className="pt-2 flex items-center gap-3 flex-wrap">
-                    <button
-                      type="button"
-                      onClick={() => handleStartExam(true)}
-                      disabled={isStarting}
-                      className="px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:opacity-90 flex items-center gap-2 shadow-sm transition-all"
-                    >
-                      <Sparkles size={14} /> {isStarting ? 'Loading questions...' : 'Start Now (Bypass Dev)'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleResetDev}
-                      className="px-4 py-2 rounded-xl border border-border text-text-muted hover:text-primary text-xs font-bold transition-all flex items-center gap-1.5"
-                    >
-                      <RotateCcw size={13} /> Reset Cycle
-                    </button>
-                  </div>
+                  {isStaff(user) && (
+                    <div className="pt-2 flex items-center gap-3 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => handleStartExam(true)}
+                        disabled={isStarting}
+                        className="px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:opacity-90 flex items-center gap-2 shadow-sm transition-all"
+                      >
+                        <Sparkles size={14} /> {isStarting ? 'Loading questions...' : 'Start Now (Bypass Dev)'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleResetDev}
+                        className="px-4 py-2 rounded-xl border border-border text-text-muted hover:text-primary text-xs font-bold transition-all flex items-center gap-1.5"
+                      >
+                        <RotateCcw size={13} /> Reset Cycle
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* 90-Day Progress */}

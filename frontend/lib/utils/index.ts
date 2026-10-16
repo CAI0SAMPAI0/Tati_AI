@@ -100,6 +100,7 @@ const STAFF_ROLES = new Set([
   'tatiana',
   'Tati',
   'tati',
+  'tatys_english_class',
   'admin',
   'Admin',
   'Programador',
@@ -119,6 +120,8 @@ export function isStaff(user: { role?: string; username?: string } | null): bool
 }
 
 export function canAccessExams(user: { role?: string; username?: string } | null): boolean {
+  if (!user) return false;
+  if (process.env.NEXT_PUBLIC_EXAMS_FOR_ALL === 'true') return true;
   return isStaff(user);
 }
 

@@ -22,13 +22,15 @@ logger = logging.getLogger(__name__)
 
 # Usuários liberados para acesso e testes de exames trimestrais
 # Hardcoded até liberar para todos (programador, professor/Tatiana)
-_default_allowed = {"programador", "professor", "professora", "tatiana"}
+_default_allowed = {"programador", "professor", "professora", "tatiana", "tatys_english_class"}
 _env_allowed = {
     u.strip().lower()
     for u in os.getenv("TRIMESTRAL_ALLOWED_USERNAMES", "").split(",")
     if u.strip()
 }
 ALLOWED_USERNAMES = {u.lower() for u in (_default_allowed | _env_allowed)}
+# Permite liberar para 100% dos alunos via variável de ambiente (TRIMESTRAL_EXAMS_FOR_ALL=true)
+EXAMS_FOR_ALL = os.getenv("TRIMESTRAL_EXAMS_FOR_ALL", "false").strip().lower() in ("true", "1", "yes")
 
 CEFR_OFFICIAL_GUIDELINES_URL = (
     "https://rm.coe.int/CoERMPublicCommonSearchServices/DisplayDCTMContent?documentId=090000168045bb52",
@@ -193,6 +195,9 @@ def is_user_authorized(user_or_username: Any) -> bool:
     """Verifica se o usuário tem acesso permitido aos testes trimestrais."""
     if not user_or_username:
         return False
+
+    if EXAMS_FOR_ALL:
+        return True
 
     # Se já for instância de User (evita consulta extra ao banco de dados)
     if isinstance(user_or_username, User):
