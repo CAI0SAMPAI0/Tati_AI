@@ -560,12 +560,23 @@ export default function PronunciationReaderClientPage() {
         body
       );
       if (res.ok && res.data) {
-        setResult(res.data);
+        const data = { ...res.data };
+        if (data.words && data.words.length > 0) {
+          const avgWord = data.words.reduce((acc, w) => acc + (w.score || 0), 0) / data.words.length;
+          const allHigh = data.words.every(w => (w.score || 0) >= 90);
+          if ((allHigh || avgWord >= 95) && data.score < avgWord) {
+            data.score = Math.round(avgWord * 10) / 10;
+            if (data.score >= 90 && data.feedback && /tentativa|ritmo|confusa/i.test(data.feedback)) {
+              data.feedback = "Excelente pronúncia! Muito clara, natural e bem articulada.";
+            }
+          }
+        }
+        setResult(data);
         setHistory(prev => [
           ...prev,
           {
             sentence: referenceText || '(free speech)',
-            score: res.data.score,
+            score: data.score,
           },
         ]);
       } else {

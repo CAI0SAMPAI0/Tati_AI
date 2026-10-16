@@ -188,4 +188,69 @@ class SpeechPronunciationTestCase(TestCase):
                 self.assertTrue(result.is_correct)
                 self.assertEqual(len(result.words), 15)
 
+    async def test_gemini_multimodal_calibrates_100_percent_words_from_deflated_score(self):
+        """
+        Garante o caso relatado pela Tatiana: quando o aluno acerta 100% de todas as palavras,
+        mas o LLM alucina uma pontuação geral deflacionada (ex: 65%), o calibrador eleva
+        o score para 100% e ajusta o feedback positivamente.
+        """
+        fake_audio_bytes = b"\x1a\x45\xdf\xa3fake_audio"
+        fake_b64 = base64.b64encode(fake_audio_bytes).decode("utf-8")
+        target = "Good morning everyone"
+
+        mock_gemini_deflated_response = {
+            "score": 65.0,  # Deflacionado arbitrariamente pelo LLM
+            "transcription": "Good morning everyone",
+            "words": [
+                {"word": "Good", "score": 100.0, "accuracy": "correct", "tip": None},
+                {"word": "morning", "score": 100.0, "accuracy": "correct", "tip": None},
+                {"word": "everyone", "score": 100.0, "accuracy": "correct", "tip": None},
+            ],
+            "feedback": "Boa tentativa! Continue praticando o ritmo e a pronúncia das palavras.",
+            "pedagogical_tip": "Perfeito! Articulação excelente.",
+        }
+
+        with patch.object(
+            SpeechService,
+            "_evaluate_with_gemini_async",
+            new_callable=AsyncMock,
+            return_value=mock_gemini_deflated_response,
+        ):
+            with patch("apps.chat.audio_service.AudioService.text_to_speech_async", new_callable=AsyncMock, return_value="fake_tts"):
+                result: PronunciationVerifyOut = await SpeechService.verify_pronunciation_async(
+                    reference_text=target,
+                    audio_b64=fake_b64,
+                    threshold=70.0,
+                )
+
+                self.assertEqual(result.score, 100.0)
+                self.assertTrue(result.is_correct)
+                self.assertIn("Excelente pronúncia", result.feedback)
+
+    async def test_fallback_free_speech_with_perfect_words_calibrates_to_100(self):
+        """
+        Garante que no fallback (ex: Whisper), fala com 100% de precisão nas palavras
+        não fique presa no antigo default de 65.0%, calibrando para 100.0%.
+        """
+        fake_audio_bytes = b"fake_raw_audio"
+        fake_b64 = base64.b64encode(fake_audio_bytes).decode("utf-8")
+
+        with patch.object(
+            SpeechService,
+            "_evaluate_with_gemini_async",
+            new_callable=AsyncMock,
+            return_value=None,
+        ):
+            with patch("apps.chat.audio_service.AudioService.transcribe_audio_async", new_callable=AsyncMock, return_value="Good morning everyone"):
+                with patch("apps.chat.audio_service.AudioService.text_to_speech_async", new_callable=AsyncMock, return_value=""):
+                    result: PronunciationVerifyOut = await SpeechService.verify_pronunciation_async(
+                        reference_text="",
+                        audio_b64=fake_b64,
+                        threshold=70.0,
+                    )
+
+                    self.assertEqual(result.score, 100.0)
+                    self.assertTrue(result.is_correct)
+                    self.assertIn("Excelente", result.feedback)
+
 
