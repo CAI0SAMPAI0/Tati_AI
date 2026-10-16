@@ -94,8 +94,13 @@ const STAFF_ROLES = new Set([
   'professor',
   'professora',
   'programador',
+  'programmer',
+  'teacher',
   'Tatiana',
+  'tatiana',
   'Tati',
+  'tati',
+  'tatys_english_class',
   'admin',
   'Admin',
   'Programador',
@@ -106,7 +111,18 @@ export function isStaff(user: { role?: string; username?: string } | null): bool
   if (!user) return false;
   const role = user.role ?? '';
   const username = user.username ?? '';
-  return STAFF_ROLES.has(role) || STAFF_ROLES.has(username) || STAFF_ROLES.has(role.toLowerCase());
+  return (
+    STAFF_ROLES.has(role) ||
+    STAFF_ROLES.has(username) ||
+    STAFF_ROLES.has(role.toLowerCase()) ||
+    STAFF_ROLES.has(username.toLowerCase())
+  );
+}
+
+export function canAccessExams(user: { role?: string; username?: string } | null): boolean {
+  if (!user) return false;
+  if (process.env.NEXT_PUBLIC_EXAMS_FOR_ALL === 'true') return true;
+  return isStaff(user);
 }
 
 export function canAccessDashboard(

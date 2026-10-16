@@ -1891,7 +1891,7 @@ def start_trimestral_exam(request: HttpRequest, payload: Optional[TrimestralExam
     """
     from .trimestral_exams import TrimestralExamService, is_user_authorized
 
-    if not is_user_authorized(request.auth.username):
+    if not is_user_authorized(request.auth):
         raise HttpError(403, "Os exames trimestrais estão em fase de testes e serão liberados em breve para todos os alunos.")
 
     data = payload or TrimestralExamStartInput()
@@ -1917,7 +1917,7 @@ def get_current_trimestral_exam(request: HttpRequest):
     """
     from .trimestral_exams import TrimestralExamService, is_user_authorized
 
-    if not is_user_authorized(request.auth.username):
+    if not is_user_authorized(request.auth):
         raise HttpError(403, "Acesso restrito.")
 
     current = TrimestralExamService.get_current_active_exam(request.auth)
@@ -1934,7 +1934,7 @@ def submit_trimestral_exam(request: HttpRequest, payload: TrimestralExamSubmitIn
     """
     from .trimestral_exams import TrimestralExamService, is_user_authorized
 
-    if not is_user_authorized(request.auth.username):
+    if not is_user_authorized(request.auth):
         raise HttpError(403, "Acesso restrito.")
 
     try:
@@ -1980,7 +1980,7 @@ def reset_trimestral_exam(request: HttpRequest):
     """
     from .trimestral_exams import TrimestralExamService, is_user_authorized
 
-    if not is_user_authorized(request.auth.username):
+    if not is_user_authorized(request.auth):
         raise HttpError(403, "Acesso restrito.")
 
     TrimestralExamService.reset_user_exams(request.auth)

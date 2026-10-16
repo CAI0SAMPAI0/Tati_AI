@@ -21,14 +21,16 @@ from .models import TrimestralExam, CEFRReference, ActivitySubmission
 logger = logging.getLogger(__name__)
 
 # Usuários liberados para acesso e testes de exames trimestrais
-# Hardcoded até liberar para todos
-_default_allowed = {"programador", "professor"}
+# Hardcoded até liberar para todos (programador, professor/Tatiana)
+_default_allowed = {"programador", "professor", "professora", "tatiana", "tatys_english_class"}
 _env_allowed = {
     u.strip().lower()
     for u in os.getenv("TRIMESTRAL_ALLOWED_USERNAMES", "").split(",")
     if u.strip()
 }
-ALLOWED_USERNAMES = _default_allowed | _env_allowed
+ALLOWED_USERNAMES = {u.lower() for u in (_default_allowed | _env_allowed)}
+# Permite liberar para 100% dos alunos via variável de ambiente (TRIMESTRAL_EXAMS_FOR_ALL=true)
+EXAMS_FOR_ALL = os.getenv("TRIMESTRAL_EXAMS_FOR_ALL", "false").strip().lower() in ("true", "1", "yes")
 
 CEFR_OFFICIAL_GUIDELINES_URL = (
     "https://rm.coe.int/CoERMPublicCommonSearchServices/DisplayDCTMContent?documentId=090000168045bb52",
@@ -189,19 +191,48 @@ DYNAMIC_THEMES = get_dynamic_themes()
 
 
 
-def is_user_authorized(username: Optional[str]) -> bool:
+def is_user_authorized(user_or_username: Any) -> bool:
     """Verifica se o usuário tem acesso permitido aos testes trimestrais."""
-    if not username:
+    if not user_or_username:
         return False
-    uname = str(username).strip().lower()
+
+    if EXAMS_FOR_ALL:
+        return True
+
+    # Se já for instância de User (evita consulta extra ao banco de dados)
+    if isinstance(user_or_username, User):
+        if (
+            getattr(user_or_username, "is_staff", False)
+            or getattr(user_or_username, "is_superuser", False)
+            or getattr(user_or_username, "is_teacher", False)
+            or getattr(user_or_username, "is_programmer", False)
+        ):
+            return True
+        role = str(getattr(user_or_username, "role", "")).strip().lower()
+        if role in ("programador", "professor", "professora", "teacher", "admin"):
+            return True
+        uname = str(getattr(user_or_username, "username", "")).strip().lower()
+        return uname in ALLOWED_USERNAMES
+
+    uname = str(user_or_username).strip().lower()
     if uname in ALLOWED_USERNAMES:
         return True
     try:
-        user = User.objects.filter(username=uname).only("role").first()
+        user = User.objects.filter(username__iexact=uname).only("role").first()
         if user and (
             getattr(user, "is_staff", False)
             or getattr(user, "is_superuser", False)
-            or getattr(user, "role", "") in (UserRole.PROGRAMADOR, UserRole.PROFESSOR, "admin", "Admin")
+            or getattr(user, "is_teacher", False)
+            or getattr(user, "is_programmer", False)
+            or str(getattr(user, "role", "")).strip().lower() in (
+                UserRole.PROGRAMADOR,
+                UserRole.PROFESSOR,
+                "admin",
+                "professor",
+                "professora",
+                "teacher",
+                "programador",
+            )
         ):
             return True
     except Exception:
