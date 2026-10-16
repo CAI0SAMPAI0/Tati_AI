@@ -8,7 +8,7 @@ import { useSidebarState } from '@/hooks/useSidebarState';
 import { useAuth } from '@/hooks/useAuth';
 import { apiGet, apiPost } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
-import { cn } from '@/lib/utils';
+import { canAccessExams, cn } from '@/lib/utils';
 import { getStoredAccent } from '@/lib/constants/accents';
 import toast from 'react-hot-toast';
 import {
@@ -18,7 +18,6 @@ import {
   CheckCircle2,
   XCircle,
   ArrowRight,
-  ChevronRight,
   ChevronLeft,
   Sparkles,
   BookOpen,
@@ -148,7 +147,7 @@ export default function ExamsClientPage() {
   const { user, isLoaded } = useAuth();
 
   useEffect(() => {
-    if (isLoaded && user && user.username !== 'programador') {
+    if (isLoaded && user && !canAccessExams(user)) {
       router.replace('/activities');
     }
   }, [user, isLoaded, router]);
@@ -430,7 +429,7 @@ export default function ExamsClientPage() {
   };
 
   useEffect(() => {
-    if (user?.username === 'programador') {
+    if (canAccessExams(user)) {
       fetchStatusAndHistory();
     }
   }, [user]);
@@ -606,7 +605,7 @@ export default function ExamsClientPage() {
     return <div className="min-h-screen bg-bg" />;
   }
 
-  if (user?.username !== 'programador') {
+  if (!canAccessExams(user)) {
     return null;
   }
 
