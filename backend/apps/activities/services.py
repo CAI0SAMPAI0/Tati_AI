@@ -5,7 +5,7 @@ import difflib
 import uuid
 import asyncio
 from asgiref.sync import async_to_sync
-from typing import Optional, Any
+from typing import Optional, Any, List
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from django.conf import settings
@@ -75,9 +75,10 @@ Ouça o áudio gravado pelo aluno atentamente e analise a pronúncia acústica r
 4. FEEDBACK E DICA DA TEACHER TATI:
    - "score": Nota geral ponderada de 0 a 100 baseada na precisão e fluência.
      * REGRA DE PROPORCIONALIDADE PEDAGÓGICA (MUITO IMPORTANTE):
-       Se o aluno articulou bem a grande maioria das palavras da frase (ex: 80% ou mais das palavras corretas) e cometeu apenas 1 ou 2 erros pontuais de fonema (ex: "now" soando como "know" ou "think" com TH impreciso), a nota geral ("score") DEVE ser PROPORCIONAL (entre 75 e 88), reconhecendo o sucesso global da comunicação! NUNCA dê nota destruidora (20 a 45) para uma frase com quase todas as palavras acertadas!
-       Se a frase teve ritmo razoável mas múltiplos fonemas imprecisos: entre 55 e 74.
-       Notas baixas (< 40) são reservadas estritamente para quando o aluno não falou a frase esperada, falou português, ou a fala foi ininteligível.
+       - Se todas as palavras forem articuladas corretamente (100% ou próximas de 100% em cada palavra na lista "words"), a nota geral ("score") DEVE ser entre 95 e 100! JAMAIS atribua nota mediana (como 60, 65 ou 70) quando todas as palavras individuais estão com 100%.
+       - Se o aluno articulou bem a grande maioria das palavras da frase (ex: 80% ou mais das palavras corretas) e cometeu apenas 1 ou 2 erros pontuais de fonema (ex: "now" soando como "know" ou "think" com TH impreciso), a nota geral ("score") DEVE ser PROPORCIONAL (entre 75 e 88), reconhecendo o sucesso global da comunicação! NUNCA dê nota destruidora (20 a 45) para uma frase com quase todas as palavras acertadas!
+       - Se a frase teve ritmo razoável mas múltiplos fonemas imprecisos: entre 55 e 74.
+       - Notas baixas (< 40) são reservadas estritamente para quando o aluno não falou a frase esperada, falou português, ou a fala foi ininteligível.
    - "feedback": Resumo honesto e acolhedor em português.
    - "pedagogical_tip": Dica pedagógica prática da Teacher Tati SEMPRE EM PORTUGUÊS. IMPORTANTE: Se houver mais de uma palavra com atenção ou erro (ex: 'think' e 'now'), mencione e explique o movimento físico da boca/língua para TODAS elas em um parágrafo fluido e acolhedor! Se tudo estiver perfeito, parabenize com entusiasmo!
 
@@ -133,6 +134,7 @@ Ouça atentamente o áudio gravado e realize uma avaliação pedagógica humana,
 6. NOTA GERAL PONDERADA E PROPORCIONALIDADE PEDAGÓGICA (CRÍTICO):
    - "score": Nota geral de 0 a 100 ponderando pronúncia e articulação, concordância gramatical e coerência, e uso exclusivo do inglês.
    - REGRA DE PROPORCIONALIDADE E JUSTIÇA:
+     * Se todas as palavras faladas estiverem corretas em inglês e bem articuladas (100% ou próximas de 100%), a nota geral ("score") DEVE ser entre 95 e 100!
      * A nota DEVE ser proporcional ao conjunto da fala do aluno:
      * Se a frase for fluente, com sentido e a grande maioria das palavras estiver correta (ex: 14 palavras perfeitas e apenas 1 deslize ou confusão numérica pontual como 90 vs nineteen), a nota geral DEVE ficar entre 75 e 88. NUNCA destrua a nota dando 35% quando 90% da frase foi bem articulada!
      * Se a frase tiver bom ritmo geral com pequenos deslizes de fonemas ou preposição: entre 70 e 84.
@@ -2516,6 +2518,42 @@ class HubService:
 
 class SpeechService:
     @classmethod
+    def _calibrate_pronunciation_score(
+        cls,
+        raw_score: float,
+        words_out: List[WordResultOut],
+        has_portuguese: bool,
+    ) -> float:
+        """
+        Calibra pedagogicamente a pontuação geral da pronúncia:
+        - Se contiver português: teto de 30% (fala em português não deve pontuar alto).
+        - Se todas as palavras forem corretas e com notas altas (>= 90%) ou média >= 95%:
+          a nota geral DEVE ser no mínimo a média das palavras (evitando que 100% nas palavras resulte em 65%).
+        - Se média >= 60%: a nota geral não pode ser desproporcionalmente esmagada por um deslize isolado
+          (piso de 88% da média).
+        """
+        if not words_out:
+            return round(max(0.0, min(100.0, raw_score)), 1)
+        if has_portuguese:
+            return round(min(raw_score, 30.0), 1)
+
+        avg_word = sum(w.score for w in words_out) / len(words_out)
+        all_correct = all(getattr(w, "accuracy", "") == "correct" for w in words_out)
+        all_high = all(getattr(w, "score", 0.0) >= 90.0 for w in words_out)
+
+        if all_correct and all_high:
+            calibrated = max(raw_score, round(avg_word, 1))
+        elif avg_word >= 95.0:
+            calibrated = max(raw_score, round(avg_word, 1))
+        elif avg_word >= 60.0:
+            min_score = round(avg_word * 0.88, 1)
+            calibrated = max(raw_score, min_score)
+        else:
+            calibrated = raw_score
+
+        return round(max(0.0, min(100.0, calibrated)), 1)
+
+    @classmethod
     async def verify_pronunciation_async(
         cls,
         target: Optional[str] = None,
@@ -2561,11 +2599,7 @@ class SpeechService:
                     score = float(gemini_res.get("score", 0.0))
 
                     # ⚖️ Proteção de proporcionalidade pedagógica no score:
-                    # Se o aluno articulou com sucesso a grande maioria das palavras (média >= 60%)
-                    # e não há palavras em português ou fala desconexa, a nota geral não deve ser
-                    # esmagada por um deslize pontual isolado (ex: 14 palavras corretas caindo para 35%).
                     if words_out:
-                        avg_word_score = sum(w.score for w in words_out) / len(words_out)
                         pt_markers = {
                             "tudo", "voce", "você", "nao", "não", "sim", "como", "esta", "está",
                             "muito", "obrigado", "oi", "ola", "olá", "beleza", "legal", "que",
@@ -2576,17 +2610,18 @@ class SpeechService:
                             (re.sub(r"[^\w]", "", w.word.lower()) in pt_markers)
                             for w in words_out
                         )
-                        if not has_portuguese and avg_word_score >= 60.0:
-                            min_fair_score = round(avg_word_score * 0.88, 1)
-                            if score < min_fair_score:
-                                logger.info(
-                                    f"[SpeechService] Calibrating score from {score} to {min_fair_score} "
-                                    f"(word avg: {avg_word_score:.1f})"
-                                )
-                                score = min_fair_score
+                        calibrated_score = cls._calibrate_pronunciation_score(score, words_out, has_portuguese)
+                        if calibrated_score != score:
+                            logger.info(
+                                f"[SpeechService] Calibrating score from {score} to {calibrated_score} "
+                                f"(word avg: {sum(w.score for w in words_out) / len(words_out):.1f})"
+                            )
+                            score = calibrated_score
 
                     is_correct = score >= threshold
                     feedback = gemini_res.get("feedback") or "Boa tentativa!"
+                    if score >= 90.0 and any(m in feedback.lower() for m in ["boa tentativa", "continue praticando o ritmo", "soou confusa"]):
+                        feedback = "Excelente pronúncia! Muito clara, natural e bem articulada."
                     pedagogical_tip = gemini_res.get("pedagogical_tip") or ""
                     suggested_sentence = gemini_res.get("suggested_sentence") or ""
                     transcription = gemini_res.get("transcription") or ""
@@ -2688,15 +2723,26 @@ class SpeechService:
                 score = 50.0
                 feedback = "Fala muito curta. Pratique frases completas em inglês para uma avaliação fonética mais detalhada."
             else:
-                score = 65.0
-                feedback = "Sua fala foi compreendida. Continue praticando para aprimorar o ritmo e a pronúncia."
+                avg_spoken = (sum(w.score for w in words_out) / len(words_out)) if words_out else 85.0
+                score = round(avg_spoken, 1)
+                feedback = "Excelente fala livre! Vocabulário em inglês bem articulado."
         else:
             score = 0.0
             feedback = "Áudio não compreendido com clareza. Tente falar novamente."
 
+        # ⚖️ Proteção e calibração pedagógica no fallback
+        if words_out:
+            calibrated_score = cls._calibrate_pronunciation_score(score, words_out, has_pt_word)
+            if calibrated_score != score:
+                logger.info(
+                    f"[SpeechService Fallback] Calibrating score from {score} to {calibrated_score} "
+                    f"(word avg: {sum(w.score for w in words_out) / len(words_out):.1f})"
+                )
+                score = calibrated_score
+
         is_correct = score >= threshold
 
-        if not feedback:
+        if not feedback or (score >= 90.0 and any(m in feedback.lower() for m in ["boa tentativa", "continue praticando", "soou confusa"])):
             if score >= 85:
                 feedback = (
                     "Excelente pronúncia! Muito clara, natural e bem articulada."
