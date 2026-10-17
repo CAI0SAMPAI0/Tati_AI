@@ -562,13 +562,27 @@ export default function PronunciationReaderClientPage() {
       if (res.ok && res.data) {
         const data = { ...res.data };
         if (data.words && data.words.length > 0) {
-          const avgWord = data.words.reduce((acc, w) => acc + (w.score || 0), 0) / data.words.length;
-          const allHigh = data.words.every(w => (w.score || 0) >= 90);
-          if ((allHigh || avgWord >= 95) && data.score < avgWord) {
-            data.score = Math.round(avgWord * 10) / 10;
-            if (data.score >= 90 && data.feedback && /tentativa|ritmo|confusa/i.test(data.feedback)) {
+          const scores = data.words.map(w => w.score || 0);
+          const avgWord = scores.reduce((acc, s) => acc + s, 0) / scores.length;
+          const minWord = Math.min(...scores);
+          const allGood = scores.every(s => s >= 80);
+
+          // Calibração de segurança: se as palavras individuais foram bem avaliadas
+          // (todas >= 80 ou média >= 85), o score geral NUNCA deve ser rebaixado para a faixa amarela (< 85)
+          // nem ficar abaixo da pior palavra/média
+          if ((avgWord >= 85 || allGood) && (data.score < 85 || data.score < minWord || data.score < avgWord)) {
+            data.score = Math.round(Math.max(data.score, avgWord) * 10) / 10;
+            if (data.metadata) {
+              data.metadata.accuracy_score = data.score;
+            }
+            if (data.score >= 85 && data.feedback && /tentativa|ritmo|confusa|cortou|incompleta|esforço/i.test(data.feedback)) {
               data.feedback = "Excelente pronúncia! Muito clara, natural e bem articulada.";
             }
+          }
+
+          // Higienização de alucinação de áudio cortado
+          if (data.feedback && /cortou|incompleto|incompleta/i.test(data.feedback)) {
+            data.feedback = data.feedback.replace(/O áudio cortou no final ou a gravação foi incompleta,?\s*(?:mas\s*)?/gi, '');
           }
         }
         setResult(data);

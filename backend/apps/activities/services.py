@@ -76,9 +76,12 @@ Ouça o áudio gravado pelo aluno atentamente e analise a pronúncia acústica r
    - "score": Nota geral ponderada de 0 a 100 baseada na precisão e fluência.
      * REGRA DE PROPORCIONALIDADE PEDAGÓGICA (MUITO IMPORTANTE):
        - Se todas as palavras forem articuladas corretamente (100% ou próximas de 100% em cada palavra na lista "words"), a nota geral ("score") DEVE ser entre 95 e 100! JAMAIS atribua nota mediana (como 60, 65 ou 70) quando todas as palavras individuais estão com 100%.
-       - Se o aluno articulou bem a grande maioria das palavras da frase (ex: 80% ou mais das palavras corretas) e cometeu apenas 1 ou 2 erros pontuais de fonema (ex: "now" soando como "know" ou "think" com TH impreciso), a nota geral ("score") DEVE ser PROPORCIONAL (entre 75 e 88), reconhecendo o sucesso global da comunicação! NUNCA dê nota destruidora (20 a 45) para uma frase com quase todas as palavras acertadas!
+       - Se todas as palavras forem bem articuladas (todas na faixa de 85% a 100%), a nota geral ("score") DEVE refletir esse excelente desempenho (entre 88 e 96)! JAMAIS rebaixe para a faixa amarela (< 85%) quando todas as palavras individuais foram bem pontuadas (85%+).
+       - Se o aluno articulou bem a grande maioria das palavras da frase mas cometeu 1 ou 2 erros pontuais de fonema (ex: "now" trocado por "know" com nota 40), a nota geral ("score") DEVE ser PROPORCIONAL (entre 75 e 85), reconhecendo o sucesso global da comunicação! NUNCA dê nota destruidora (20 a 45) para uma frase com quase todas as palavras acertadas!
        - Se a frase teve ritmo razoável mas múltiplos fonemas imprecisos: entre 55 e 74.
        - Notas baixas (< 40) são reservadas estritamente para quando o aluno não falou a frase esperada, falou português, ou a fala foi ininteligível.
+   - PROIBIÇÃO ABSOLUTA DE ALUCINAÇÃO SOBRE ÁUDIO CORTADO OU INCOMPLETO:
+     NUNCA diga em "feedback" ou "pedagogical_tip" que o áudio cortou no final ou que a gravação foi incompleta se a transcrição contém as palavras da frase! Se o aluno pronunciou a frase, avalie diretamente a pronúncia sem inventar falhas técnicas inexistentes.
    - "feedback": Resumo honesto e acolhedor em português.
    - "pedagogical_tip": Dica pedagógica prática da Teacher Tati SEMPRE EM PORTUGUÊS. IMPORTANTE: Se houver mais de uma palavra com atenção ou erro (ex: 'think' e 'now'), mencione e explique o movimento físico da boca/língua para TODAS elas em um parágrafo fluido e acolhedor! Se tudo estiver perfeito, parabenize com entusiasmo!
 
@@ -142,6 +145,8 @@ Ouça atentamente o áudio gravado e realize uma avaliação pedagógica humana,
      * NOTAS BAIXAS (15 a 45) são reservadas ESTRITAMENTE para:
        a) Presença de palavras em PORTUGUÊS misturadas (ex: "Hi I am verb 7 Tudo").
        b) Frases quase totalmente desconexas, sem sentido ou ininteligíveis.
+   - PROIBIÇÃO ABSOLUTA DE ALUCINAÇÃO SOBRE ÁUDIO CORTADO OU INCOMPLETO:
+     NUNCA diga em "feedback" que o áudio cortou ou que a gravação foi incompleta se o aluno falou a frase! Avalie a fala com honestidade e acolhimento sem inventar problemas técnicos.
    - "feedback": Feedback acolhedor e honesto da Teacher Tati SEMPRE EM PORTUGUÊS destacando os acertos e indicando onde focar.
    - "pedagogical_tip": Explicação pedagógica detalhada em português ensinando como dizer a frase sugerida com boa concordância e pronúncia.
 
@@ -2537,14 +2542,27 @@ class SpeechService:
         if has_portuguese:
             return round(min(raw_score, 30.0), 1)
 
-        avg_word = sum(w.score for w in words_out) / len(words_out)
+        scores = [getattr(w, "score", 0.0) for w in words_out]
+        avg_word = sum(scores) / len(scores)
+        min_word = min(scores)
         all_correct = all(getattr(w, "accuracy", "") == "correct" for w in words_out)
-        all_high = all(getattr(w, "score", 0.0) >= 90.0 for w in words_out)
+        all_high = all(s >= 90.0 for s in scores)
+        all_good = all(s >= 80.0 for s in scores)
 
-        if all_correct and all_high:
+        # 1. Caso perfeito / quase perfeito (ex: 100% em todas ou média >= 95%):
+        if (all_correct and all_high) or avg_word >= 95.0:
             calibrated = max(raw_score, round(avg_word, 1))
-        elif avg_word >= 95.0:
+
+        # 2. Caso excelente (ex: Tatiana: média >= 85% ou todas as palavras >= 80%):
+        # A nota não pode ser deflacionada para a faixa amarela (< 85) e nem ficar abaixo da menor palavra/média
+        elif (avg_word >= 85.0 or all_good) and (raw_score < 85.0 or raw_score < min_word):
             calibrated = max(raw_score, round(avg_word, 1))
+
+        # 3. Deflação anômala: nota geral menor que a pior palavra quando todas >= 75%
+        elif min_word >= 75.0 and raw_score < min_word:
+            calibrated = max(raw_score, round(avg_word, 1))
+
+        # 4. Salvaguarda geral proporcional (piso de 88% da média quando média >= 60%)
         elif avg_word >= 60.0:
             min_score = round(avg_word * 0.88, 1)
             calibrated = max(raw_score, min_score)
@@ -2620,7 +2638,21 @@ class SpeechService:
 
                     is_correct = score >= threshold
                     feedback = gemini_res.get("feedback") or "Boa tentativa!"
-                    if score >= 90.0 and any(m in feedback.lower() for m in ["boa tentativa", "continue praticando o ritmo", "soou confusa"]):
+
+                    # Remove alucinações sobre gravação incompleta ou áudio cortado quando a fala foi reconhecida
+                    if any(phrase in feedback.lower() for phrase in ["áudio cortou", "audio cortou", "gravação foi incompleta", "gravacao foi incompleta", "áudio incompleto", "audio incompleto"]):
+                        clean_fb = re.sub(
+                            r"(?:Hello!\s*)?(?:Teacher Tati aqui\.\s*)?(?:O áudio cortou no final ou a gravação foi incompleta|O áudio cortou|A gravação foi incompleta),?\s*(?:mas\s*)?",
+                            "",
+                            feedback,
+                            flags=re.IGNORECASE
+                        ).strip()
+                        if clean_fb:
+                            feedback = clean_fb[0].upper() + clean_fb[1:]
+                        else:
+                            feedback = "Excelente pronúncia! Frase clara, natural e bem articulada."
+
+                    if score >= 85.0 and any(m in feedback.lower() for m in ["boa tentativa", "continue praticando o ritmo", "soou confusa", "bom esforço"]):
                         feedback = "Excelente pronúncia! Muito clara, natural e bem articulada."
                     pedagogical_tip = gemini_res.get("pedagogical_tip") or ""
                     suggested_sentence = gemini_res.get("suggested_sentence") or ""

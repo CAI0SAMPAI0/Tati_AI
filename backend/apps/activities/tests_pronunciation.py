@@ -253,4 +253,56 @@ class SpeechPronunciationTestCase(TestCase):
                     self.assertTrue(result.is_correct)
                     self.assertIn("Excelente", result.feedback)
 
+    async def test_gemini_multimodal_calibrates_excellent_speech_and_sanitizes_audio_cut_hallucination(self):
+        """
+        Reproduz exatamente o caso real da Tatiana:
+        - Frase: 'The final poll showed President Lula narrowly ahead.'
+        - Palavras avaliadas com notas entre 85% e 95% (média 90.6%).
+        - LLM alucina score de 79.2% e feedback dizendo 'O áudio cortou no final ou a gravação foi incompleta'.
+        - O sistema DEVE calibrar o score para 90.6% (faixa verde >= 85%) e sanitizar a alucinação de corte.
+        """
+        fake_audio_bytes = b"\x1a\x45\xdf\xa3fake_audio"
+        fake_b64 = base64.b64encode(fake_audio_bytes).decode("utf-8")
+        target = "The final poll showed President Lula narrowly ahead."
+
+        mock_gemini_deflated = {
+            "score": 79.2,  # Deflação alucinada do LLM
+            "transcription": "The final poll showed President Lula narrowly ahead",
+            "words": [
+                {"word": "The", "score": 95.0, "accuracy": "correct", "tip": None},
+                {"word": "final", "score": 95.0, "accuracy": "correct", "tip": None},
+                {"word": "poll", "score": 90.0, "accuracy": "correct", "tip": None},
+                {"word": "showed", "score": 90.0, "accuracy": "correct", "tip": None},
+                {"word": "President", "score": 90.0, "accuracy": "correct", "tip": None},
+                {"word": "Lula", "score": 90.0, "accuracy": "correct", "tip": None},
+                {"word": "narrowly", "score": 85.0, "accuracy": "needs_work", "tip": "Ajuste a entonação na sílaba tônica."},
+                {"word": "ahead", "score": 90.0, "accuracy": "correct", "tip": None},
+            ],
+            "feedback": "Hello! Teacher Tati aqui. O áudio cortou no final ou a gravação foi incompleta, mas a pronúncia das palavras que você disse foi muito boa e clara!",
+            "pedagogical_tip": "Quando pronunciar palavras como 'narrowly', lembre-se de enfatizar a sílaba tônica correta ('na-rrow-ly') para soar mais natural e claro em inglês.",
+        }
+
+        with patch.object(
+            SpeechService,
+            "_evaluate_with_gemini_async",
+            new_callable=AsyncMock,
+            return_value=mock_gemini_deflated,
+        ):
+            with patch("apps.chat.audio_service.AudioService.text_to_speech_async", new_callable=AsyncMock, return_value="fake_tts"):
+                result: PronunciationVerifyOut = await SpeechService.verify_pronunciation_async(
+                    reference_text=target,
+                    audio_b64=fake_b64,
+                    threshold=70.0,
+                )
+
+                # Score deve ser calibrado para a média das palavras (90.6%), NÃO 79.2% nem 79.8%!
+                self.assertEqual(result.score, 90.6)
+                self.assertTrue(result.is_correct)
+                self.assertGreaterEqual(result.score, 85.0)
+
+                # Alucinação de corte de áudio deve ter sido removida do feedback
+                self.assertNotIn("cortou no final", result.feedback)
+                self.assertNotIn("incompleta", result.feedback)
+                self.assertIn("pronúncia", result.feedback.lower())
+
 
