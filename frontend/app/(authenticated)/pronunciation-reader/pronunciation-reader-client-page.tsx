@@ -554,6 +554,9 @@ export default function PronunciationReaderClientPage() {
       if (referenceText) {
         body.reference_text = referenceText;
       }
+      if (inputMode === 'custom') {
+        body.mode = 'write';
+      }
 
       const res = await apiPost<PronunciationResult>(
         ENDPOINTS.SPEECH_VERIFY_PRONUNCIATION,
