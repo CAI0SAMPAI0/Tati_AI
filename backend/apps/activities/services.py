@@ -42,11 +42,16 @@ def get_pronunciation_teacher_prompt(target_phrase: str = "") -> str:
     clean_target = (target_phrase or "").strip()
     return PromptManager.get_prompt("pronunciation_teacher", target_phrase=clean_target)
 
+def get_pronunciation_write_prompt(target_phrase: str = "") -> str:
+    clean_target = (target_phrase or "").strip()
+    return PromptManager.get_prompt("pronunciation_write", target_phrase=clean_target)
+
 def get_pronunciation_free_speech_prompt() -> str:
     return PromptManager.get_prompt("pronunciation_free_speech")
 
 # Retrocompatibilidade caso algum teste ou módulo acesse diretamente
 PRONUNCIATION_TEACHER_PROMPT = PromptManager.load_raw_prompt("pronunciation_teacher")
+PRONUNCIATION_WRITE_PROMPT = PromptManager.load_raw_prompt("pronunciation_write")
 PRONUNCIATION_FREE_SPEECH_PROMPT = PromptManager.load_raw_prompt("pronunciation_free_speech")
 
 
@@ -2461,6 +2466,7 @@ class SpeechService:
         audio_b64: Optional[str] = None,
         reference_text: Optional[str] = None,
         accent: str = "en-US",
+        mode: Optional[str] = None,
     ) -> PronunciationVerifyOut:
         import re
         from apps.chat.audio_service import AudioService
@@ -2483,6 +2489,7 @@ class SpeechService:
                     mime_type=mime_type,
                     target_phrase=target_phrase,
                     accent=accent,
+                    mode=mode,
                 )
 
                 if gemini_res and isinstance(gemini_res, dict):
@@ -2700,6 +2707,7 @@ class SpeechService:
         audio_b64: Optional[str] = None,
         reference_text: Optional[str] = None,
         accent: str = "en-US",
+        mode: Optional[str] = None,
     ) -> PronunciationVerifyOut:
         try:
             try:
@@ -2719,6 +2727,7 @@ class SpeechService:
                                 audio_b64=audio_b64,
                                 reference_text=reference_text,
                                 accent=accent,
+                                mode=mode,
                             )
                         )
                     )
@@ -2731,6 +2740,7 @@ class SpeechService:
                     audio_b64=audio_b64,
                     reference_text=reference_text,
                     accent=accent,
+                    mode=mode,
                 )
         except Exception as e:
             logger.error(f"[SpeechService] Erro ao verificar pronúncia: {e}", exc_info=True)
@@ -2754,6 +2764,7 @@ class SpeechService:
         mime_type: str,
         target_phrase: str = "",
         accent: str = "en-US",
+        mode: Optional[str] = None,
     ) -> Optional[dict]:
         from apps.chat.audio_service import get_gemini_client
         import json
@@ -2763,7 +2774,9 @@ class SpeechService:
             return None
 
         clean_target = (target_phrase or "").strip()
-        if clean_target:
+        if mode == "write" and clean_target:
+            base_prompt = PromptManager.get_prompt("pronunciation_write", target_phrase=clean_target)
+        elif clean_target:
             base_prompt = PromptManager.get_prompt("pronunciation_teacher", target_phrase=clean_target)
         else:
             base_prompt = PromptManager.get_prompt("pronunciation_free_speech")

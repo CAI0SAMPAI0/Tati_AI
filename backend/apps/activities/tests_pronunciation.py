@@ -305,4 +305,62 @@ class SpeechPronunciationTestCase(TestCase):
                 self.assertNotIn("incompleta", result.feedback)
                 self.assertIn("pronúncia", result.feedback.lower())
 
+    async def test_pronunciation_write_mode_and_prompt(self):
+        from apps.activities.services import get_pronunciation_write_prompt, PRONUNCIATION_WRITE_PROMPT
+
+        # 1. Verifica carregamento do prompt do write
+        prompt = get_pronunciation_write_prompt("I have 20 years and I want learn English")
+        self.assertIn("I have 20 years and I want learn English", prompt)
+        self.assertIn("Write Your Own", prompt)
+        self.assertIn("Teacher Tati", prompt)
+        self.assertTrue(len(PRONUNCIATION_WRITE_PROMPT) > 100)
+
+        # 2. Verifica fluxo do verify_pronunciation_async com mode='write'
+        fake_audio_bytes = b"\x1a\x45\xdf\xa3fake_audio"
+        fake_b64 = base64.b64encode(fake_audio_bytes).decode("utf-8")
+        target = "I am 20 years old and I want to learn English"
+
+        mock_response = {
+            "score": 92.0,
+            "transcription": "I am 20 years old and I want to learn English",
+            "suggested_sentence": "I am 20 years old and I want to learn English.",
+            "words": [
+                {"word": "I", "score": 95.0, "accuracy": "correct", "tip": None},
+                {"word": "am", "score": 95.0, "accuracy": "correct", "tip": None},
+                {"word": "20", "score": 90.0, "accuracy": "correct", "tip": None},
+                {"word": "years", "score": 90.0, "accuracy": "correct", "tip": None},
+                {"word": "old", "score": 90.0, "accuracy": "correct", "tip": None},
+                {"word": "and", "score": 95.0, "accuracy": "correct", "tip": None},
+                {"word": "I", "score": 95.0, "accuracy": "correct", "tip": None},
+                {"word": "want", "score": 90.0, "accuracy": "correct", "tip": None},
+                {"word": "to", "score": 90.0, "accuracy": "correct", "tip": None},
+                {"word": "learn", "score": 90.0, "accuracy": "correct", "tip": None},
+                {"word": "English", "score": 90.0, "accuracy": "correct", "tip": None},
+            ],
+            "feedback": "Parabéns por escrever sua própria frase! Sua escrita e pronúncia foram excelentes.",
+            "pedagogical_tip": "Lembre-se sempre de usar o verbo 'to be' para falar de idade em inglês: 'I am 20 years old'.",
+        }
+
+        with patch.object(
+            SpeechService,
+            "_evaluate_with_gemini_async",
+            new_callable=AsyncMock,
+            return_value=mock_response,
+        ) as mock_gemini:
+            with patch("apps.chat.audio_service.AudioService.text_to_speech_async", new_callable=AsyncMock, return_value="fake_tts"):
+                result: PronunciationVerifyOut = await SpeechService.verify_pronunciation_async(
+                    reference_text=target,
+                    audio_b64=fake_b64,
+                    threshold=70.0,
+                    mode="write",
+                )
+
+                mock_gemini.assert_awaited_once()
+                call_kwargs = mock_gemini.call_args.kwargs
+                self.assertEqual(call_kwargs.get("mode"), "write")
+                self.assertEqual(result.score, 92.0)
+                self.assertEqual(result.suggested_sentence, "I am 20 years old and I want to learn English.")
+                self.assertIn("Teacher Tati", prompt)
+
+
 

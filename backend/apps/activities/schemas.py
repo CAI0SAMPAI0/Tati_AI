@@ -129,6 +129,7 @@ class PronunciationVerifyInput(BaseModel):
     spoken_phrase: Optional[str] = None
     accuracy_threshold: Optional[float] = 70.0
     accent: Optional[str] = "en-US"
+    mode: Optional[str] = None
 
 
 

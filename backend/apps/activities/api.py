@@ -534,6 +534,7 @@ async def verify_pronunciation(request: HttpRequest, payload: PronunciationVerif
             audio_b64=payload.audio,
             reference_text=payload.reference_text,
             accent=user_accent,
+            mode=payload.mode,
         )
 
         if streak_info and res.metadata is not None:
