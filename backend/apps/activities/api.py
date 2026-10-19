@@ -1877,7 +1877,7 @@ def get_trimestral_status(request: HttpRequest):
     """
     Retorna a elegibilidade do aluno para realizar o teste trimestral.
     Disponível exatamente após 3 meses desde o último teste concluído.
-    Acesso temporariamente restrito aos usuários autorizados (programador e caio.sampaio).
+    Acesso temporariamente restrito aos usuários autorizados (programadores e professores).
     """
     from .trimestral_exams import TrimestralExamService
     return TrimestralExamService.get_status(request.auth)

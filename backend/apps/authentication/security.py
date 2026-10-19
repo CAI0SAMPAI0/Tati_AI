@@ -229,13 +229,14 @@ auth_optional = OptionalAuthBearer()
 
 def require_programmer(user: User):
     """Garante que o usuário é um programador/superadmin."""
-    if not user or not user.is_programmer:
+    if not user or isinstance(user, bool) or not getattr(user, "is_programmer", False):
         raise HttpError(403, "Acesso restrito apenas ao programador / superadmin.")
 
 
 def require_teacher(user: User):
     """Garante que o usuário é a professora Tatiana ou o programador."""
-    if not user or not user.is_teacher:
+    if not user or isinstance(user, bool) or not getattr(user, "is_teacher", False):
         raise HttpError(
             403, "Acesso restrito apenas à professora ou equipe administrativa."
         )
+

@@ -124,10 +124,10 @@ def call_meta_llama(
     except Exception as hf_err:
         err_msg = str(hf_err).lower()
         if "402" in err_msg or "payment required" in err_msg or "depleted your monthly included credits" in err_msg:
-            _HF_CREDITS_DEPLETED_UNTIL = now + 3600
+            _HF_CREDITS_DEPLETED_UNTIL = now + (30 * 24 * 60 * 60)
             logger.warning(
                 "[AI] Hugging Face Router: Créditos de inferência esgotados (402 Payment Required). "
-                "Pausando chamadas ao Hugging Face por 1 hora e ativando fallback automático."
+                "Pausando chamadas ao Hugging Face por 30 mês e ativando fallback automático."
             )
             return None
         logger.warning(
