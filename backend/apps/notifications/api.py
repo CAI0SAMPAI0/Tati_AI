@@ -1,3 +1,5 @@
+import logging
+import os
 from typing import List, Optional
 from ninja import Router
 from django.http import HttpRequest
@@ -12,6 +14,7 @@ from .schemas import (
 )
 from .services import NotificationService, BrevoEmailService, WahaWhatsAppService
 
+logger = logging.getLogger(__name__)
 User = get_user_model()
 notifications_router = Router(tags=["Notifications"])
 
@@ -131,54 +134,6 @@ def get_email_status(request: HttpRequest):
         "verified_sender": get_verified_sender_email(),
         "resend_configured": bool(resend_key),
         "smtp_configured": bool(smtp_host and os.getenv("SMTP_USER")),
-    }
-
-
-@notifications_router.post("/test", auth=auth_optional)
-@notifications_router.post("/send-all-test", auth=auth_optional)
-def send_test_notification(
-    request: HttpRequest,
-    username: Optional[str] = None,
-    notification_type: str = "streak_reminder",
-):
-    """
-    Dispara notificação de teste controlada.
-    Por padrão envia apenas 1 tipo solicitado ('streak_reminder', 'weekly_report', 'inactivity_nudge', 'streak_broken', 'streak_milestone', 'new_activity' ou 'all').
-    Permite acesso via token seguro de cron/webhook ou via login de professor/admin.
-    """
-    if not _validate_cron_access(request):
-        require_teacher(request.auth)
-    from django.contrib.auth import get_user_model
-    from ninja.errors import HttpError
-    from .services import NotificationSchedulerService
-
-    User = get_user_model()
-    is_admin = getattr(request.auth, "is_staff", False) or getattr(
-        request.auth, "is_programmer", False
-    )
-
-    if username and is_admin:
-        targets = list(User.objects.filter(username=username))
-    elif request.auth and hasattr(request.auth, "username"):
-        targets = [request.auth]
-    else:
-        targets = list(User.objects.filter(username="caio.sampaio")[:1])
-
-    if not targets:
-        raise HttpError(404, "Nenhum usuário alvo encontrado para o teste.")
-
-    all_results = {}
-    for target_user in targets:
-        res = NotificationSchedulerService.send_test_notification_to_user(
-            target_user, notification_type=notification_type, force=True
-        )
-        all_results[target_user.username] = res
-
-    return {
-        "ok": True,
-        "notification_type": notification_type,
-        "target_users": [u.username for u in targets],
-        "results": all_results,
     }
 
 
