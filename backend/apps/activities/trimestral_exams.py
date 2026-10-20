@@ -803,9 +803,9 @@ FALLBACK_QUESTION_BANKS: Dict[str, List[Dict[str, Any]]] = {
             "reading_text": "As summer heatwaves intensify across southern holiday destinations, travelers are rethinking their vacation habits in favor of 'coolcationing.' Rather than flocking to sweltering Mediterranean beaches, holidaymakers are increasingly choosing temperate northern escapes, such as the Norwegian fjords, the Scottish Highlands, and Swedish lakeside villages. Travel sociologists note that this shift reflects not only a search for thermal comfort, but also a desire for tranquil, uncrowded natural landscapes where outdoor activities like hiking and wild swimming can be enjoyed without physical exhaustion. Hospitality surveys indicate that bookings in Nordic regions during peak summer months have surged by over thirty percent, signaling a lasting transformation in international leisure travel.",
             "question": "According to the passage, what primary motivation is driving travelers toward 'coolcationing'?",
             "options": [
-                "Escaping oppressive summer heat in search of comfortable, peaceful northern landscapes.",
                 "Taking advantage of discounted long-haul business airline fares.",
                 "Attending international electronic music festivals in coastal capitals.",
+                "Escaping oppressive summer heat in search of comfortable, peaceful northern landscapes.",
                 "Complying with municipal regulations prohibiting seaside sunbathing."
             ],
             "correct_answer": "Escaping oppressive summer heat in search of comfortable, peaceful northern landscapes.",
@@ -816,8 +816,8 @@ FALLBACK_QUESTION_BANKS: Dict[str, List[Dict[str, Any]]] = {
             "reading_text": "In historic European city centers such as Venice, Barcelona, and Amsterdam, the unchecked proliferation of short-term holiday rentals has ignited intense debate over housing affordability. While residential tourism brings substantial revenue to local hospitality businesses, long-term residents argue that converting residential apartments into lucrative tourist accommodation has driven rental prices to unsustainable levels. Young families and public sector workers find themselves priced out of neighborhoods their families inhabited for generations, eroding community ties and replacing local bakeries and bookshops with souvenir outlets. To preserve community life, several municipal councils have introduced strict quotas on holiday rental permits and imposed higher visitor taxes to fund affordable social housing.",
             "question": "What major negative consequence of short-term holiday rentals for local communities is highlighted in the text?",
             "options": [
-                "It drives housing costs up and forces long-term residents out of their traditional neighborhoods.",
                 "It completely stops international visitors from spending money in neighborhood cafes.",
+                "It drives housing costs up and forces long-term residents out of their traditional neighborhoods.",
                 "It prevents municipal public transportation networks from operating morning schedules.",
                 "It requires residential property owners to convert private living rooms into souvenir shops."
             ],
@@ -827,28 +827,28 @@ FALLBACK_QUESTION_BANKS: Dict[str, List[Dict[str, Any]]] = {
         {
             "type": "grammar",
             "question": "Complete the sentence using inversion: 'Not only _______ the prestigious international marathon, but she also raised thousands of pounds for a local children's hospital.'",
-            "options": ["did she complete", "she completed", "she did complete", "completed she"],
+            "options": ["she completed", "she did complete", "completed she", "did she complete"],
             "correct_answer": "did she complete",
             "explanation": "Negative adverbials placed at the beginning of a clause ('Not only...') trigger subject-auxiliary inversion ('did she complete').",
         },
         {
             "type": "grammar",
             "question": "Complete the third conditional sentence: 'If Marcus _______ the job offer in Edinburgh ten years ago, he would never have met his future wife at the neighborhood arts festival.'",
-            "options": ["hadn't accepted", "wouldn't accept", "didn't accept", "hasn't accepted"],
+            "options": ["wouldn't accept", "didn't accept", "hadn't accepted", "hasn't accepted"],
             "correct_answer": "hadn't accepted",
             "explanation": "Third conditional past counterfactual uses 'If + Past Perfect (hadn't accepted), would have + participle'.",
         },
         {
             "type": "vocabulary",
             "question": "Choose the word that best completes the sentence: 'After months of exhausting overtime, Clara decided to change jobs to strike a healthier _______ between her career and personal life.'",
-            "options": ["balance", "compromise", "equilibrium", "proportion"],
+            "options": ["compromise", "balance", "equilibrium", "proportion"],
             "correct_answer": "balance",
             "explanation": "'Strike a balance' is the established natural English collocation.",
         },
         {
             "type": "vocabulary",
             "question": "Choose the most appropriate adjective: 'Even during the stressful relocation to a new country, Liam remained remarkably _______ and handled each unexpected complication with calm patience.'",
-            "options": ["resilient", "negligible", "tentative", "fleeting"],
+            "options": ["negligible", "tentative", "resilient", "fleeting"],
             "correct_answer": "resilient",
             "explanation": "'Resilient' describes the capacity to recover quickly from difficulties and maintain emotional balance.",
         },
@@ -857,10 +857,10 @@ FALLBACK_QUESTION_BANKS: Dict[str, List[Dict[str, Any]]] = {
             "audio_text": "Podcast Host: In today's episode on holistic well-being, we welcome clinical psychologist Dr. Elena Foster. Dr. Foster explains that regular engagement with music—whether singing in a choir or listening to soothing acoustic compositions—lowers cortisol levels and stimulates dopamine pathways, providing significant therapeutic relief for chronic work stress and anxiety.",
             "question": "According to Dr. Foster, how does musical engagement support mental well-being?",
             "options": [
-                "It lowers stress hormone levels and stimulates neurotransmitters associated with relaxation.",
                 "It completely replaces the physiological necessity for sleep and physical exercise.",
                 "It causes individuals to avoid social interaction and live in total acoustic solitude.",
-                "It permanently eliminates the requirement for balanced nutrition in daily life."
+                "It permanently eliminates the requirement for balanced nutrition in daily life.",
+                "It lowers stress hormone levels and stimulates neurotransmitters associated with relaxation."
             ],
             "correct_answer": "It lowers stress hormone levels and stimulates neurotransmitters associated with relaxation.",
             "explanation": "Dr. Foster notes that music lowers cortisol levels and stimulates dopamine, alleviating chronic work stress.",
@@ -870,8 +870,8 @@ FALLBACK_QUESTION_BANKS: Dict[str, List[Dict[str, Any]]] = {
             "audio_text": "Radio Counselor: Welcome back. Listener Sarah from Leeds calls in regarding a life dilemma. She has received a major promotion that requires traveling abroad for eight months each year, but her longtime partner wants to settle down and purchase a family home in their hometown. Reconciling individual career aspiration with shared relational commitment is one of the most defining personal crossroads in adult life.",
             "question": "What core personal dilemma is Sarah navigating according to the radio broadcast?",
             "options": [
-                "Balancing a demanding international career opportunity with her relationship and shared life goals.",
                 "Choosing between opening a bakery or starting a commercial bookstore.",
+                "Balancing a demanding international career opportunity with her relationship and shared life goals.",
                 "Deciding whether to move into a university dormitory after retirement.",
                 "Selecting an appropriate training regimen for an upcoming athletic triathlon."
             ],
@@ -900,16 +900,16 @@ FALLBACK_QUESTION_BANKS: Dict[str, List[Dict[str, Any]]] = {
     "C1": [
         {
             "type": "reading",
-            "reading_text": "The existential dilemma posed by hyper-mobile contemporary careerism centers not merely on geographic displacement, but on the gradual erosion of long-term civic ties and communal roots. Historically, hermeneutic textual interpretation operated under the premise that behind every syntactical construct lay a conscious author possessing lived phenomenological experience, ethical accountability, and contextual awareness. When sophisticated neural architectures generate seemingly erudite treatises on jurisprudence, bioethics, or aesthetic theory without possessing internal semantic comprehension or existential stakes, readers are confronted with what philosophers term semantic dissociation. The proliferation of syntactically impeccable yet ethically unmoored prose threatens to debase public deliberation unless rigorous provenance frameworks and verification protocols are systematically embedded into digital dissemination channels.",
-            "question": "What philosophical concern regarding AI-generated text is highlighted in the excerpt?",
+            "reading_text": "In an increasingly relentless professional landscape, mid-career sabbaticals have evolved from an eccentric indulgence into a strategic mechanism for psychological recalibration. Organizational psychologists observe that individuals who deliberately interrupt extended periods of linear corporate ambition frequently experience a profound reordering of personal priorities. Rather than signifying burnout or apathy, stepping away from entrenched professional identities enables individuals to cultivate latent creative capacities, rebuild neglected kinship networks, and confront the existential disquiet that unceasing productivity often masks. Longitudinal studies suggest that professionals who undertake purposeful periods of unhurried contemplation return to vocational life with heightened cognitive flexibility, greater empathetic leadership, and a more sustainable orientation toward long-term achievement.",
+            "question": "According to organizational psychologists in the passage, what primary psychological benefit arises from taking a mid-career sabbatical?",
             "options": [
-                "The semantic dissociation between syntactical eloquence and conscious authorial intentionality.",
-                "The high computational electricity cost of training multimodal transformer layers.",
-                "The total inability of neural architectures to format complex legal citations accurately.",
-                "The replacement of peer-reviewed scientific journals by amateur personal blogs."
+                "It enables individuals to permanently abandon all professional responsibilities and obligations.",
+                "It guarantees an automatic promotion and salary doubling upon returning to corporate employment.",
+                "It facilitates a profound reordering of personal priorities and nurtures latent creative capacities.",
+                "It completely shields professionals from experiencing any future interpersonal conflicts at work."
             ],
-            "correct_answer": "The semantic dissociation between syntactical eloquence and conscious authorial intentionality.",
-            "explanation": "The passage examines 'semantic dissociation' where prose is syntactically impeccable yet produced without lived phenomenological experience or authorial intentionality.",
+            "correct_answer": "It facilitates a profound reordering of personal priorities and nurtures latent creative capacities.",
+            "explanation": "The text explains that stepping away from linear corporate ambition enables individuals to reorder personal priorities, cultivate latent creative capacities, and achieve psychological recalibration.",
         },
         {
             "type": "reading",
@@ -1054,29 +1054,29 @@ FALLBACK_QUESTION_BANKS: Dict[str, List[Dict[str, Any]]] = {
         },
         {
             "type": "listening",
-            "audio_text": "Philosophical Colloquium: It is a profound category mistake to conflate syntactical fluency with genuine cognitive interiority. When foundational neural architectures orchestrate dense philosophical lexicons, they are executing high-dimensional vector alignments rather than engaging in the fraught, dialectical search for ontological truth that characterizes human existential consciousness.",
-            "question": "What fundamental 'category mistake' does the colloquium speaker identify?",
+            "audio_text": "Sociological Colloquium: In contemporary gerontology and social psychology, researchers increasingly emphasize the irreplaceable role of non-kin companionate bonds in preserving cognitive vitality. While familial relationships are frequently bounded by intergenerational obligations and caretaking friction, long-term friendships founded on reciprocal vulnerability and shared intellectual memory provide an autonomous psychological sanctuary. Longitudinal data indicate that sustaining deep, non-obligatory friendships into late adulthood contributes significantly more to subjective life satisfaction than material wealth or inherited familial stature.",
+            "question": "What primary psychological distinction between long-term friendships and familial relationships is highlighted by the colloquium speaker?",
             "options": [
-                "Conflating statistical syntactical fluency with genuine cognitive interiority and conscious reflection.",
-                "Assuming that mechanical vector alignments require more electricity than organic neural tissue.",
-                "Believing that human philosophers cannot utilize digital writing processors for peer-reviewed monographs.",
-                "Claiming that high-dimensional mathematics has no legitimate application in computational linguistics."
+                "Friendships require substantial financial investments and legally binding contracts.",
+                "Non-kin companionate bonds offer an autonomous psychological sanctuary free of obligatory caretaking friction.",
+                "Familial obligations consistently improve cognitive vitality more than non-kin friendships.",
+                "Friendships inevitably dissolve as individuals transition into late adulthood."
             ],
-            "correct_answer": "Conflating statistical syntactical fluency with genuine cognitive interiority and conscious reflection.",
-            "explanation": "The speaker explicitly decries the category mistake of 'conflating syntactical fluency with genuine cognitive interiority.'",
+            "correct_answer": "Non-kin companionate bonds offer an autonomous psychological sanctuary free of obligatory caretaking friction.",
+            "explanation": "The speaker contrasts familial relationships bounded by obligation with friendships that provide an autonomous psychological sanctuary rooted in reciprocal vulnerability.",
         },
         {
             "type": "listening",
-            "audio_text": "Keynote Lecture: The perennial seduction of technocratic governance lies in its illusory promise of friction-free optimization. Yet political history demonstrates that when democratic contestation is supplanted by ostensibly neutral algorithmic metrics, normative ideological tensions are not resolved; they are merely concealed beneath an impenetrable veneer of quantitative inevitability.",
-            "question": "According to the lecturer, what occurs when algorithmic metrics supplant democratic contestation?",
+            "audio_text": "Urban Anthropology Forum: As commercial real estate pressures progressively commodify metropolitan spaces, public libraries persist as one of the few remaining secular sanctuaries predicated on unconditional hospitality. Unlike coffeehouses or shopping pavilions where belonging is strictly contingent on consumer expenditure, libraries validate civic presence without financial transactions. Sociologists observe that preserving non-commercial public commons is essential for cultivating spontaneous cross-class solidarity and mitigating urban social isolation.",
+            "question": "According to the speaker, what distinctive democratic characteristic sets public libraries apart from commercial metropolitan spaces?",
             "options": [
-                "Normative ideological tensions are merely concealed beneath a veneer of quantitative inevitability.",
-                "Societal governance achieves genuine impartiality free of historical bias or human error.",
-                "Elected parliaments immediately regain unanimous public trust and civic enthusiasm.",
-                "Economic market competition completely ceases across all industrialized democratic nations."
+                "They require visitors to purchase annual memberships before entering reading rooms.",
+                "They are exclusively situated in affluent suburban neighborhoods away from public transport.",
+                "They provide a non-commercial civic space that welcomes presence without requiring financial expenditure.",
+                "They replace traditional municipal government offices for official public voting."
             ],
-            "correct_answer": "Normative ideological tensions are merely concealed beneath a veneer of quantitative inevitability.",
-            "explanation": "The lecturer concludes that 'normative ideological tensions are not resolved; they are merely concealed beneath an impenetrable veneer of quantitative inevitability.'",
+            "correct_answer": "They provide a non-commercial civic space that welcomes presence without requiring financial expenditure.",
+            "explanation": "The speaker emphasizes that unlike commercial venues where presence depends on consumer spending, libraries validate civic presence without any financial transactions.",
         },
         {
             "type": "writing",
@@ -1612,6 +1612,12 @@ class ExamGeneratorService:
                 t["max_words"] = specs["writing_max_words"]
                 t["options"] = []
                 t["correct_answer"] = ""
+            else:
+                # Embaralha as alternativas para que a resposta correta nunca fique sempre na mesma letra
+                if isinstance(t.get("options"), list) and len(t["options"]) > 1:
+                    opts_shuffled = list(t["options"])
+                    random.shuffle(opts_shuffled)
+                    t["options"] = opts_shuffled
             items.append(t)
         return items
 
@@ -1772,15 +1778,38 @@ class TrimestralExamService:
     def _ensure_exam_has_writing(cls, exam: TrimestralExam) -> TrimestralExam:
         """
         Garante que exames pré-gerados ou em andamento no banco sempre possuam
-        ao menos 1 questão de writing e 1 de speaking calibradas para o nível.
+        ao menos 1 questão de writing e 1 de speaking calibradas para o nível,
+        e que as alternativas de múltipla escolha estejam devidamente distribuídas (não todas em A).
         """
         qs = exam.questions or []
         has_writing = any(str(q.get("type", "")).lower().strip() == "writing" for q in qs)
-        if not has_writing:
-            target_len = len(qs) if len(qs) >= 8 else 10
-            updated_qs = ExamGeneratorService._normalize_questions(qs, target_len, exam.level or "A1")
-            exam.questions = updated_qs
-            exam.total_questions = len(updated_qs)
+        has_speaking = any(str(q.get("type", "")).lower().strip() == "speaking" for q in qs)
+        
+        # Embaralha as alternativas de qualquer questão que ainda tenha o gabarito na letra A (índice 0)
+        options_fixed = False
+        for q in qs:
+            q_type = str(q.get("type", "")).lower().strip()
+            if q_type not in ("writing", "speaking"):
+                opts = q.get("options")
+                correct = q.get("correct_answer")
+                if isinstance(opts, list) and len(opts) > 1:
+                    if opts[0] == correct:
+                        shuffled = list(opts)
+                        for _ in range(10):
+                            random.shuffle(shuffled)
+                            if shuffled[0] != correct:
+                                break
+                        q["options"] = shuffled
+                        options_fixed = True
+
+        if not has_writing or not has_speaking or options_fixed:
+            if not has_writing or not has_speaking:
+                target_len = len(qs) if len(qs) >= 8 else 10
+                updated_qs = ExamGeneratorService._normalize_questions(qs, target_len, exam.level or "A1")
+                exam.questions = updated_qs
+                exam.total_questions = len(updated_qs)
+            else:
+                exam.questions = qs
             exam.save(update_fields=["questions", "total_questions"])
         return exam
 

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { SidebarActivities } from '@/components/activities/sidebar-activities';
 import { MainHeader } from '@/components/layout/main-header';
 import { Button } from '@/components/ui/button';
+import { DialogModal } from '@/components/ui/dialog-modal';
 import { useSidebarState } from '@/hooks/useSidebarState';
 import { useAuth } from '@/hooks/useAuth';
 import { apiGet, apiPost } from '@/lib/api/client';
@@ -35,6 +36,7 @@ import {
   Pause,
   Mic,
   Square,
+  AlertTriangle,
 } from 'lucide-react';
 
 // TYPES
@@ -228,6 +230,7 @@ export default function ExamsClientPage() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [recordedAudioB64, setRecordedAudioB64] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
 
   // Exam result
@@ -541,21 +544,16 @@ export default function ExamsClientPage() {
     }
   };
 
-  // Submit Exam
-  const handleSubmitExam = async () => {
+  // Open submit confirmation modal
+  const handleOpenSubmitModal = () => {
     if (!activeExam) return;
+    setShowSubmitModal(true);
+  };
 
-    const answeredCount = activeExam.questions.filter(
-      (q) => Boolean(answers[q.id]) || Boolean(recordedAudioB64[q.id])
-    ).length;
-    const totalCount = activeExam.questions.length;
-
-    if (answeredCount < totalCount) {
-      const confirmSubmit = window.confirm(
-        `You answered ${answeredCount} of ${totalCount} questions. Do you want to submit anyway?`
-      );
-      if (!confirmSubmit) return;
-    }
+  // Submit Exam
+  const handleExecuteSubmit = async () => {
+    if (!activeExam) return;
+    setShowSubmitModal(false);
 
     try {
       setIsSubmitting(true);
@@ -680,6 +678,10 @@ export default function ExamsClientPage() {
       (q) => Boolean(answers[q.id]) || Boolean(recordedAudioB64[q.id])
     ).length;
     const progressPercent = Math.round((answeredTotal / activeExam.total_questions) * 100);
+    const unansweredQuestions = activeExam.questions.filter(
+      (q) => !Boolean(answers[q.id]) && !Boolean(recordedAudioB64[q.id])
+    );
+    const hasUnanswered = unansweredQuestions.length > 0;
 
     const scrollToQuestion = (qId: string) => {
       const el = document.getElementById(`question-card-${qId}`);
@@ -721,7 +723,7 @@ export default function ExamsClientPage() {
                 </span>
                 <button
                   type="button"
-                  onClick={handleSubmitExam}
+                  onClick={handleOpenSubmitModal}
                   disabled={isSubmitting}
                   className="px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-bold shadow-sm transition-all flex items-center gap-1.5 active:scale-95 disabled:opacity-50 cursor-pointer"
                 >
@@ -802,8 +804,8 @@ export default function ExamsClientPage() {
                         {q.type === 'grammar' && "Applied Grammar"}
                         {q.type === 'vocabulary' && "Vocabulary in Context"}
                         {q.type === 'listening' && "Listening Comprehension"}
-                        {q.type === 'writing' && "✍️ Written Expression & Composition"}
-                        {q.type === 'speaking' && "🎙 Oral Expression & Speaking"}
+                        {q.type === 'writing' && "Written Expression & Composition"}
+                        {q.type === 'speaking' && "Oral Expression & Speaking"}
                       </span>
                     </div>
 
@@ -1068,7 +1070,7 @@ export default function ExamsClientPage() {
 
             <button
               type="button"
-              onClick={handleSubmitExam}
+              onClick={handleOpenSubmitModal}
               disabled={isSubmitting}
               className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-success text-white font-bold text-sm hover:opacity-90 shadow-md flex items-center justify-center gap-2.5 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
             >
@@ -1082,6 +1084,120 @@ export default function ExamsClientPage() {
             </button>
           </div>
         </div>
+
+        {/* Submit Confirmation Modal */}
+        <DialogModal
+          isOpen={showSubmitModal}
+          onClose={() => !isSubmitting && setShowSubmitModal(false)}
+          title={hasUnanswered ? "Incomplete Exam Submission" : "Submit Quarterly Exam"}
+          size="md"
+        >
+          <div className="space-y-5 pt-1">
+            {hasUnanswered ? (
+              <>
+                <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-500 flex items-center justify-center shrink-0 mt-0.5">
+                    <AlertTriangle size={22} />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-bold text-text">
+                      You answered {answeredTotal} of {activeExam.total_questions} questions
+                    </h4>
+                    <p className="text-xs text-text-muted leading-relaxed">
+                      You have <span className="font-bold text-amber-600 dark:text-amber-400">{unansweredQuestions.length} unanswered {unansweredQuestions.length === 1 ? 'question' : 'questions'}</span>. Any unanswered questions will receive <strong className="text-danger">0 points</strong>.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-surface border border-border rounded-xl">
+                  <p className="text-xs font-semibold text-text-muted mb-2">Unanswered Questions:</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {unansweredQuestions.map((q) => {
+                      const qIdx = activeExam.questions.findIndex((item) => item.id === q.id);
+                      return (
+                        <button
+                          key={q.id}
+                          type="button"
+                          onClick={() => {
+                            setShowSubmitModal(false);
+                            setTimeout(() => scrollToQuestion(q.id), 150);
+                          }}
+                          className="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500/25 transition-all cursor-pointer"
+                          title="Jump to this question"
+                        >
+                          Q{qIdx + 1} ({q.type})
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <p className="text-xs text-text-muted">
+                  Do you want to review the missing questions or submit anyway?
+                </p>
+
+                <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-2.5 pt-2 border-t border-border">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      setShowSubmitModal(false);
+                      if (unansweredQuestions.length > 0) {
+                        setTimeout(() => scrollToQuestion(unansweredQuestions[0].id), 150);
+                      }
+                    }}
+                    className="w-full sm:w-auto text-xs font-bold cursor-pointer"
+                  >
+                    Review Missing Questions
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handleExecuteSubmit}
+                    disabled={isSubmitting}
+                    className="w-full sm:w-auto text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white border-0 shadow-sm cursor-pointer"
+                  >
+                    {isSubmitting ? 'Submitting...' : 'Submit Anyway'}
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="p-4 rounded-2xl bg-success/10 border border-success/30 flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-success/20 text-success flex items-center justify-center shrink-0 mt-0.5">
+                    <CheckCircle2 size={22} />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-bold text-text">
+                      All {activeExam.total_questions} Questions Answered! 🎉
+                    </h4>
+                    <p className="text-xs text-text-muted leading-relaxed">
+                      You are about to submit your exam for pedagogical review. Teacher Tati and the diagnostic system will evaluate your responses and calibrate your CEFR level.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-2.5 pt-2 border-t border-border">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => setShowSubmitModal(false)}
+                    className="w-full sm:w-auto text-xs font-bold cursor-pointer"
+                  >
+                    Keep Reviewing
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handleExecuteSubmit}
+                    disabled={isSubmitting}
+                    className="w-full sm:w-auto text-xs font-bold bg-success hover:bg-success/90 text-white border-0 shadow-sm cursor-pointer"
+                  >
+                    {isSubmitting ? 'Submitting...' : 'Yes, Finalize & Submit'}
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        </DialogModal>
       </div>
     );
   }
