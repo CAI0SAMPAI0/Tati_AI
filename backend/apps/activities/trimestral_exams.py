@@ -426,9 +426,9 @@ def evaluate_writing_with_ai(
         groq_client = ExamGeneratorService._get_groq_client()
         if groq_client and eval_prompt:
             for model_name in [
-                getattr(settings, "GROQ_MODEL", "openai/gpt-oss-120b"),
-                "openai/gpt-oss-120b",
-                "openai/gpt-oss-20b",
+                getattr(settings, "GROQ_MODEL", "llama-3.3-70b-versatile"),
+                "llama-3.3-70b-versatile",
+                "llama-3.1-8b-instant",
             ]:
                 try:
                     res = groq_client.chat.completions.create(
@@ -1282,7 +1282,7 @@ class ExamGeneratorService:
         # Coleta e sorteia uma amostra das atividades reais da plataforma para o nível
         all_activities = cls._fetch_level_activities(lvl)
         sampled_activities = {
-            cat: (random.sample(items, k=min(10, len(items))) if items else [])
+            cat: (random.sample(items, k=min(4, len(items))) if items else [])
             for cat, items in all_activities.items()
         }
         cefr_context = cls._fetch_cefr_context(lvl, sampled_activities=sampled_activities)
@@ -1351,53 +1351,27 @@ class ExamGeneratorService:
         )
 
 
-        # 1. Tenta via Groq
-        groq_client = cls._get_groq_client()
-        candidate_models = [
-            getattr(settings, "GROQ_MODEL", "openai/gpt-oss-120b"),
-            "openai/gpt-oss-120b",
-            "openai/gpt-oss-20b",
-            "qwen/qwen3.8-27b",
-        ]
-
-        if groq_client:
-            for model_name in candidate_models:
-                try:
-                    res = groq_client.chat.completions.create(
-                        model=model_name,
-                        messages=[
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_prompt},
-                        ],
-                        response_format={"type": "json_object"},
-                        temperature=0.75,
-                    )
-                    content = res.choices[0].message.content
-                    if content:
-                        parsed = json.loads(content)
-                        questions = parsed.get("questions", [])
-                        if questions and len(questions) >= 6:
-                            logger.info(f"[ExamGeneratorService] Exame gerado via Groq ({model_name}) para nível {lvl} com {len(questions)} questões.")
-                            return cls._normalize_questions(questions, num_questions, lvl)
-                except Exception as e:
-                    logger.warning(f"[ExamGeneratorService] Falha no Groq com {model_name}: {e}")
-
-        # 2. Tenta via Gemini (com fallback para os modelos disponíveis)
+        # 1. Tenta via Gemini primeiro (janela de 1M tokens, sem limite de 8k TPM e alta velocidade)
         try:
+            from apps.chat.audio_service import get_gemini_client
             from google import genai
             from google.genai import types
 
-            gemini_key = getattr(settings, "GEMINI_API_KEY", None) or os.getenv("GEMINI_API_KEY")
-            if gemini_key:
-                client = genai.Client(api_key=gemini_key.strip())
-                for g_model in ["gemini-flash-latest", "gemini-3.8-flash", "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-2.5-flash-lite", "gemini-2.5-flash"]:
+            client = get_gemini_client()
+            if not client:
+                gemini_key = getattr(settings, "GEMINI_API_KEY", None) or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+                if gemini_key:
+                    client = genai.Client(api_key=gemini_key.strip())
+
+            if client:
+                for g_model in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-flash-lite", "gemini-1.5-flash"]:
                     try:
                         response = client.models.generate_content(
                             model=g_model,
                             contents=f"{system_prompt}\n\n{user_prompt}",
                             config=types.GenerateContentConfig(
                                 response_mime_type="application/json",
-                                temperature=0.75,
+                                temperature=0.7,
                             ),
                         )
                         if response and response.text:
@@ -1410,6 +1384,36 @@ class ExamGeneratorService:
                         logger.warning(f"[ExamGeneratorService] Falha no modelo Gemini {g_model}: {gemini_try_err}")
         except Exception as e:
             logger.warning(f"[ExamGeneratorService] Falha geral no Gemini: {e}")
+
+        # 2. Tenta via Groq (com modelos estáveis Llama de alto throughput e sem erro de 8k TPM)
+        groq_client = cls._get_groq_client()
+        candidate_models = [
+            getattr(settings, "GROQ_MODEL", "llama-3.3-70b-versatile"),
+            "llama-3.3-70b-versatile",
+            "llama-3.1-8b-instant",
+        ]
+
+        if groq_client:
+            for model_name in candidate_models:
+                try:
+                    res = groq_client.chat.completions.create(
+                        model=model_name,
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt},
+                        ],
+                        response_format={"type": "json_object"},
+                        temperature=0.7,
+                    )
+                    raw_content = res.choices[0].message.content
+                    if raw_content:
+                        parsed = json.loads(raw_content)
+                        questions = parsed.get("questions", [])
+                        if questions and len(questions) >= 6:
+                            logger.info(f"[ExamGeneratorService] Exame gerado via Groq ({model_name}) para nível {lvl} com {len(questions)} questões.")
+                            return cls._normalize_questions(questions, num_questions, lvl)
+                except Exception as e:
+                    logger.warning(f"[ExamGeneratorService] Falha no Groq com {model_name}: {e}")
 
         # 3. Fallback Pedagógico Calibrado por Nível (100% em Inglês e sem imagens)
         logger.info(f"[ExamGeneratorService] Utilizando fallback estruturado calibrado para o nível {lvl}.")

@@ -1973,8 +1973,7 @@ def get_trimestral_exam_detail(request: HttpRequest, exam_id: str):
     return detail
 
 
-@exams_router.post("/trimestral/reset", auth=auth_required)
-@exams_router.post("/exams/trimestral/reset", auth=auth_required)
+@exams_router.api_operation(["POST", "GET"], "/trimestral/reset", auth=auth_required)
 def reset_trimestral_exam(request: HttpRequest):
     """
     Endpoint de teste para desenvolvedores: reseta os exames do usuário para testar novamente.
