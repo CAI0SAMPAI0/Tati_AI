@@ -319,11 +319,10 @@ def evaluate_speaking_with_gemini(
         try:
             from google.genai import types
             gemini_models = [
-                os.getenv("GEMINI_AUDIO_MODEL", "gemini-2.5-flash"),
-                "gemini-2.5-flash",
-                "gemini-2.0-flash",
+                os.getenv("GEMINI_AUDIO_MODEL", "gemini-flash-latest"),
+                "gemini-flash-latest",
                 "gemini-3.8-flash",
-                "gemini-3.5-flash-lite",
+                "gemini-3.1-flash-lite",
             ]
             unique_models = []
             for gm in gemini_models:
@@ -426,9 +425,10 @@ def evaluate_writing_with_ai(
         groq_client = ExamGeneratorService._get_groq_client()
         if groq_client and eval_prompt:
             for model_name in [
-                getattr(settings, "GROQ_MODEL", "llama-3.3-70b-versatile"),
-                "llama-3.3-70b-versatile",
-                "llama-3.1-8b-instant",
+                getattr(settings, "GROQ_MODEL", "openai/gpt-oss-120b"),
+                "openai/gpt-oss-120b",
+                "openai/gpt-oss-20b",
+                "qwen/qwen3.8-27b",
             ]:
                 try:
                     res = groq_client.chat.completions.create(
@@ -471,7 +471,7 @@ def evaluate_writing_with_ai(
 
         client = get_gemini_client()
         if client and eval_prompt:
-            for g_model in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-flash-lite"]:
+            for g_model in ["gemini-flash-latest", "gemini-3.8-flash", "gemini-3.1-flash-lite"]:
                 try:
                     resp = client.models.generate_content(
                         model=g_model,
@@ -1364,7 +1364,7 @@ class ExamGeneratorService:
                     client = genai.Client(api_key=gemini_key.strip())
 
             if client:
-                for g_model in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-flash-lite", "gemini-1.5-flash"]:
+                for g_model in ["gemini-flash-latest", "gemini-3.8-flash", "gemini-3.1-flash-lite"]:
                     try:
                         response = client.models.generate_content(
                             model=g_model,
@@ -1388,9 +1388,10 @@ class ExamGeneratorService:
         # 2. Tenta via Groq (com modelos estáveis Llama de alto throughput e sem erro de 8k TPM)
         groq_client = cls._get_groq_client()
         candidate_models = [
-            getattr(settings, "GROQ_MODEL", "llama-3.3-70b-versatile"),
-            "llama-3.3-70b-versatile",
-            "llama-3.1-8b-instant",
+            getattr(settings, "GROQ_MODEL", "openai/gpt-oss-120b"),
+            "openai/gpt-oss-120b",
+            "openai/gpt-oss-20b",
+            "qwen/qwen3.8-27b",
         ]
 
         if groq_client:

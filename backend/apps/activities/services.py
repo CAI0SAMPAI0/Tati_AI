@@ -2791,10 +2791,7 @@ class SpeechService:
             env_model,
             "gemini-flash-latest",
             "gemini-3.8-flash",
-            "gemini-3.5-flash",
             "gemini-3.1-flash-lite",
-            "gemini-2.5-flash-lite",
-            "gemini-2.5-flash",
         ]
         unique_models = []
         for m in models_to_try:
@@ -2827,7 +2824,11 @@ class SpeechService:
                     if isinstance(parsed, dict) and "score" in parsed:
                         return parsed
             except Exception as e:
+                err_str = str(e)
                 logger.warning(f"[SpeechService] Tentativa multimodal com modelo {model} falhou: {e}")
+                if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "quota" in err_str.lower():
+                    logger.warning("[SpeechService] Quota Gemini esgotada (429). Interrompendo tentativas e acionando Groq Whisper diretamente.")
+                    break
         return None
 
 
