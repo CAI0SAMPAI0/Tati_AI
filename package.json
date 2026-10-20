@@ -5,6 +5,7 @@
   "description": "Teacher Tati - Plataforma de Aprendizado de Inglês com IA",
   "workspaces": [
     "frontend",
+    "frontend-vue",
     "apps/*",
     "packages/*"
   ],
@@ -14,6 +15,8 @@
     "dev": "npm run dev --workspace frontend",
     "dev:frontend": "npm run dev --workspace frontend",
     "dev:frontend:clean": "npm run dev:clean --workspace frontend",
+    "dev:vue": "npm run dev --workspace frontend-vue",
+    "build:vue": "npm run build --workspace frontend-vue",
     "dev:hub": "npm run dev --workspace @tati/hub-site",
     "build:hub": "npm run build --workspace @tati/hub-site",
     "install-pwa": "node pwa/create-pwa-icons.js && echo 'PWA files created successfully!'",

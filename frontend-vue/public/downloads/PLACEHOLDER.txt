@@ -1,0 +1,1 @@
+Coloque o arquivo tati-ai.apk aqui após gerar no Android Studio.
