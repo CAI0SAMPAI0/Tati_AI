@@ -68,16 +68,14 @@ export function Sidebar({
     queryFn: () => apiGet<AccessControl>(ENDPOINTS.ACCESS_CONTROL),
     staleTime: 60_000,
   });
-  const { data: subStatus } = useQuery({
-    queryKey: ['payments-status'],
-    queryFn: () => apiGet<{ status?: string }>(ENDPOINTS.PAYMENTS_STATUS),
-    staleTime: 60_000,
-  });
 
   const showDashboard = canAccessDashboard(user, access);
   const showActivities = isStaff(user) || access?.can_access_activities || access?.free_mode;
 
-  const isPremium = subStatus?.status === 'active' || isStaff(user);
+  const isPremium =
+    Boolean(access?.full_access) ||
+    Boolean(access?.plan_type && access.plan_type !== 'free') ||
+    isStaff(user);
 
   const handleDeleteAll = async () => {
     if (!confirm('⚠️ Delete ALL conversations?')) return;

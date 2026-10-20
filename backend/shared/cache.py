@@ -5,9 +5,6 @@ from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
-#    CACHE HELPERS (DJANGO CORE CACHE + REDIS)                          
-
-
 async def cache_get(key: str) -> Optional[Any]:
     """
     Obtém valor do cache do Django de forma assíncrona (não bloqueante).

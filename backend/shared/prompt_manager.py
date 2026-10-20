@@ -58,9 +58,10 @@ class PromptManager:
     def extract_section(cls, content: str, section_title: str) -> str:
         """
         Extrai o bloco de texto ou código de uma seção específica do Markdown (ex: '## Flashcards Generator').
+        Ignora subtítulos '###' dentro da seção, parando apenas no próximo '## ' de nível 2 ou no fim do arquivo.
         """
-        pattern = rf"##\s+{re.escape(section_title)}\s*\n(?:```(?:[a-zA-Z0-9_-]+)?\n)?(.*?)(?:```|\n##|\Z)"
-        match = re.search(pattern, content, re.DOTALL | re.IGNORECASE)
+        pattern = rf"^##\s+{re.escape(section_title)}\s*\r?\n(?:```(?:[a-zA-Z0-9_-]+)?\r?\n)?(.*?)(?:```|\r?\n##(?!#)|\Z)"
+        match = re.search(pattern, content, re.DOTALL | re.IGNORECASE | re.MULTILINE)
         if match:
             return match.group(1).strip()
         return ""
@@ -114,4 +115,3 @@ class PromptManager:
         """Limpa o cache em memória para forçar releitura dos arquivos."""
         cls._CACHE.clear()
         cls._MTIMES.clear()
-

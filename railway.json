@@ -5,6 +5,7 @@
     "dockerfilePath": "backend/Dockerfile.api"
   },
   "deploy": {
+    "sleepApplication": true,
     "restartPolicyType": "ON_FAILURE"
   }
 }

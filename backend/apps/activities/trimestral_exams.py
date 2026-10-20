@@ -42,6 +42,8 @@ LEVEL_ORDER = ["A1", "A2", "B1", "B2", "C1", "C2"]
 CEFR_LEVEL_SPECS: Dict[str, Dict[str, Any]] = {
     "A1": {
         "name": "Breakthrough",
+        "writing_min_words": 25,
+        "writing_max_words": 45,
         "reading_min_words": 35,
         "reading_max_words": 55,
         "reading_descriptors": "Very short, simple texts (notices, posters, personal messages, simple daily routines) using basic everyday vocabulary and simple SVO sentence structures.",
@@ -63,6 +65,8 @@ CEFR_LEVEL_SPECS: Dict[str, Dict[str, Any]] = {
     },
     "A2": {
         "name": "Waystage",
+        "writing_min_words": 40,
+        "writing_max_words": 65,
         "reading_min_words": 55,
         "reading_max_words": 85,
         "reading_descriptors": "Short, simple factual texts on familiar matters (emails, menus, advertisements, simple travel descriptions, personal letters).",
@@ -84,6 +88,8 @@ CEFR_LEVEL_SPECS: Dict[str, Dict[str, Any]] = {
     },
     "B1": {
         "name": "Threshold",
+        "writing_min_words": 60,
+        "writing_max_words": 95,
         "reading_min_words": 85,
         "reading_max_words": 130,
         "reading_descriptors": "Straightforward factual texts on subjects related to fields of interest or work (short articles, personal narratives, cultural explanations, informational brochures).",
@@ -105,6 +111,8 @@ CEFR_LEVEL_SPECS: Dict[str, Dict[str, Any]] = {
     },
     "B2": {
         "name": "Vantage",
+        "writing_min_words": 90,
+        "writing_max_words": 130,
         "reading_min_words": 130,
         "reading_max_words": 180,
         "reading_descriptors": "Articles and reports concerned with contemporary problems in which writers adopt particular stances or viewpoints; complex factual and analytical passages.",
@@ -126,6 +134,8 @@ CEFR_LEVEL_SPECS: Dict[str, Dict[str, Any]] = {
     },
     "C1": {
         "name": "Effective Operational Proficiency",
+        "writing_min_words": 120,
+        "writing_max_words": 170,
         "reading_min_words": 180,
         "reading_max_words": 240,
         "reading_descriptors": "Long, complex texts appreciating subtle distinctions of style and implicit as well as explicit meaning; analytical essays, literary criticism, academic reviews.",
@@ -147,6 +157,8 @@ CEFR_LEVEL_SPECS: Dict[str, Dict[str, Any]] = {
     },
     "C2": {
         "name": "Mastery",
+        "writing_min_words": 150,
+        "writing_max_words": 220,
         "reading_min_words": 220,
         "reading_max_words": 280,
         "reading_descriptors": "Dense, highly conceptual texts, critical philosophical debates, subtle satire, or advanced scholarly writing with complex register shifts.",
@@ -368,6 +380,142 @@ def evaluate_speaking_with_gemini(
     }
 
 
+def evaluate_writing_with_ai(
+    student_text: Optional[str],
+    question_prompt: str,
+    level: str = "A1",
+    min_words: int = 25,
+    max_words: int = 60,
+) -> Dict[str, Any]:
+    """
+    Avalia a resposta escrita (writing) do aluno no exame trimestral seguindo a rubrica de 10 pontos:
+    - Grammar and agreement: 3 pts
+    - Sentence construction: 2 pts
+    - Vocabulary: 2 pts
+    - Coherence and organization: 2 pts
+    - Task completion: 1 pt
+    NUNCA desconta pontos por erros de pontuação ou vírgulas (Punctuation exclusion policy).
+    """
+    cleaned = (student_text or "").strip()
+    words = [w for w in cleaned.split() if w.strip()]
+    word_count = len(words)
+
+    if not cleaned or word_count < 3:
+        return {
+            "passed": False,
+            "score": 0,
+            "points_out_of_10": 0,
+            "feedback": "Insufficient written response provided. Please write an original paragraph in English to complete this writing task.",
+            "improved_version": "",
+        }
+
+    specs = get_cefr_level_specs(level)
+    eval_prompt = PromptManager.get_prompt(
+        "exam_writing_eval",
+        section="Writing Evaluation Prompt",
+        level=level,
+        level_name=specs["name"],
+        question_prompt=question_prompt,
+        student_text=cleaned,
+        min_words=min_words,
+        max_words=max_words,
+    )
+
+    # 1. Tenta via Groq
+    try:
+        groq_client = ExamGeneratorService._get_groq_client()
+        if groq_client and eval_prompt:
+            for model_name in [
+                getattr(settings, "GROQ_MODEL", "openai/gpt-oss-120b"),
+                "openai/gpt-oss-120b",
+                "openai/gpt-oss-20b",
+            ]:
+                try:
+                    res = groq_client.chat.completions.create(
+                        model=model_name,
+                        messages=[
+                            {
+                                "role": "system",
+                                "content": "You are a fair CEFR English writing examiner. Return valid JSON only. Never deduct points for punctuation or comma errors.",
+                            },
+                            {"role": "user", "content": eval_prompt},
+                        ],
+                        response_format={"type": "json_object"},
+                        temperature=0.2,
+                    )
+                    raw = res.choices[0].message.content
+                    if raw:
+                        data = json.loads(raw.strip())
+                        pts10 = int(round(float(data.get("points_out_of_10", round(float(data.get("score", 75)) / 10)))))
+                        pts10 = max(0, min(10, pts10))
+                        score = int(data.get("score", pts10 * 10))
+                        passed = bool(data.get("passed", score >= 60))
+                        feedback = str(data.get("feedback", "Good written paragraph in English.")).strip()
+                        improved = str(data.get("improved_version", "")).strip()
+                        return {
+                            "passed": passed,
+                            "score": score,
+                            "points_out_of_10": pts10,
+                            "feedback": feedback,
+                            "improved_version": improved,
+                        }
+                except Exception as groq_err:
+                    logger.warning(f"[WritingEval] Falha no Groq ({model_name}): {groq_err}")
+    except Exception as e:
+        logger.warning(f"[WritingEval] Erro ao inicializar Groq: {e}")
+
+    # 2. Tenta via Gemini
+    try:
+        from apps.chat.audio_service import get_gemini_client
+        from google.genai import types
+
+        client = get_gemini_client()
+        if client and eval_prompt:
+            for g_model in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-flash-lite"]:
+                try:
+                    resp = client.models.generate_content(
+                        model=g_model,
+                        contents=eval_prompt,
+                        config=types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                            temperature=0.2,
+                        ),
+                    )
+                    if resp and resp.text:
+                        data = json.loads(resp.text.strip())
+                        pts10 = int(round(float(data.get("points_out_of_10", round(float(data.get("score", 75)) / 10)))))
+                        pts10 = max(0, min(10, pts10))
+                        score = int(data.get("score", pts10 * 10))
+                        passed = bool(data.get("passed", score >= 60))
+                        feedback = str(data.get("feedback", "Good written paragraph in English.")).strip()
+                        improved = str(data.get("improved_version", "")).strip()
+                        return {
+                            "passed": passed,
+                            "score": score,
+                            "points_out_of_10": pts10,
+                            "feedback": feedback,
+                            "improved_version": improved,
+                        }
+                except Exception as gem_err:
+                    logger.warning(f"[WritingEval] Falha no Gemini ({g_model}): {gem_err}")
+    except Exception as e:
+        logger.warning(f"[WritingEval] Erro geral no Gemini: {e}")
+
+    # 3. Fallback determinístico caso as APIs de IA estejam indisponíveis
+    pts10 = 8 if word_count >= max(10, int(min_words * 0.7)) else 6
+    score = pts10 * 10
+    return {
+        "passed": score >= 60,
+        "score": score,
+        "points_out_of_10": pts10,
+        "feedback": (
+            f"Your written response ({word_count} words) communicates clear ideas appropriate for CEFR {level}. "
+            f"Evaluated on grammar and agreement, sentence construction, vocabulary, coherence, and task completion (punctuation errors excluded)."
+        ),
+        "improved_version": cleaned,
+    }
+
+
 FALLBACK_QUESTION_BANKS: Dict[str, List[Dict[str, Any]]] = {
     "A1": [
         {
@@ -441,13 +589,13 @@ FALLBACK_QUESTION_BANKS: Dict[str, List[Dict[str, Any]]] = {
             "explanation": "The server states: 'A large black coffee is two dollars'.",
         },
         {
-            "type": "speaking",
-            "question": "Please speak in English for 15 to 25 seconds: Introduce yourself, mention where you live, and describe what you like to do in your free time.",
-            "options": ["Record your voice response in English"],
-            "correct_answer": "Record your voice response in English",
-            "explanation": "Evaluated on CEFR A1 spoken production: basic vocabulary, clear pronunciation of everyday words, and simple sentence structures.",
-            "min_seconds": 15,
-            "max_seconds": 30,
+            "type": "writing",
+            "question": "Write a short paragraph in English (25 to 45 words) introducing yourself, describing where you live, and mentioning what you enjoy doing on weekends.",
+            "options": [],
+            "correct_answer": "",
+            "explanation": "Evaluated on CEFR A1 written production (up to 10 points): grammar and verb agreement, sentence construction, everyday vocabulary, coherence, and task completion (punctuation errors excluded).",
+            "min_words": 25,
+            "max_words": 45,
         },
         {
             "type": "speaking",
@@ -536,13 +684,13 @@ FALLBACK_QUESTION_BANKS: Dict[str, List[Dict[str, Any]]] = {
             "explanation": "The guide notes: 'The ancient Roman gallery is located on the second floor'.",
         },
         {
-            "type": "speaking",
-            "question": "Please speak in English for 20 to 35 seconds: Describe a memorable trip or holiday you took in the past. Mention where you went, who was with you, and what you enjoyed most.",
-            "options": ["Record your voice response in English"],
-            "correct_answer": "Record your voice response in English",
-            "explanation": "Evaluated on CEFR A2 ability to narrate past events with simple connected sentences and past verb forms.",
-            "min_seconds": 20,
-            "max_seconds": 45,
+            "type": "writing",
+            "question": "Write a paragraph in English (35 to 60 words) describing a memorable trip or weekend activity you did recently. Explain where you went, who was with you, and why you enjoyed it.",
+            "options": [],
+            "correct_answer": "",
+            "explanation": "Evaluated on CEFR A2 written production (up to 10 points): past tense grammar and agreement, connected sentence construction, appropriate vocabulary, coherence, and task completion (punctuation errors excluded).",
+            "min_words": 35,
+            "max_words": 60,
         },
         {
             "type": "speaking",
@@ -631,13 +779,13 @@ FALLBACK_QUESTION_BANKS: Dict[str, List[Dict[str, Any]]] = {
             "explanation": "The chair explicitly announces: 'lunch will be served in the pavilion garden at 1:15 PM'.",
         },
         {
-            "type": "speaking",
-            "question": "Please speak in English for 30 to 50 seconds: Express your opinion on whether working remotely or in a physical office is more beneficial for young professionals, providing reasons and examples.",
-            "options": ["Record your voice response in English"],
-            "correct_answer": "Record your voice response in English",
-            "explanation": "Evaluated on CEFR B1 qualitative criteria (Table 3): ability to express personal viewpoints, connect linear ideas with logical connectors, and maintain comprehensibility.",
-            "min_seconds": 30,
-            "max_seconds": 60,
+            "type": "writing",
+            "question": "Write a structured paragraph in English (50 to 80 words) explaining whether you prefer studying or working remotely from home or in person, giving clear reasons and personal examples.",
+            "options": [],
+            "correct_answer": "",
+            "explanation": "Evaluated on CEFR B1 written production (up to 10 points): grammatical control and agreement, connected sentence structures, varied vocabulary, logical transitions, and task completion (punctuation errors excluded).",
+            "min_words": 50,
+            "max_words": 80,
         },
         {
             "type": "speaking",
@@ -731,13 +879,13 @@ FALLBACK_QUESTION_BANKS: Dict[str, List[Dict[str, Any]]] = {
             "explanation": "The keynote focuses on establishing legal accountability and liability frameworks for autonomous vehicle algorithms.",
         },
         {
-            "type": "speaking",
-            "question": "Please speak in English for 45 to 70 seconds: Analyze the advantages and ethical drawbacks of artificial intelligence in education, arguing whether automated grading and AI tutoring enhance or jeopardize student critical thinking.",
-            "options": ["Record your voice response in English"],
-            "correct_answer": "Record your voice response in English",
-            "explanation": "Evaluated on CEFR B2 qualitative criteria (Table 3): range of complex argument vocabulary, grammatical precision with complex sentence structures, and smooth logical transitions.",
-            "min_seconds": 45,
-            "max_seconds": 80,
+            "type": "writing",
+            "question": "Write an analytical paragraph in English (70 to 110 words) discussing how artificial intelligence and digital automation are reshaping modern workplaces, weighing both productivity benefits and potential risks for professionals.",
+            "options": [],
+            "correct_answer": "",
+            "explanation": "Evaluated on CEFR B2 written production (up to 10 points): complex grammatical structures and agreement, subordinate sentence variety, precise academic/professional vocabulary, cohesive argumentation, and task completion (punctuation errors excluded).",
+            "min_words": 70,
+            "max_words": 110,
         },
         {
             "type": "speaking",
@@ -831,13 +979,13 @@ FALLBACK_QUESTION_BANKS: Dict[str, List[Dict[str, Any]]] = {
             "explanation": "The panelist highlights 'fragmented polyphonic recollections rather than linear causal timelines' resisting comfortable catharsis.",
         },
         {
-            "type": "speaking",
-            "question": "Please speak in English for 60 to 90 seconds: Critically examine how algorithmic curation in digital public squares affects democratic deliberation, evaluating whether algorithmic optimization facilitates pluralism or accelerates epistemic polarization.",
-            "options": ["Record your voice response in English"],
-            "correct_answer": "Record your voice response in English",
-            "explanation": "Evaluated on CEFR C1 qualitative criteria (Table 3): broad lexical range, effortless fluency, sophisticated grammatical structures, and seamless discursive coherence.",
-            "min_seconds": 60,
-            "max_seconds": 100,
+            "type": "writing",
+            "question": "Write a well-structured critical paragraph in English (90 to 140 words) evaluating the extent to which algorithmic recommendation systems in digital media influence public discourse and intellectual diversity.",
+            "options": [],
+            "correct_answer": "",
+            "explanation": "Evaluated on CEFR C1 written production (up to 10 points): advanced syntactic structures and agreement, sophisticated sentence construction, idiomatic and academic lexical precision, seamless discursive cohesion, and task completion (punctuation errors excluded).",
+            "min_words": 90,
+            "max_words": 140,
         },
         {
             "type": "speaking",
@@ -931,13 +1079,13 @@ FALLBACK_QUESTION_BANKS: Dict[str, List[Dict[str, Any]]] = {
             "explanation": "The lecturer concludes that 'normative ideological tensions are not resolved; they are merely concealed beneath an impenetrable veneer of quantitative inevitability.'",
         },
         {
-            "type": "speaking",
-            "question": "Please speak in English for 75 to 110 seconds: Deliver a rigorous, nuanced critique examining whether the pursuit of automated technocratic governance fundamentally subverts or preserves democratic legitimacy in pluralistic societies.",
-            "options": ["Record your voice response in English"],
-            "correct_answer": "Record your voice response in English",
-            "explanation": "Evaluated on CEFR C2 qualitative criteria (Table 3): absolute grammatical mastery, extensive sophisticated vocabulary, effortless spontaneous fluency, and flawless register adaptation.",
-            "min_seconds": 75,
-            "max_seconds": 120,
+            "type": "writing",
+            "question": "Write a rigorous philosophical paragraph in English (110 to 160 words) critically examining whether hyper-specialization in modern scientific inquiry enriches or fragments humanity's capacity to address complex global ethical dilemmas.",
+            "options": [],
+            "correct_answer": "",
+            "explanation": "Evaluated on CEFR C2 written production (up to 10 points): mastery of complex syntax and agreement, nuanced sentence construction, erudite lexical range, rhetorical coherence, and comprehensive task realization (punctuation errors excluded).",
+            "min_words": 110,
+            "max_words": 160,
         },
         {
             "type": "speaking",
@@ -971,20 +1119,127 @@ class ExamGeneratorService:
             logger.warning(f"[ExamGeneratorService] Não foi possível instanciar Groq: {e}")
         return None
 
+    @staticmethod
+    def _clean_activity_title(raw_title: str) -> str:
+        """Limpa sufixos padronizados de títulos de atividades para uso no prompt em inglês."""
+        if not raw_title:
+            return ""
+        import re as _re
+        cleaned = _re.sub(r"\s*[–—-]\s*(A1|A2|B1\+?|B1-B2|B2|C1|C2).*$", "", str(raw_title), flags=_re.IGNORECASE)
+        return cleaned.strip()
+
     @classmethod
-    def _fetch_cefr_context(cls, level: str) -> str:
+    def _fetch_level_activities(cls, level: str) -> Dict[str, List[str]]:
+        """
+        Coleta as atividades reais existentes na plataforma para o nível solicitado
+        nas 4 áreas: grammar, vocabulary, listening e reading.
+        Combina:
+        - Catálogo Test-English (te_english_data.json)
+        - Catálogo LiveWorksheets (liveworksheets_data.json)
+        - Catálogo GrammarService (grammar_data.py)
+        - Decks de Flashcards CEFR (cefr_flashcards)
+        - Podcasts e News publicados do nível
+        """
+        lvl = (level or "A1").strip().upper()
+        result: Dict[str, List[str]] = {
+            "grammar": [],
+            "vocabulary": [],
+            "listening": [],
+            "reading": [],
+        }
+
+        try:
+            from .services import ExternalContentService
+            from .grammar_data import GrammarService
+            from .models import Flashcard, Podcast, NewsItem
+
+            # 1. Grammar: GrammarService + Test-English + LiveWorksheets
+            g_data = GrammarService.get_grammar(level=lvl)
+            for t in g_data.get("topics", []):
+                title = t.get("title", "")
+                struct = t.get("key_structure", "")
+                if title:
+                    result["grammar"].append(f"{title} ({struct})" if struct else title)
+
+            for cat in ("grammar", "vocabulary", "listening", "reading"):
+                te_items = ExternalContentService.get_test_english_content(lvl, cat).get("items", [])
+                if not te_items and lvl == "C2":
+                    te_items = ExternalContentService.get_test_english_content("C1", cat).get("items", [])
+                for it in te_items:
+                    title = cls._clean_activity_title(it.get("title", ""))
+                    if title and title not in result[cat]:
+                        result[cat].append(title)
+
+                lw_items = ExternalContentService.get_liveworksheets_content(lvl, cat).get("items", [])
+                for it in lw_items:
+                    title = cls._clean_activity_title(it.get("title", ""))
+                    if title and title not in result[cat]:
+                        result[cat].append(title)
+
+            # 2. Vocabulary extra: tópicos e palavras dos Flashcards CEFR do nível
+            try:
+                fc_rows = list(Flashcard.objects.filter(level__iexact=lvl, is_published=True)[:40])
+                fc_topics = sorted({(c.topic or "").strip() for c in fc_rows if (c.topic or "").strip()})
+                fc_words = [c.front.strip() for c in fc_rows if c.front and len(c.front.strip()) <= 35][:15]
+                for ft in fc_topics:
+                    label = f"Flashcard Topic: {ft}"
+                    if label not in result["vocabulary"]:
+                        result["vocabulary"].append(label)
+                if fc_words:
+                    result["vocabulary"].append(f"Platform Vocabulary Words ({lvl}): {', '.join(fc_words)}")
+            except Exception:
+                pass
+
+            # 3. Listening extra: Podcasts do nível
+            try:
+                podcasts = list(Podcast.objects.filter(level__icontains=lvl)[:8])
+                for p in podcasts:
+                    if p.title and p.title not in result["listening"]:
+                        result["listening"].append(f"Podcast: {p.title}")
+            except Exception:
+                pass
+
+            # 4. Reading extra: News do nível
+            try:
+                news_qs = list(NewsItem.objects.filter(is_published=True)[:15])
+                for n in news_qs:
+                    lvls = [str(x).upper() for x in (n.levels or [])]
+                    if not lvls or lvl in lvls or "ALL" in lvls:
+                        if n.title and n.title not in result["reading"]:
+                            result["reading"].append(f"Article: {n.title}")
+            except Exception:
+                pass
+
+        except Exception as e:
+            logger.warning(f"[ExamGeneratorService] Erro ao carregar atividades do nível {lvl}: {e}")
+
+        return result
+
+    @classmethod
+    def _fetch_cefr_context(cls, level: str, sampled_activities: Optional[Dict[str, List[str]]] = None) -> str:
         """
         Recupera trechos de conteúdo real dos documentos CEFR cadastrados no banco
-        para o nível solicitado (ex: A1, A2, B1, B2).
+        e combina com as atividades existentes de Grammar, Vocabulary, Listening e Reading do nível.
         """
         context_snippets = []
         lvl = (level or "A1").strip().upper()
+
+        if sampled_activities:
+            context_snippets.append(f"Existing Platform Activities for Level {lvl} (use these topics, structures, and themes to generate the exam questions):")
+            if sampled_activities.get("grammar"):
+                context_snippets.append(f"- Level {lvl} Grammar Activities: {'; '.join(sampled_activities['grammar'])}")
+            if sampled_activities.get("vocabulary"):
+                context_snippets.append(f"- Level {lvl} Vocabulary Activities: {'; '.join(sampled_activities['vocabulary'])}")
+            if sampled_activities.get("listening"):
+                context_snippets.append(f"- Level {lvl} Listening Activities: {'; '.join(sampled_activities['listening'])}")
+            if sampled_activities.get("reading"):
+                context_snippets.append(f"- Level {lvl} Reading Activities: {'; '.join(sampled_activities['reading'])}")
 
         try:
             refs = list(CEFRReference.objects.filter(cefr_level__iexact=lvl)[:3])
             if refs:
                 ref_names = [r.filename for r in refs]
-                context_snippets.append(f"Arquivos CEFR de referência para o nível {lvl}: {', '.join(ref_names)}.")
+                context_snippets.append(f"Official CEFR Reference Documents for level {lvl}: {', '.join(ref_names)}.")
 
                 with connection.cursor() as cur:
                     cur.execute(
@@ -1001,11 +1256,11 @@ class ExamGeneratorService:
                     for r in rows:
                         if r and r[0]:
                             cleaned_snippet = r[0].replace("\n", " ").strip()
-                            context_snippets.append(f"- Tópico pedagógico: {cleaned_snippet[:250]}")
+                            context_snippets.append(f"- Pedagogical Reference Excerpt: {cleaned_snippet[:250]}")
         except Exception as e:
             logger.warning(f"[ExamGeneratorService] Erro ao buscar contexto CEFR: {e}")
 
-        return "\n".join(context_snippets) if context_snippets else f"Nível CEFR: {lvl}"
+        return "\n".join(context_snippets) if context_snippets else f"CEFR Level: {lvl}"
 
     @classmethod
     def generate_trimestral_questions(
@@ -1014,58 +1269,85 @@ class ExamGeneratorService:
         num_questions: int = 10,
     ) -> List[Dict[str, Any]]:
         """
-        Gera entre 8 e 15 questões balanceadas (Reading, Grammar, Vocabulary, Listening, Speaking)
+        Gera entre 8 e 15 questões balanceadas (Reading, Grammar, Vocabulary, Listening, Writing, Speaking)
         totalmente dinâmicas, não repetitivas e calibradas de acordo com as diretrizes oficiais CEFR
-        (Companion Volume e Tabela 3 de aspectos qualitativos de fala).
+        e com as atividades reais de Grammar, Vocabulary, Listening e Reading do nível na plataforma.
         """
         num_questions = max(8, min(15, num_questions))
         lvl = (level or "A1").strip().upper()
         if lvl not in CEFR_LEVEL_SPECS:
             lvl = "A1"
         specs = CEFR_LEVEL_SPECS[lvl]
-        cefr_context = cls._fetch_cefr_context(lvl)
 
-        # Seleção aleatória de temas do pool dinâmico para garantir variedade única a cada exame
-        selected_themes = random.sample(DYNAMIC_THEMES, k=min(4, len(DYNAMIC_THEMES)))
+        # Coleta e sorteia uma amostra das atividades reais da plataforma para o nível
+        all_activities = cls._fetch_level_activities(lvl)
+        sampled_activities = {
+            cat: (random.sample(items, k=min(10, len(items))) if items else [])
+            for cat, items in all_activities.items()
+        }
+        cefr_context = cls._fetch_cefr_context(lvl, sampled_activities=sampled_activities)
+
+        # Combina as especificações CEFR com as atividades reais de cada modalidade do nível
+        grammar_topics = specs["grammar_topics"]
+        if sampled_activities["grammar"]:
+            grammar_topics = f"{grammar_topics} | Platform {lvl} Grammar Activities: {', '.join(sampled_activities['grammar'])}"
+
+        vocabulary_topics = specs["vocabulary_topics"]
+        if sampled_activities["vocabulary"]:
+            vocabulary_topics = f"{vocabulary_topics} | Platform {lvl} Vocabulary Activities: {', '.join(sampled_activities['vocabulary'])}"
+
+        reading_descriptors = specs["reading_descriptors"]
+        if sampled_activities["reading"]:
+            reading_descriptors = f"{reading_descriptors} | Platform {lvl} Reading Activity Topics: {', '.join(sampled_activities['reading'])}"
+
+        listening_descriptors = specs["listening_descriptors"]
+        if sampled_activities["listening"]:
+            listening_descriptors = f"{listening_descriptors} | Platform {lvl} Listening Activity Topics: {', '.join(sampled_activities['listening'])}"
+
+        # Seleção de temas combinando as atividades de Reading/Listening/Vocabulary do nível + DYNAMIC_THEMES
+        activity_theme_pool = (
+            sampled_activities["reading"][:4]
+            + sampled_activities["listening"][:4]
+            + sampled_activities["vocabulary"][:3]
+        )
+        dynamic_sample = random.sample(DYNAMIC_THEMES, k=min(3, len(DYNAMIC_THEMES)))
+        combined_themes = activity_theme_pool[:5] + dynamic_sample
         generation_salt = uuid.uuid4().hex[:8]
 
-        system_prompt = PromptManager.get_prompt(
-            "exam_generator_system",
-            section="System Prompt",
+        prompt_kwargs = dict(
             lvl=lvl,
             level_name=specs["name"],
             cefr_context=cefr_context,
             reading_min_words=specs["reading_min_words"],
             reading_max_words=specs["reading_max_words"],
-            reading_descriptors=specs["reading_descriptors"],
+            reading_descriptors=reading_descriptors,
             listening_min_words=specs["listening_min_words"],
             listening_max_words=specs["listening_max_words"],
             listening_duration=specs["listening_duration"],
-            listening_descriptors=specs["listening_descriptors"],
+            listening_descriptors=listening_descriptors,
             speaking_min_seconds=specs["speaking_min_seconds"],
             speaking_max_seconds=specs["speaking_max_seconds"],
             speaking_limit_seconds=specs["speaking_limit_seconds"],
             speaking_descriptors=specs["speaking_descriptors"],
-            grammar_topics=specs["grammar_topics"],
-            vocabulary_topics=specs["vocabulary_topics"],
-            selected_themes=", ".join(selected_themes),
+            grammar_topics=grammar_topics,
+            vocabulary_topics=vocabulary_topics,
+            writing_min_words=specs["writing_min_words"],
+            writing_max_words=specs["writing_max_words"],
+            selected_themes=", ".join(combined_themes),
             generation_salt=generation_salt,
             num_questions=num_questions,
+        )
+
+        system_prompt = PromptManager.get_prompt(
+            "exam_generator_system",
+            section="System Prompt",
+            **prompt_kwargs,
         )
 
         user_prompt = PromptManager.get_prompt(
             "exam_generator_system",
             section="User Prompt",
-            lvl=lvl,
-            level_name=specs["name"],
-            num_questions=num_questions,
-            reading_min_words=specs["reading_min_words"],
-            reading_max_words=specs["reading_max_words"],
-            listening_min_words=specs["listening_min_words"],
-            listening_max_words=specs["listening_max_words"],
-            speaking_min_seconds=specs["speaking_min_seconds"],
-            speaking_max_seconds=specs["speaking_max_seconds"],
-            selected_themes=", ".join(selected_themes),
+            **prompt_kwargs,
         )
 
 
@@ -1170,33 +1452,40 @@ class ExamGeneratorService:
                             break
                 used_reading_texts.add(reading_text)
 
-            # Tratamento de options e gabarito
-            if q_type != "speaking":
+            # Tratamento de options e gabarito por modalidade (multiple-choice vs writing vs speaking)
+            if q_type == "writing":
+                options = []
+                correct = ""
+            elif q_type == "speaking":
+                if not isinstance(options, list) or len(options) == 0:
+                    options = ["Record your voice response in English"]
+                correct = options[0]
+            else:
                 if not isinstance(options, list) or len(options) < 4:
                     options = [correct, "Alternative B", "Alternative C", "Alternative D"]
                 if correct not in options:
                     options[0] = correct
-            else:
-                if not isinstance(options, list) or len(options) == 0:
-                    options = ["Record your voice response in English"]
-                correct = options[0]
 
             min_sec = int(q.get("min_seconds") or specs["speaking_min_seconds"]) if q_type == "speaking" else None
             max_sec = int(q.get("max_seconds") or specs["speaking_limit_seconds"]) if q_type == "speaking" else None
+            min_w = int(q.get("min_words") or specs["writing_min_words"]) if q_type == "writing" else None
+            max_w = int(q.get("max_words") or specs["writing_max_words"]) if q_type == "writing" else None
 
             normalized.append({
                 "id": q_id,
                 "type": q_type,
                 "points": int(q.get("points", 10)),
                 "question": question_text,
-                "options": options if q_type != "speaking" else [],
-                "correct_answer": correct if q_type != "speaking" else None,
+                "options": options if q_type not in ("speaking", "writing") else [],
+                "correct_answer": correct if q_type not in ("speaking", "writing") else ("" if q_type == "writing" else None),
                 "explanation": explanation,
                 "reading_text": reading_text,
                 "audio_text": audio_text,
                 "audio_url": None,
                 "min_seconds": min_sec,
                 "max_seconds": max_sec,
+                "min_words": min_w,
+                "max_words": max_w,
             })
 
         # Se vieram menos do que o total solicitado, complementa com fallback
@@ -1206,7 +1495,75 @@ class ExamGeneratorService:
                 f_item["id"] = f"q{len(normalized) + 1}"
                 normalized.append(f_item)
 
-        return normalized[:target_count]
+        normalized = normalized[:target_count]
+
+        # Garantir obrigatoriamente ao menos 1 questão de writing e 1 de speaking em todo exame
+        lvl_key = (level or "A1").strip().upper()
+        fb_bank = FALLBACK_QUESTION_BANKS.get(lvl_key, FALLBACK_QUESTION_BANKS["A1"])
+
+        has_writing = any(q.get("type") == "writing" for q in normalized)
+        if not has_writing and normalized:
+            fb_writing = next((q.copy() for q in fb_bank if q.get("type") == "writing"), None)
+            if fb_writing:
+                writing_item = {
+                    "id": "q9",
+                    "type": "writing",
+                    "points": 10,
+                    "question": fb_writing["question"],
+                    "options": [],
+                    "correct_answer": "",
+                    "explanation": fb_writing.get("explanation", "Evaluated on CEFR written production criteria."),
+                    "reading_text": None,
+                    "audio_text": None,
+                    "audio_url": None,
+                    "min_seconds": None,
+                    "max_seconds": None,
+                    "min_words": int(fb_writing.get("min_words") or specs["writing_min_words"]),
+                    "max_words": int(fb_writing.get("max_words") or specs["writing_max_words"]),
+                }
+                speaking_indices = [i for i, q in enumerate(normalized) if q.get("type") == "speaking"]
+                if len(speaking_indices) >= 2:
+                    normalized[speaking_indices[0]] = writing_item
+                elif len(normalized) >= 2:
+                    replace_idx = len(normalized) - 2 if normalized[-1].get("type") == "speaking" else len(normalized) - 1
+                    normalized[replace_idx] = writing_item
+                else:
+                    normalized[-1] = writing_item
+
+        has_speaking = any(q.get("type") == "speaking" for q in normalized)
+        if not has_speaking and len(normalized) >= 2:
+            fb_speaking = next((q.copy() for q in fb_bank if q.get("type") == "speaking"), None)
+            if fb_speaking:
+                speaking_item = {
+                    "id": f"q{len(normalized)}",
+                    "type": "speaking",
+                    "points": 10,
+                    "question": fb_speaking["question"],
+                    "options": [],
+                    "correct_answer": None,
+                    "explanation": fb_speaking.get("explanation", "Evaluated on CEFR spoken production criteria."),
+                    "reading_text": None,
+                    "audio_text": None,
+                    "audio_url": None,
+                    "min_seconds": int(fb_speaking.get("min_seconds") or specs["speaking_min_seconds"]),
+                    "max_seconds": int(fb_speaking.get("max_seconds") or specs["speaking_limit_seconds"]),
+                    "min_words": None,
+                    "max_words": None,
+                }
+                replace_idx = len(normalized) - 1 if normalized[-1].get("type") != "writing" else len(normalized) - 2
+                normalized[replace_idx] = speaking_item
+
+        # Ordena para manter múltipla escolha primeiro, seguido de writing (q9) e speaking por último (q10)
+        mc_items = [q for q in normalized if q.get("type") not in ("writing", "speaking")]
+        writing_items = [q for q in normalized if q.get("type") == "writing"]
+        speaking_items = [q for q in normalized if q.get("type") == "speaking"]
+        normalized = mc_items + writing_items + speaking_items
+
+        # Re-indexa IDs sequenciais (q1..qN)
+        for idx, item in enumerate(normalized, start=1):
+            item["id"] = f"q{idx}"
+
+        return normalized
 
     @classmethod
     def _generate_fallback_questions(cls, level: str, count: int) -> List[Dict[str, Any]]:
@@ -1214,20 +1571,38 @@ class ExamGeneratorService:
         lvl = (level or "A1").strip().upper()
         if lvl not in FALLBACK_QUESTION_BANKS:
             lvl = "A1"
-        bank = [q.copy() for q in FALLBACK_QUESTION_BANKS[lvl]]
-        # Embaralha as questões do banco do nível para que nunca venham na mesma ordem
-        random.shuffle(bank)
+        raw_bank = [q.copy() for q in FALLBACK_QUESTION_BANKS[lvl]]
+        mc_questions = [q for q in raw_bank if q.get("type") not in ("writing", "speaking")]
+        writing_questions = [q for q in raw_bank if q.get("type") == "writing"]
+        speaking_questions = [q for q in raw_bank if q.get("type") == "speaking"]
+
+        random.shuffle(mc_questions)
         specs = get_cefr_level_specs(lvl)
 
+        if count >= 3 and (writing_questions or speaking_questions):
+            mc_needed = max(0, count - (1 if writing_questions else 0) - (1 if speaking_questions else 0))
+            selected = [mc_questions[i % len(mc_questions)].copy() for i in range(mc_needed)]
+            if writing_questions:
+                selected.append(writing_questions[0].copy())
+            if speaking_questions:
+                selected.append(speaking_questions[0].copy())
+        else:
+            random.shuffle(raw_bank)
+            selected = [raw_bank[i % len(raw_bank)].copy() for i in range(count)]
+
         items = []
-        for idx in range(count):
-            t = bank[idx % len(bank)].copy()
+        for idx, t in enumerate(selected[:count]):
             t["id"] = f"q{idx + 1}"
             t["points"] = 10
             t["image_url"] = None
             if t.get("type") == "speaking":
                 t["min_seconds"] = specs["speaking_min_seconds"]
                 t["max_seconds"] = specs["speaking_limit_seconds"]
+            elif t.get("type") == "writing":
+                t["min_words"] = specs["writing_min_words"]
+                t["max_words"] = specs["writing_max_words"]
+                t["options"] = []
+                t["correct_answer"] = ""
             items.append(t)
         return items
 
@@ -1385,6 +1760,22 @@ class TrimestralExamService:
         }
 
     @classmethod
+    def _ensure_exam_has_writing(cls, exam: TrimestralExam) -> TrimestralExam:
+        """
+        Garante que exames pré-gerados ou em andamento no banco sempre possuam
+        ao menos 1 questão de writing e 1 de speaking calibradas para o nível.
+        """
+        qs = exam.questions or []
+        has_writing = any(str(q.get("type", "")).lower().strip() == "writing" for q in qs)
+        if not has_writing:
+            target_len = len(qs) if len(qs) >= 8 else 10
+            updated_qs = ExamGeneratorService._normalize_questions(qs, target_len, exam.level or "A1")
+            exam.questions = updated_qs
+            exam.total_questions = len(updated_qs)
+            exam.save(update_fields=["questions", "total_questions"])
+        return exam
+
+    @classmethod
     def start_or_get_exam(
         cls,
         user: User,
@@ -1414,6 +1805,7 @@ class TrimestralExamService:
             ready_exam = None
 
         if ready_exam and not force:
+            ready_exam = cls._ensure_exam_has_writing(ready_exam)
             ready_exam.status = "in_progress"
             ready_exam.started_at = django_timezone.now()
             ready_exam.save(update_fields=["status", "started_at"])
@@ -1433,6 +1825,7 @@ class TrimestralExamService:
             active_exam = None
 
         if active_exam and not force:
+            active_exam = cls._ensure_exam_has_writing(active_exam)
             return cls._format_exam_start_payload(active_exam)
 
         # Se for iniciar novo do zero, verifica elegibilidade
@@ -1490,6 +1883,7 @@ class TrimestralExamService:
             active_exam.save(update_fields=["status"])
             return None
 
+        active_exam = cls._ensure_exam_has_writing(active_exam)
         return cls._format_exam_start_payload(active_exam)
 
 
@@ -1561,6 +1955,7 @@ class TrimestralExamService:
                 audio_val = student_val
 
             is_speaking = ("speak" in q_type or "oral" in q_type or "speech" in q_type)
+            is_writing = ("writ" in q_type or "essay" in q_type or "composition" in q_type)
 
             if is_speaking:
                 # Avaliação de fala com Gemini multimodal
@@ -1595,6 +1990,41 @@ class TrimestralExamService:
                     "points_earned": item_points,
                     "explanation": explanation_display,
                 })
+            elif is_writing:
+                specs_lvl = get_cefr_level_specs(exam.level or "A1")
+                min_w = int(q.get("min_words") or specs_lvl.get("writing_min_words", 25))
+                max_w = int(q.get("max_words") or specs_lvl.get("writing_max_words", 60))
+                writing_eval = evaluate_writing_with_ai(
+                    student_text=student_val,
+                    question_prompt=q_text,
+                    level=exam.level or "A1",
+                    min_words=min_w,
+                    max_words=max_w,
+                )
+                is_correct = writing_eval["passed"]
+                score_pct = writing_eval.get("score", 0)
+                pts10 = writing_eval.get("points_out_of_10", round(score_pct / 10))
+                item_points = int(round(points * (pts10 / 10.0)))
+                earned_points += item_points
+
+                student_display = (
+                    f'{student_val} (Score: {pts10}/10)'
+                    if student_val
+                    else "(not answered)"
+                )
+                improved_ver = writing_eval.get("improved_version") or "Original paragraph in English meeting CEFR criteria"
+                explanation_display = writing_eval.get("feedback") or explanation
+
+                corrections.append({
+                    "question_id": q_id,
+                    "question": q_text,
+                    "type": "writing",
+                    "student_answer": student_display,
+                    "correct_answer": improved_ver,
+                    "is_correct": is_correct,
+                    "points_earned": item_points,
+                    "explanation": explanation_display,
+                })
             else:
                 is_correct = (student_val.lower() == correct_val.lower()) and bool(student_val)
                 if q_type == "reading":
@@ -1617,7 +2047,7 @@ class TrimestralExamService:
                 })
 
         # Score geral de 0 a 100
-        score = int((earned_points / total_points * 100)) if total_points > 0 else 0
+        score = int(round((earned_points / total_points) * 100)) if total_points > 0 else 0
         passed = score >= 70
 
         # Progressão de Nível CEFR
@@ -1649,10 +2079,11 @@ class TrimestralExamService:
         now = django_timezone.now()
         next_exam_date = now + relativedelta(months=3)
 
-        # Gamificação e XP (Exame trimestral premia 100 XP por conclusão)
-        xp_earned = 100 if passed else 40
+        # Gamificação e XP proporcional à quantidade de questões/pontos que o aluno acertou (0 a 100 XP)
+        xp_earned = max(0, score)
         try:
-            XPService.award_xp(user, xp_earned, f"Quarterly CEFR Exam {current_level}")
+            if xp_earned > 0:
+                XPService.award_xp(user, xp_earned, f"Quarterly CEFR Exam {current_level}")
             StreakService.record_activity(user)
         except Exception as e:
             logger.warning(f"[TrimestralExamService] Erro ao creditar XP: {e}")
@@ -1672,6 +2103,7 @@ class TrimestralExamService:
             "recommended_level": recommended_level,
             "earned_points": earned_points,
             "total_points": total_points,
+            "xp_earned": xp_earned,
             "can_do_statements": evolution["can_do_statements"],
             "skills_breakdown": evolution["skills_breakdown"],
             "points_to_improve": evolution["points_to_improve"],
@@ -1731,6 +2163,7 @@ class TrimestralExamService:
             "grammar": {"correct": 0, "total": 0, "label": "Applied Grammar"},
             "vocabulary": {"correct": 0, "total": 0, "label": "Vocabulary & Usage"},
             "listening": {"correct": 0, "total": 0, "label": "Listening Comprehension"},
+            "writing": {"correct": 0, "total": 0, "label": "Written Expression & Composition"},
             "speaking": {"correct": 0, "total": 0, "label": "Oral Expression & Speaking"},
         }
 
@@ -1778,6 +2211,11 @@ class TrimestralExamService:
                         can_do_statements.append("Comprehends spoken dialogues, announcements, and everyday oral instructions.")
                     else:
                         points_to_improve.append("Active listening practice with podcasts and spoken dialogues.")
+                elif s_key == "writing":
+                    if pct >= 70:
+                        can_do_statements.append("Produces coherent, well-structured written paragraphs with level-appropriate grammar and vocabulary.")
+                    else:
+                        points_to_improve.append("Written paragraph composition, verb agreement, and sentence construction.")
                 elif s_key == "speaking":
                     if pct >= 70:
                         can_do_statements.append("Expresses thoughts orally with clarity, relevant vocabulary, and natural delivery.")
@@ -1817,6 +2255,7 @@ class TrimestralExamService:
 
             student_val = answers_map.get(q_id, "")
             is_speaking = ("speak" in q_type or "oral" in q_type or "speech" in q_type)
+            is_writing = ("writ" in q_type or "essay" in q_type or "composition" in q_type)
 
             if is_speaking:
                 has_audio = bool(student_val and len(student_val) > 20)
@@ -1834,6 +2273,18 @@ class TrimestralExamService:
                     "is_correct": bool(student_val),
                     "points_earned": points if student_val else 0,
                     "explanation": explanation or "Evaluated on CEFR spoken communicative competence.",
+                })
+            elif is_writing:
+                has_text = bool(student_val and len(student_val.strip().split()) >= 3)
+                corrections.append({
+                    "question_id": q_id,
+                    "question": q_text,
+                    "type": "writing",
+                    "student_answer": student_val or "(not answered)",
+                    "correct_answer": "Original written paragraph in English",
+                    "is_correct": has_text,
+                    "points_earned": points if has_text else 0,
+                    "explanation": explanation or "Evaluated on grammar, sentence construction, vocabulary, coherence, and task completion (punctuation excluded).",
                 })
             else:
                 is_correct = (student_val.lower() == correct_val.lower()) and bool(student_val)
@@ -1872,6 +2323,7 @@ class TrimestralExamService:
                 "level": e.level,
                 "score": e.score,
                 "passed": e.passed,
+                "xp_earned": fb.get("xp_earned", e.score),
                 "completed_at": e.completed_at,
                 "total_questions": e.total_questions,
                 "feedback": summary_text,
@@ -1909,6 +2361,7 @@ class TrimestralExamService:
             "level": exam.level,
             "score": exam.score,
             "passed": exam.passed,
+            "xp_earned": fb.get("xp_earned", exam.score),
             "completed_at": exam.completed_at,
             "total_questions": exam.total_questions,
             "feedback": summary_text,
@@ -1934,18 +2387,26 @@ class TrimestralExamService:
                 min_sec = specs.get("speaking_min_seconds", 15)
                 max_sec = specs.get("speaking_limit_seconds", 30)
 
+            min_w = q.get("min_words")
+            max_w = q.get("max_words")
+            if q_type == "writing" and (not min_w or not max_w):
+                min_w = specs.get("writing_min_words", 25)
+                max_w = specs.get("writing_max_words", 45)
+
             masked_questions.append({
                 "id": str(q.get("id")),
                 "type": q_type,
                 "question": str(q.get("question", "")),
                 "points": int(q.get("points", 10)),
-                "options": q.get("options", []),
+                "options": q.get("options", []) if q_type not in ("speaking", "writing") else [],
                 "audio_url": q.get("audio_url"),
                 "audio_text": q.get("audio_text"),
                 "reading_text": q.get("reading_text"),
                 "image_url": None,  # Imagens removidas
                 "min_seconds": min_sec,
                 "max_seconds": max_sec,
+                "min_words": min_w,
+                "max_words": max_w,
             })
 
         return {
@@ -1966,4 +2427,3 @@ class TrimestralExamService:
         TrimestralExam.objects.filter(username=username).delete()
         ActivitySubmission.objects.filter(username=username, activity_type="trimestral_exam").delete()
         logger.info(f"[TrimestralExamService] Exames de {username} resetados para teste.")
-

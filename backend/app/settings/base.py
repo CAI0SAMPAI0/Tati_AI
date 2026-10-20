@@ -132,8 +132,9 @@ if DATABASE_URL:
     # manter conexões abertas (conn_max_age > 0) causa 'SSL SYSCALL error: EOF detected' e esgotamento do pool
     # de clientes em menos de 1 minuto. Deve ser 0 para fechar a cada requisição limpa.
     is_supabase = "supabase" in DATABASE_URL
-    conn_max_age = 0 if is_supabase else int(os.getenv("DB_CONN_MAX_AGE", "60"))
-    conn_health_checks = False if is_supabase else True
+    IS_SERVERLESS = os.getenv("SERVERLESS", "false").lower() in ("true", "1", "yes")
+    conn_max_age = 0 if (is_supabase or IS_SERVERLESS) else int(os.getenv("DB_CONN_MAX_AGE", "60"))
+    conn_health_checks = False if (is_supabase or IS_SERVERLESS) else True
 
     db_config = dj_database_url.parse(
         DATABASE_URL,
@@ -146,11 +147,16 @@ if DATABASE_URL:
 
     db_options = db_config.setdefault("OPTIONS", {})
     db_options["connect_timeout"] = 10
-    # Keepalives TCP para proxies do PostgreSQL (Railway tokaido.proxy.rlwy.net, Supabase, etc.)
-    db_options["keepalives"] = 1
-    db_options["keepalives_idle"] = 30
-    db_options["keepalives_interval"] = 10
-    db_options["keepalives_count"] = 5
+    if IS_SERVERLESS:
+        # Em modo SERVERLESS (Railway App-Sleeping), desativa TCP keepalives persistentes
+        # para garantir zero tráfego de rede outbound após cada request e permitir hibernação em 10 min.
+        db_options["keepalives"] = 0
+    else:
+        # Keepalives TCP para proxies do PostgreSQL (Railway tokaido.proxy.rlwy.net, Supabase, etc.)
+        db_options["keepalives"] = 1
+        db_options["keepalives_idle"] = 30
+        db_options["keepalives_interval"] = 10
+        db_options["keepalives_count"] = 5
     DATABASES = {"default": db_config}
 else:
     DATABASES = {

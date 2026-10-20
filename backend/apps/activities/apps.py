@@ -7,8 +7,12 @@ class ActivitiesConfig(AppConfig):
     verbose_name = "Atividades e Conteúdos Pedagógicos"
 
     def ready(self):
+        import os
         import sys
         if any(cmd in sys.argv for cmd in ["makemigrations", "migrate", "test"]):
+            return
+        # Em modo SERVERLESS (Railway App-Sleeping), evita threads de banco no boot que mantêm conexões abertas
+        if os.getenv("SERVERLESS", "false").lower() in ("true", "1", "yes"):
             return
 
         def _sanitize_legacy_levels():
@@ -28,6 +32,12 @@ class ActivitiesConfig(AppConfig):
                         n.save(update_fields=["levels"])
             except Exception:
                 pass
+            finally:
+                try:
+                    from django.db import connection
+                    connection.close()
+                except Exception:
+                    pass
 
         def _ensure_user_trophies_schema():
             import time
@@ -63,6 +73,12 @@ class ActivitiesConfig(AppConfig):
                     """)
             except Exception:
                 pass
+            finally:
+                try:
+                    from django.db import connection
+                    connection.close()
+                except Exception:
+                    pass
 
         import threading
         threading.Thread(target=_sanitize_legacy_levels, daemon=True).start()

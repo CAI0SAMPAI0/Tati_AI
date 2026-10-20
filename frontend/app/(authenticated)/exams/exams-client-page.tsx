@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { SidebarActivities } from '@/components/activities/sidebar-activities';
 import { MainHeader } from '@/components/layout/main-header';
+import { Button } from '@/components/ui/button';
 import { useSidebarState } from '@/hooks/useSidebarState';
 import { useAuth } from '@/hooks/useAuth';
 import { apiGet, apiPost } from '@/lib/api/client';
@@ -25,10 +26,8 @@ import {
   RotateCcw,
   Trophy,
   Flame,
-  Award,
   Lightbulb,
   Check,
-  BrainCircuit,
   BookmarkCheck,
   FileText,
   Headphones,
@@ -71,6 +70,8 @@ interface Question {
   reading_text?: string | null;
   min_seconds?: number | null;
   max_seconds?: number | null;
+  min_words?: number | null;
+  max_words?: number | null;
 }
 
 const getSpeakingLimits = (q?: Question, examLevel?: string) => {
@@ -129,6 +130,7 @@ interface HistoryItem {
   level: string;
   score: number;
   passed: boolean;
+  xp_earned?: number;
   completed_at: string;
   total_questions: number;
   feedback?: string;
@@ -139,6 +141,65 @@ interface HistoryItem {
   corrections?: CorrectionItem[];
   questions?: Question[];
   answers?: Record<string, string>;
+}
+
+// ── Dashboard UI helpers (redesign) ───────────────────────────────────────────
+const CEFR_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] as const;
+
+function ScoreRing({ value, size = 168 }: { value?: number | null; size?: number }) {
+  const hasValue = typeof value === 'number';
+  const pct = hasValue ? Math.min(100, Math.max(0, value as number)) : 0;
+  const r = 54;
+  const c = 2 * Math.PI * r;
+  return (
+    <div
+      className="relative shrink-0"
+      style={{ width: size, height: size }}
+      role="img"
+      aria-label={hasValue ? `Overall score ${pct} percent` : 'No score yet'}
+    >
+      <svg viewBox="0 0 128 128" className="w-full h-full -rotate-90" aria-hidden="true">
+        <circle cx="64" cy="64" r={r} fill="none" strokeWidth="12" className="stroke-bg-secondary" />
+        <circle
+          cx="64"
+          cy="64"
+          r={r}
+          fill="none"
+          strokeWidth="12"
+          strokeLinecap="round"
+          className="stroke-primary transition-all duration-700"
+          strokeDasharray={c}
+          strokeDashoffset={c * (1 - pct / 100)}
+        />
+      </svg>
+      <span className="absolute inset-0 flex items-center justify-center text-3xl font-black text-text">
+        {hasValue ? `${pct}%` : '--'}
+      </span>
+    </div>
+  );
+}
+
+function CefrJourney({ level, score }: { level?: string; score?: number | null }) {
+  const current = CEFR_LEVELS.indexOf((level || '').toUpperCase() as (typeof CEFR_LEVELS)[number]);
+  return (
+    <ol className="grid grid-cols-6 gap-2" aria-label="CEFR journey">
+      {CEFR_LEVELS.map((lvl, i) => {
+        const fill = i < current ? 100 : i === current ? Math.min(100, Math.max(0, score ?? 0)) : 0;
+        const isCurrent = i === current;
+        return (
+          <li key={lvl} className="space-y-2">
+            <div className="h-2 rounded-full bg-bg-secondary overflow-hidden">
+              <div className="h-full rounded-full bg-primary transition-all duration-500" style={{ width: `${fill}%` }} />
+            </div>
+            <span className={cn('block text-sm font-bold', isCurrent ? 'text-primary' : 'text-text-muted')}>
+              {lvl}
+              {isCurrent && typeof score === 'number' ? ` · ${score}%` : ''}
+            </span>
+          </li>
+        );
+      })}
+    </ol>
+  );
 }
 
 export default function ExamsClientPage() {
@@ -571,7 +632,7 @@ export default function ExamsClientPage() {
         score: hItem.score,
         passed: hItem.passed,
         recommended_level: hItem.level,
-        xp_earned: hItem.passed ? 100 : 40,
+        xp_earned: hItem.xp_earned ?? hItem.score,
         next_exam_date: status?.next_available_date || hItem.completed_at,
         summary_feedback: summaryFeedback || 'Assessment completed.',
         can_do_statements: canDo,
@@ -600,6 +661,8 @@ export default function ExamsClientPage() {
   };
 
   const latestEvolution = status?.last_exam_evolution || (history.length > 0 ? history[0] : null);
+  const daysRemaining = status?.days_remaining ?? 90;
+  const cycleProgress = Math.min(100, Math.max(5, ((90 - daysRemaining) / 90) * 100));
 
   if (!isLoaded) {
     return <div className="min-h-screen bg-bg" />;
@@ -732,12 +795,14 @@ export default function ExamsClientPage() {
                         q.type === 'grammar' && "bg-purple-500/10 text-purple-500 border border-purple-500/20",
                         q.type === 'vocabulary' && "bg-amber-500/10 text-amber-500 border border-amber-500/20",
                         q.type === 'listening' && "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20",
+                        q.type === 'writing' && "bg-indigo-500/10 text-indigo-500 border border-indigo-500/20",
                         q.type === 'speaking' && "bg-rose-500/10 text-rose-500 border border-rose-500/20",
                       )}>
                         {q.type === 'reading' && "Reading Comprehension"}
                         {q.type === 'grammar' && "Applied Grammar"}
                         {q.type === 'vocabulary' && "Vocabulary in Context"}
                         {q.type === 'listening' && "Listening Comprehension"}
+                        {q.type === 'writing' && "✍️ Written Expression & Composition"}
                         {q.type === 'speaking' && "🎙 Oral Expression & Speaking"}
                       </span>
                     </div>
@@ -889,8 +954,47 @@ export default function ExamsClientPage() {
                     {q.question}
                   </h2>
 
+                  {/* Writing Task (Original Paragraph Input with Word Counter) */}
+                  {q.type === 'writing' && (() => {
+                    const currentText = answers[q.id] || '';
+                    const wordCount = currentText.trim() ? currentText.trim().split(/\s+/).length : 0;
+                    const minW = q.min_words || 25;
+                    const maxW = q.max_words || 80;
+                    const inRange = wordCount >= minW && wordCount <= maxW;
+                    return (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between text-xs font-semibold text-text-muted">
+                          <span>Write an original paragraph in English ({minW}–{maxW} words). Punctuation errors do not reduce your score.</span>
+                          <span className={cn(
+                            "px-2.5 py-1 rounded-full font-bold border",
+                            inRange
+                              ? "bg-success/10 text-success border-success/30"
+                              : wordCount > 0
+                                ? "bg-amber-500/10 text-amber-500 border-amber-500/30"
+                                : "bg-bg-secondary text-text-muted border-border"
+                          )}>
+                            {wordCount} / {minW}–{maxW} words
+                          </span>
+                        </div>
+                        <textarea
+                          rows={5}
+                          value={currentText}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setAnswers((prev) => ({
+                              ...prev,
+                              [q.id]: val,
+                            }));
+                          }}
+                          placeholder={`Write your paragraph in English here (${minW} to ${maxW} words)...`}
+                          className="w-full p-4 rounded-2xl border border-border bg-bg-secondary/40 text-sm md:text-base text-text placeholder:text-text-muted/60 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all leading-relaxed"
+                        />
+                      </div>
+                    );
+                  })()}
+
                   {/* Multiple Choice Options (for reading, grammar, vocabulary, listening) */}
-                  {q.type !== 'speaking' && (
+                  {q.type !== 'speaking' && q.type !== 'writing' && (
                     <div className="space-y-3">
                       {q.options.map((optionText, optIdx) => {
                         const isSelected = answers[q.id] === optionText;
@@ -1149,9 +1253,11 @@ export default function ExamsClientPage() {
     );
   }
 
-  // ==============================================================================
-  // RENDER: QUARTERLY EXAM DASHBOARD & EVOLUTION PANEL (100% ENGLISH)
-  // ==============================================================================
+  const isResume = status?.status === 'in_progress';
+  const isActionState = !loadingStatus && (isResume || Boolean(status?.can_start));
+  const bestScore = history.length > 0 ? Math.max(...history.map((h) => h.score)) : null;
+  const improvePoints = latestEvolution?.points_to_improve ?? [];
+
   return (
     <div className="min-h-screen bg-bg flex flex-col md:flex-row overflow-x-clip text-text">
       <SidebarActivities isOpen={sidebarOpen} onClose={closeSidebar} />
@@ -1159,312 +1265,282 @@ export default function ExamsClientPage() {
       <div className={cn("flex-1 flex flex-col min-w-0 transition-all duration-300", sidebarOpen ? "md:ml-[280px]" : "md:ml-0")}>
         <MainHeader onToggleMenu={toggleSidebar} />
 
-        <main className="p-4 md:p-8 max-w-7xl w-full mx-auto space-y-8 animate-fade-in">
-          {/* Page Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <main className="p-4 md:p-8 max-w-6xl w-full mx-auto space-y-6 animate-fade-in">
+          {/* Page header */}
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
             <div>
-              <div className="flex items-center gap-2 text-xs font-bold text-primary uppercase tracking-wider mb-1">
-                <GraduationCap size={16} /> Periodic Assessment • Every 3 Months
+              <div className="flex items-center gap-2 text-xs font-bold text-primary uppercase tracking-wider mb-2">
+                <GraduationCap size={16} /> Taty&apos;s Exams
               </div>
-              <h1 className="text-2xl md:text-3xl font-black text-text tracking-tight">
-                Quarterly CEFR Exam
-              </h1>
-              <p className="text-xs md:text-sm text-text-muted">
-                Track your actual proficiency in Reading, Grammar, Vocabulary, Listening, and Speaking every 3 months.
-              </p>
             </div>
 
-            {/* Actions / Status Badge */}
-            {status && (
-              <div className="flex items-center gap-2">
-                <span className="px-3.5 py-1.5 rounded-xl bg-surface border border-border text-xs font-bold text-text-muted flex items-center gap-2 shadow-sm">
-                  <span>Current Level:</span>
-                  <strong className="text-primary text-sm">{status.current_level}</strong>
+            <div className="flex items-center gap-2 flex-wrap">
+              {status && !isActionState && !loadingStatus && (
+                <span className="px-4 py-2 rounded-full bg-surface border border-border text-xs font-semibold text-text-muted flex items-center gap-2">
+                  <Clock size={14} className="text-primary" aria-hidden="true" />
+                  Next exam in <strong className="text-text text-sm">{daysRemaining} days</strong>
                 </span>
-
-                {/* Reset Dev Button (Staff only) */}
-                {isStaff(user) && (
-                  <button
-                    type="button"
-                    onClick={handleResetDev}
-                    title="Reset exam cycle to test again immediately (Dev)"
-                    className="px-3 py-1.5 rounded-xl border border-border text-xs font-bold text-text-muted hover:text-primary hover:border-primary/40 flex items-center gap-1.5 transition-all"
-                  >
-                    <RotateCcw size={13} /> Reset (Dev)
-                  </button>
-                )}
-              </div>
-            )}
+              )}
+              {isStaff(user) && (
+                <Button type="button" onClick={handleResetDev} title="Reset exam cycle to test again immediately (Dev)" variant="secondary" size="sm" className="gap-1.5">
+                  <RotateCcw size={13} /> Reset (Dev)
+                </Button>
+              )}
+            </div>
           </div>
 
-          {/* MAIN STATUS CARD */}
-          {loadingStatus ? (
-            <div className="h-44 bg-surface border border-border rounded-3xl animate-pulse flex items-center justify-center">
-              <span className="text-xs text-text-muted font-bold">Loading quarterly exam status...</span>
-            </div>
-          ) : status?.status === 'in_progress' ? (
-            <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-surface border border-amber-500/30 rounded-3xl p-6 md:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 shadow-sm">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-xs font-bold text-amber-500 uppercase tracking-wider">
-                  <Clock size={16} /> Exam in Progress
-                </div>
-                <h2 className="text-xl md:text-2xl font-bold text-text">You have an active quarterly assessment</h2>
-                <p className="text-xs md:text-sm text-text-muted max-w-xl">
-                  Your questions are already prepared. Continue where you left off to register your quarterly evolution and claim your XP!
-                </p>
+          {/* CEFR journey */}
+          {!loadingStatus && (
+            <section className="bg-surface border border-border rounded-3xl p-6 md:p-8 shadow-sm" aria-label="CEFR journey">
+              <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider mb-4">
+                <span className="text-text-muted">CEFR journey</span>
+                {status?.current_level && <span className="text-primary">You are here: {status.current_level}</span>}
               </div>
-
-              <button
-                type="button"
-                onClick={handleResumeActiveExam}
-                disabled={isStarting}
-                className="px-8 py-3.5 rounded-2xl bg-amber-500 text-white font-bold text-sm hover:opacity-90 shadow-md shrink-0 flex items-center gap-2"
-              >
-                {isStarting ? 'Loading...' : <>Resume Exam <ArrowRight size={18} /></>}
-              </button>
-            </div>
-          ) : status?.can_start ? (
-            <div className="bg-gradient-to-r from-primary/15 via-primary/5 to-surface border border-primary/30 rounded-3xl p-6 md:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 shadow-sm relative overflow-hidden">
-              <div className="space-y-2 relative z-10">
-                <div className="flex items-center gap-2 text-xs font-bold text-primary uppercase tracking-wider">
-                  <Sparkles size={16} /> Ready to Take
-                </div>
-                <h2 className="text-xl md:text-2xl font-bold text-text">Your Quarterly Exam is Available!</h2>
-                <p className="text-xs md:text-sm text-text-muted max-w-xl leading-relaxed">
-                  Official CEFR assessment with 8 to 15 questions tailored for level <strong>{status.current_level}</strong>.
-                  Short reading texts, grammar, listening dialogue, and speaking tasks. Average duration: 15 minutes.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => handleStartExam(false)}
-                disabled={isStarting}
-                className="px-8 py-4 rounded-2xl bg-primary text-white font-bold text-sm hover:opacity-90 shadow-lg shadow-primary/20 shrink-0 flex items-center gap-2.5 transition-all transform hover:scale-[1.02] active:scale-[0.98]"
-              >
-                {isStarting ? 'Loading exam questions...' : (
-                  <>
-                    <GraduationCap size={20} /> Start Quarterly Exam <ArrowRight size={18} />
-                  </>
-                )}
-              </button>
-            </div>
-          ) : (
-            <div className="bg-surface border border-border rounded-3xl p-6 md:p-8 shadow-sm">
-              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-xs font-bold text-text-muted uppercase tracking-wider">
-                    <Clock size={16} className="text-primary" /> 3-Month Cycle in Progress
-                  </div>
-                  <h2 className="text-xl md:text-2xl font-bold text-text">
-                    Next exam unlocked in <span className="text-primary">{status?.days_remaining ?? 90} days</span>
-                  </h2>
-                  <p className="text-xs md:text-sm text-text-muted max-w-xl">
-                    Expected unlock date: <strong>{formatDate(status?.next_available_date)}</strong>. Continue practicing your daily activities and building your streak!
-                  </p>
-
-                  {isStaff(user) && (
-                    <div className="pt-2 flex items-center gap-3 flex-wrap">
-                      <button
-                        type="button"
-                        onClick={() => handleStartExam(true)}
-                        disabled={isStarting}
-                        className="px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:opacity-90 flex items-center gap-2 shadow-sm transition-all"
-                      >
-                        <Sparkles size={14} /> {isStarting ? 'Loading questions...' : 'Start Now (Bypass Dev)'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleResetDev}
-                        className="px-4 py-2 rounded-xl border border-border text-text-muted hover:text-primary text-xs font-bold transition-all flex items-center gap-1.5"
-                      >
-                        <RotateCcw size={13} /> Reset Cycle
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* 90-Day Progress */}
-                <div className="w-full md:w-64 bg-bg-secondary p-4 rounded-2xl border border-border">
-                  <div className="flex justify-between text-xs font-bold mb-2">
-                    <span className="text-text-muted">Quarterly Cycle</span>
-                    <span className="text-primary">{Math.max(0, 90 - (status?.days_remaining ?? 90))}/90 days</span>
-                  </div>
-                  <div className="w-full bg-surface h-2 rounded-full overflow-hidden">
-                    <div
-                      className="bg-primary h-full rounded-full transition-all"
-                      style={{ width: `${Math.min(100, Math.max(5, ((90 - (status?.days_remaining ?? 90)) / 90) * 100))}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
+              <CefrJourney level={status?.current_level} score={latestEvolution?.score} />
+            </section>
           )}
 
-          {/* STUDENT EVOLUTION PANEL ("WHAT YOU HAVE MASTERED") */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Demonstrated Competencies & Can-Do Descriptors */}
-            <div className="lg:col-span-2 bg-surface border border-border rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-bold">
-                    <BrainCircuit size={22} />
-                  </div>
+          {/* Primary status and action */}
+          {loadingStatus ? (
+            <div className="h-48 bg-surface border border-border rounded-3xl animate-pulse flex items-center justify-center">
+              <span className="text-xs text-text-muted font-bold">Loading quarterly exam status...</span>
+            </div>
+          ) : isActionState ? (
+            <section className="bg-primary text-white rounded-3xl p-6 md:p-8 shadow-md">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+                <div className="space-y-4 max-w-2xl">
+                  <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider bg-white/15 rounded-full px-3 py-1.5">
+                    {isResume ? <Clock size={15} /> : <Sparkles size={15} />}
+                    {isResume ? 'In progress' : 'Ready for you'}
+                  </span>
                   <div>
-                    <h2 className="text-lg md:text-xl font-bold text-text">What You Have Mastered</h2>
-                    <p className="text-xs text-text-muted">Communicative competencies proven in your assessments</p>
+                    <h2 className="text-2xl md:text-3xl font-extrabold">
+                      {isResume ? 'Your exam is ready. Pick up where you left off.' : 'See how far your English has come'}
+                    </h2>
+                    <p className="text-sm text-white/80 mt-2 leading-relaxed">
+                      {isResume
+                        ? 'Your answers are saved. Finish the exam to update your level and earn your XP.'
+                        : `Your level ${status?.current_level} assessment is ready. Answer a focused set of adaptive questions and get practical feedback for your next study cycle.`}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs font-semibold text-white/85">
+                    <span className="flex items-center gap-1.5"><Clock size={15} /> About 15 minutes</span>
+                    <span className="flex items-center gap-1.5"><BookOpen size={15} /> {isResume ? '5 language skills' : '8–15 questions'}</span>
+                    <span className="flex items-center gap-1.5">
+                      {isResume ? <CheckCircle2 size={15} /> : <Headphones size={15} />}
+                      {isResume ? 'Progress saved' : 'Listening & speaking'}
+                    </span>
                   </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={isResume ? handleResumeActiveExam : () => handleStartExam(false)}
+                  disabled={isStarting}
+                  className="shrink-0 min-h-12 min-w-48 px-7 rounded-2xl bg-white text-primary font-extrabold text-base inline-flex items-center justify-center gap-2 shadow-sm hover:bg-white/90 active:scale-95 transition-all disabled:opacity-60 cursor-pointer"
+                >
+                  {isStarting ? 'Loading...' : isResume ? 'Resume exam' : 'Start my exam'} <ArrowRight size={18} />
+                </button>
+              </div>
+            </section>
+          ) : (
+            <section className="bg-surface border border-border rounded-3xl p-6 md:p-8 shadow-sm space-y-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="w-full text-2xl sm:text-xs md:text-3xl font-bold text-text">Your next checkpoint is in {daysRemaining} days</h2>
+                <p className="text-sm text-text-muted mt-2 max-w-2xl">
+                  Your next assessment unlocks on <strong className="text-text">{formatDate(status?.next_available_date)}</strong>.
+                </p>
+              </div>
+              <div className="max-w-xl">
+                <div className="flex justify-between text-xs font-bold mb-2">
+                  <span className="text-text-muted">Quarterly cycle</span>
+                  <span className="text-primary">{Math.max(0, 90 - daysRemaining)} of 90 days</span>
+                </div>
+                <div className="w-full bg-bg-secondary h-2.5 rounded-full overflow-hidden" role="progressbar" aria-valuenow={cycleProgress} aria-valuemin={0} aria-valuemax={100}>
+                  <div className="bg-primary h-full rounded-full transition-all duration-500" style={{ width: `${cycleProgress}%` }} />
+                </div>
+              </div>
+              {isStaff(user) && (
+                <div className="flex items-center gap-3 flex-wrap">
+                  <Button type="button" onClick={() => handleStartExam(true)} loading={isStarting} size="sm" className="gap-2">
+                    <Sparkles size={14} /> Start now (Dev)
+                  </Button>
+                  <Button type="button" onClick={handleResetDev} variant="secondary" size="sm" className="gap-1.5">
+                    <RotateCcw size={13} /> Reset cycle
+                  </Button>
+                </div>
+              )}
+            </section>
+          )}
 
-                {latestEvolution && (
-                  <span className="text-xs font-bold px-3 py-1 bg-bg-secondary border border-border rounded-xl text-text-muted">
-                    Level {latestEvolution.level} • {latestEvolution.score}%
-                  </span>
+          {/* Score + skills */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <section className="bg-surface border border-border rounded-3xl p-6 md:p-8 shadow-sm flex flex-col items-center text-center gap-4">
+              <h2 className="text-sm font-bold text-text-muted">Latest overall score</h2>
+              <ScoreRing value={latestEvolution?.score} />
+              <p className="text-sm text-text-muted leading-relaxed">
+                {bestScore !== null ? (
+                  <>Your best result is <strong className="text-text">{bestScore}%</strong>. Each exam builds on the last.</>
+                ) : (
+                  'Take your first exam to see your score here.'
                 )}
+              </p>
+            </section>
+
+            <section className="lg:col-span-2 bg-surface border border-border rounded-3xl p-6 md:p-8 shadow-sm">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
+                  <TrendingUp size={22} />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-text">Skills breakdown</h2>
+                  <p className="text-xs text-text-muted">Proficiency in your latest quarterly assessment</p>
+                </div>
               </div>
 
-              {latestEvolution?.can_do_statements && latestEvolution.can_do_statements.length > 0 ? (
-                <div className="space-y-3">
-                  {latestEvolution.can_do_statements.map((statement, idx) => (
-                    <div key={idx} className="flex items-start gap-3.5 p-4 rounded-2xl bg-bg-secondary/40 border border-border hover:border-primary/30 transition-all">
-                      <div className="w-6 h-6 rounded-full bg-success/10 text-success flex items-center justify-center shrink-0 mt-0.5">
-                        <Check size={14} strokeWidth={3} />
+              {latestEvolution?.skills_breakdown && Object.keys(latestEvolution.skills_breakdown).length > 0 ? (
+                <div className="space-y-5">
+                  {Object.entries(latestEvolution.skills_breakdown).map(([key, skill]) => (
+                    <div key={key} className="space-y-2">
+                      <div className="flex justify-between text-sm font-semibold">
+                        <span className="text-text">{skill.label}</span>
+                        <span className="text-text-muted">{skill.percentage}% · {skill.correct}/{skill.total}</span>
                       </div>
-                      <p className="text-sm font-medium text-text leading-relaxed">
-                        {statement}
-                      </p>
+                      <div className="w-full bg-bg-secondary h-2.5 rounded-full overflow-hidden">
+                        <div
+                          className={cn(
+                            'h-full rounded-full transition-all duration-500',
+                            skill.percentage >= 80 ? 'bg-success' : skill.percentage >= 60 ? 'bg-primary' : 'bg-warning'
+                          )}
+                          style={{ width: `${skill.percentage}%` }}
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
               ) : (
+                <div className="py-10 text-center text-xs text-text-muted">
+                  Take your quarterly exam to see your breakdown across Reading, Grammar, Vocabulary, Listening and Speaking.
+                </div>
+              )}
+            </section>
+          </div>
+
+          {/* Mastered + next focus */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <section className="bg-surface border border-border rounded-3xl p-6 md:p-8 shadow-sm space-y-4">
+              <div className="flex items-center justify-between gap-4">
+                <h2 className="text-lg font-bold text-text">What you have mastered</h2>
+                {latestEvolution && (
+                  <span className="text-xs font-bold px-3 py-1 bg-bg-secondary border border-border rounded-full text-text-muted">
+                    Level {latestEvolution.level} · {latestEvolution.score}%
+                  </span>
+                )}
+              </div>
+              {latestEvolution?.can_do_statements && latestEvolution.can_do_statements.length > 0 ? (
+                <ul className="space-y-3">
+                  {latestEvolution.can_do_statements.map((statement, idx) => (
+                    <li key={idx} className="flex items-start gap-3 p-4 rounded-2xl bg-bg-secondary/40 border border-border">
+                      <span className="w-6 h-6 rounded-full bg-success/10 text-success flex items-center justify-center shrink-0 mt-0.5">
+                        <Check size={14} strokeWidth={3} />
+                      </span>
+                      <span className="text-sm font-medium text-text leading-relaxed">{statement}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
                 <div className="p-8 text-center bg-bg-secondary/30 rounded-2xl border border-dashed border-border text-text-muted text-sm">
                   <Lightbulb size={28} className="mx-auto mb-2 text-primary opacity-60" />
                   <p className="font-semibold text-text">No quarterly assessments recorded yet.</p>
-                  <p className="text-xs mt-1">As soon as you complete your first quarterly exam, this panel will display everything you can do in English!</p>
+                  <p className="text-xs mt-1">Complete your first exam and this panel will show everything you can do in English.</p>
                 </div>
               )}
+              <p className="text-xs text-text-muted leading-relaxed">
+                <strong>CEFR standard:</strong> every result is measured against official Council of Europe descriptors.
+              </p>
+            </section>
 
-              {/* CEFR Pedagogical Guideline Note */}
-              <div className="p-4 rounded-2xl bg-primary/5 border border-primary/20 flex items-start gap-3 text-xs text-text-muted">
-                <Lightbulb size={18} className="text-primary shrink-0 mt-0.5" />
-                <span>
-                  <strong>CEFR Pedagogical Standard:</strong> Our quarterly exam measures your evolution through official Council of Europe descriptors. Every correct answer reflects a real communicative ability.
-                </span>
-              </div>
-            </div>
-
-            {/* Skills Breakdown */}
-            <div className="bg-surface border border-border rounded-3xl p-6 md:p-8 shadow-sm flex flex-col justify-between space-y-6">
-              <div>
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 rounded-2xl bg-purple-500/10 text-purple-500 flex items-center justify-center font-bold">
-                    <TrendingUp size={22} />
-                  </div>
-                  <div>
-                    <h2 className="text-base md:text-lg font-bold text-text">Skills Breakdown</h2>
-                    <p className="text-xs text-text-muted">Proficiency in your latest quarterly assessment</p>
-                  </div>
+            <section className="bg-primary/5 border border-primary/20 rounded-3xl p-6 md:p-8 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
+                  <Flame size={22} />
                 </div>
-
-                {latestEvolution?.skills_breakdown && Object.keys(latestEvolution.skills_breakdown).length > 0 ? (
-                  <div className="space-y-4">
-                    {Object.entries(latestEvolution.skills_breakdown).map(([key, skillData]) => (
-                      <div key={key} className="space-y-1.5">
-                        <div className="flex justify-between text-xs font-bold">
-                          <span className="text-text">{skillData.label}</span>
-                          <span className="text-primary">{skillData.percentage}% ({skillData.correct}/{skillData.total})</span>
-                        </div>
-                        <div className="w-full bg-bg-secondary h-2 rounded-full overflow-hidden">
-                          <div
-                            className={cn(
-                              "h-full rounded-full transition-all duration-500",
-                              skillData.percentage >= 80 ? "bg-success" :
-                                skillData.percentage >= 60 ? "bg-primary" : "bg-warning"
-                            )}
-                            style={{ width: `${skillData.percentage}%` }}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="py-12 text-center text-xs text-text-muted">
-                    Take your quarterly exam to view your visual breakdown across Reading, Grammar, Vocabulary, Listening, and Speaking.
-                  </div>
-                )}
+                <h2 className="text-lg font-bold text-text">Next focus</h2>
               </div>
-
-              <div className="bg-bg-secondary p-4 rounded-2xl border border-border text-center">
-                <span className="text-xs text-text-muted block mb-1">Latest Overall Score</span>
-                <span className="text-2xl font-black text-primary">
-                  {latestEvolution?.score !== undefined ? `${latestEvolution.score}%` : '--'}
-                </span>
-              </div>
-            </div>
+              {improvePoints.length > 0 ? (
+                <ul className="space-y-3">
+                  {improvePoints.map((point, idx) => (
+                    <li key={idx} className="flex items-start gap-3 text-sm font-medium text-text leading-relaxed">
+                      <span className="w-6 h-6 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">{idx + 1}</span>
+                      {point}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-text-muted leading-relaxed">
+                  Every activity you complete helps prepare you for the next checkpoint. Your focus areas will appear here after your exam.
+                </p>
+              )}
+            </section>
           </div>
 
-          {/* QUARTERLY TIMELINE (HISTORY) */}
-          <div className="bg-surface border border-border rounded-3xl p-6 md:p-8 shadow-sm">
+          {/* Exam history */}
+          <section className="bg-surface border border-border rounded-3xl p-6 md:p-8 shadow-sm">
             <div className="flex items-center justify-between gap-4 mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center font-bold">
-                  <Award size={22} />
-                </div>
-                <div>
-                  <h2 className="text-lg md:text-xl font-bold text-text">Quarterly Exam History</h2>
-                  <p className="text-xs text-text-muted">Your evolution timeline every 3 months</p>
-                </div>
-              </div>
-
+              <h2 className="text-lg font-bold text-text">Exam history</h2>
               <span className="text-xs font-bold text-text-muted">
                 {history.length} {history.length === 1 ? 'exam completed' : 'exams completed'}
               </span>
             </div>
 
             {history.length > 0 ? (
-              <div className="space-y-4">
-                {history.map((hItem, idx) => (
-                  <div
-                    key={hItem.id || idx}
-                    className="p-5 rounded-2xl bg-bg-secondary/40 border border-border hover:border-primary/30 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-primary/10 text-primary border border-primary/20">
-                          Level {hItem.level}
-                        </span>
-                        <span className="text-xs text-text-muted font-bold flex items-center gap-1">
-                          <Calendar size={13} /> {formatDate(hItem.completed_at)}
-                        </span>
+              <ul className="space-y-3">
+                {history.map((hItem, idx) => {
+                  const prev = history[idx + 1];
+                  const delta = prev ? hItem.score - prev.score : null;
+                  return (
+                    <li
+                      key={hItem.id || idx}
+                      className="p-4 md:p-5 rounded-2xl bg-bg-secondary/40 border border-border hover:border-primary/30 transition-all flex flex-col sm:flex-row sm:items-center gap-4"
+                    >
+                      <div className="w-24 shrink-0">
+                        <span className="text-2xl font-black text-primary leading-none block">{hItem.score}%</span>
+                        {delta !== null && delta !== 0 && (
+                          <span className={cn('text-xs font-bold', delta > 0 ? 'text-success' : 'text-text-muted')}>
+                            {delta > 0 ? '+' : ''}{delta} pts
+                          </span>
+                        )}
                       </div>
-                      <p className="text-sm font-semibold text-text max-w-xl">
-                        {hItem.feedback || 'Assessment completed successfully.'}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-4 shrink-0 flex-wrap sm:flex-nowrap">
-                      <div className="text-right">
-                        <span className="text-xl font-black text-primary block leading-none">{hItem.score}%</span>
-                        <span className="text-[10px] text-text-muted font-bold uppercase">{hItem.passed ? 'Passed' : 'Completed'}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-primary/10 text-primary border border-primary/20">
+                            Level {hItem.level}
+                          </span>
+                          <span className="text-xs text-text-muted font-semibold flex items-center gap-1">
+                            <Calendar size={13} /> {formatDate(hItem.completed_at)}
+                          </span>
+                          <span className="text-[10px] text-text-muted font-bold uppercase">{hItem.passed ? 'Passed' : 'Completed'}</span>
+                        </div>
+                        <p className="text-sm text-text-muted mt-1 line-clamp-1">
+                          {hItem.feedback || 'Assessment completed successfully.'}
+                        </p>
                       </div>
-
                       <button
                         type="button"
                         onClick={() => handleReviewPastExam(hItem)}
-                        className="px-4 py-2.5 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary border border-primary/25 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                        className="min-h-11 px-4 rounded-xl bg-surface hover:bg-primary/10 text-primary border border-primary/25 text-sm font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                       >
-                        <BookmarkCheck size={14} /> Review Exam & Feedback
+                        <BookmarkCheck size={15} /> Review feedback
                       </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                    </li>
+                  );
+                })}
+              </ul>
             ) : (
               <div className="p-8 text-center bg-bg-secondary/20 rounded-2xl border border-dashed border-border text-text-muted text-xs">
                 No past history yet. Your completed exams will appear here.
               </div>
             )}
-          </div>
+          </section>
         </main>
       </div>
     </div>

@@ -13,9 +13,10 @@ SECURE_HSTS_SECONDS = 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 
-# Inicialização do Sentry para Django
+# Inicialização do Sentry para Django (desabilita sessões/telemetria contínua em modo SERVERLESS para permitir App-Sleeping)
 SENTRY_DSN = os.getenv("SENTRY_DSN")
-if SENTRY_DSN:
+IS_SERVERLESS = os.getenv("SERVERLESS", "false").lower() in ("true", "1", "yes")
+if SENTRY_DSN and not IS_SERVERLESS:
     import sentry_sdk
     from sentry_sdk.integrations.django import DjangoIntegration
     from sentry_sdk.integrations.celery import CeleryIntegration

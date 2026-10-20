@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tati-ai-v2.4.0';
+const CACHE_NAME = 'tati-ai-v2.4.1';
 const STATIC_ASSETS = ['/manifest.json', '/icons/icon-192x192.png', '/icons/icon-512x512.png', '/icons/badge-96x96.png'];
 
 self.addEventListener('install', (event) => {
@@ -53,11 +53,15 @@ self.addEventListener('fetch', (event) => {
   if (request.headers.has('authorization')) return;
   if (request.method !== 'GET') return;
 
-  // Ignora chamadas de API, auth, chat e requisições dinâmicas RSC do Next.js App Router
+  // Ignora chamadas de API, auth, chat, HMR/webpack dev e requisições dinâmicas RSC do Next.js App Router
+  const isLocalDev = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
   if (
     url.pathname.startsWith('/api') ||
     url.pathname.startsWith('/auth') ||
     url.pathname.startsWith('/chat') ||
+    url.pathname.startsWith('/_next/webpack-hmr') ||
+    url.pathname.includes('.hot-update.') ||
+    (isLocalDev && url.pathname.startsWith('/_next/')) ||
     url.searchParams.has('_rsc') ||
     request.headers.get('RSC') === '1' ||
     request.headers.get('Next-Router-State-Tree') ||

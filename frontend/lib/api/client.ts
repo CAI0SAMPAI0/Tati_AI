@@ -70,14 +70,18 @@ function resolvePath(path: string): string {
        window.location.hostname === '127.0.0.1' || 
        window.location.hostname.includes('hf.space')));
 
-  // Materiais e Pagamentos usam NEXT_PUBLIC_RAILWAY_API_URL se especificado; caso contrário usam o effectiveBase
-  if (
-    (path.includes('/admin/premium') || 
-     path.includes('/activities/premium') || 
-     path.includes('/activities/hub') ||
-     path.includes('/payments')) &&
-    process.env.NEXT_PUBLIC_RAILWAY_API_URL
-  ) {
+  // Apenas rotas estritas de pagamento/checkout acordam o container da Railway (NEXT_PUBLIC_RAILWAY_API_URL).
+  // Rotas de leitura de catálogo, hub público e verificação de status ficam no backend principal para que a Railway durma após 10 min sem pagamentos.
+  const isPaymentAction =
+    path.includes('/payments/subscribe') ||
+    path.includes('/payments/webhook') ||
+    path.includes('/payments/create') ||
+    path.includes('/activities/hub/checkout') ||
+    path.includes('/activities/hub/payment-status') ||
+    (path.includes('/activities/premium/') && path.endsWith('/buy')) ||
+    path.includes('/catalog/orders');
+
+  if (isPaymentAction && process.env.NEXT_PUBLIC_RAILWAY_API_URL) {
     const railwayBase = process.env.NEXT_PUBLIC_RAILWAY_API_URL.replace(/\/$/, '');
     return `${railwayBase}${path.startsWith('/') ? path : `/${path}`}`;
   }

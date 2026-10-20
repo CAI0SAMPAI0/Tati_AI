@@ -7,12 +7,25 @@ services:
       dockerfile: Dockerfile
     container_name: tati_ai_backend
     restart: unless-stopped
+    command:
+      [
+        "uvicorn",
+        "app.asgi:application",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+        "--reload",
+        "--reload-dir",
+        "/app",
+      ]
     env_file:
       - .env
     environment:
       - PORT=8000
       - DJANGO_SETTINGS_MODULE=app.settings.development
       - DEBUG=True
+      - WATCHFILES_FORCE_POLLING=true
     ports:
       - '8000:8000'
     volumes:
@@ -33,6 +46,7 @@ services:
         NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
     container_name: tati_ai_frontend
     restart: unless-stopped
+    command: ["sh", "-c", "rm -rf /app/.next/* && npx next dev -H 0.0.0.0 -p 3000"]
     depends_on:
       backend:
         condition: service_healthy
@@ -41,9 +55,15 @@ services:
     environment:
       - PORT=3000
       - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
-      - NODE_ENV=production
+      - NODE_ENV=development
+      - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
     ports:
       - '3000:3000'
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
 
   celery_worker:
     build:
@@ -51,13 +71,23 @@ services:
       dockerfile: Dockerfile
     container_name: tati_ai_celery_worker
     restart: unless-stopped
-    command: ["celery", "-A", "app", "worker", "-l", "info", "--concurrency=2"]
+    command:
+      [
+        "watchfiles",
+        "--filter",
+        "python",
+        "celery -A app worker -l info --concurrency=2",
+        "/app",
+      ]
     healthcheck:
       disable: true
     env_file:
       - .env
     environment:
       - DJANGO_SETTINGS_MODULE=app.settings.development
+      - WATCHFILES_FORCE_POLLING=true
+    volumes:
+      - ./backend:/app
     depends_on:
       backend:
         condition: service_healthy
@@ -75,6 +105,8 @@ services:
       - .env
     environment:
       - DJANGO_SETTINGS_MODULE=app.settings.development
+    volumes:
+      - ./backend:/app
     depends_on:
       backend:
         condition: service_healthy
