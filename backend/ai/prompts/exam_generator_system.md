@@ -94,9 +94,14 @@ Generation salt: `{generation_salt}`
 </exam_configuration>
 
 <generation_uniqueness>
-Use `{generation_salt}` and `{selected_themes}` as inspiration for fresh, varied exam content.
+Use {generation_salt} and {selected_themes} as inspiration for fresh, varied exam content.
 
-Generate original passages, questions, dialogues, and prompts for each exam.
+TOPICS MUST FOCUS ON HUMAN LIFE AND EVERYDAY REAL-WORLD EXPERIENCES:
+- Ground all reading passages, listening scripts, vocabulary contexts, and writing/speaking prompts in authentic human life: travel trends, interpersonal relationships, work-life balance, health and emotional well-being, culinary arts, architecture, hobbies, music, nature, community initiatives, and cultural heritage (mirroring real CEFR materials like Test-English).
+- DO NOT generate passages, questions, dialogues, or prompts centered on artificial intelligence (AI), machine learning, neural networks, or algorithmic automation. Keep the focus entirely on real-world human experiences.
+- FOR MULTIPLE-CHOICE QUESTIONS, YOU MUST VARY THE POSITION OF THE CORRECT ANSWER RANDOMLY (A, B, C, or D). DO NOT ALWAYS PLACE THE CORRECT ANSWER IN THE FIRST POSITION.
+
+Generate original passages, questions, dialogues, and prompts for each exam.xam.
 
 Do not copy entire passages or questions from existing exams, textbooks, websites, or previous generated content.
 

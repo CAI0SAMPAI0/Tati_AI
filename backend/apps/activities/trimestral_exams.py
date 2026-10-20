@@ -800,99 +800,99 @@ FALLBACK_QUESTION_BANKS: Dict[str, List[Dict[str, Any]]] = {
     "B2": [
         {
             "type": "reading",
-            "reading_text": "The phenomenon of algorithmic recommendation engines has redefined cultural consumption across music, literature, and news media. While predictive algorithms offer undeniable convenience by curating content aligned with individual browsing history, cultural sociologists caution against the emergence of cognitive filter bubbles. When recommendation systems exclusively reinforce established preferences, consumers are rarely exposed to dissonant perspectives, unfamiliar artistic genres, or complex investigative journalism. Consequently, intellectual curiosity may atrophy in favor of frictionless familiarity. To counter this homogenizing tendency, several independent platforms are experimenting with serendipity algorithms that deliberately introduce unpredictable, high-quality recommendations designed to broaden the user's aesthetic and intellectual horizons.",
-            "question": "According to the passage, what is the primary risk associated with predictive recommendation algorithms?",
+            "reading_text": "As summer heatwaves intensify across southern holiday destinations, travelers are rethinking their vacation habits in favor of 'coolcationing.' Rather than flocking to sweltering Mediterranean beaches, holidaymakers are increasingly choosing temperate northern escapes, such as the Norwegian fjords, the Scottish Highlands, and Swedish lakeside villages. Travel sociologists note that this shift reflects not only a search for thermal comfort, but also a desire for tranquil, uncrowded natural landscapes where outdoor activities like hiking and wild swimming can be enjoyed without physical exhaustion. Hospitality surveys indicate that bookings in Nordic regions during peak summer months have surged by over thirty percent, signaling a lasting transformation in international leisure travel.",
+            "question": "According to the passage, what primary motivation is driving travelers toward 'coolcationing'?",
             "options": [
-                "They create filter bubbles that restrict exposure to diverse perspectives and genres.",
-                "They cause substantial hardware overheating on mobile consumer devices.",
-                "They completely prevent independent artists from monetizing creative works.",
-                "They require users to manually categorize all consumed literature and music."
+                "Escaping oppressive summer heat in search of comfortable, peaceful northern landscapes.",
+                "Taking advantage of discounted long-haul business airline fares.",
+                "Attending international electronic music festivals in coastal capitals.",
+                "Complying with municipal regulations prohibiting seaside sunbathing."
             ],
-            "correct_answer": "They create filter bubbles that restrict exposure to diverse perspectives and genres.",
-            "explanation": "The text cautions against cognitive filter bubbles that reinforce established preferences without exposing users to unfamiliar genres or dissonant perspectives.",
+            "correct_answer": "Escaping oppressive summer heat in search of comfortable, peaceful northern landscapes.",
+            "explanation": "The text explains that intense heatwaves are causing travelers to seek temperate northern destinations for thermal comfort and peaceful nature.",
         },
         {
             "type": "reading",
-            "reading_text": "Urban rewilding represents an ambitious paradigm shift in metropolitan biodiversity management. Rather than merely manicuring ornamental shrubs and lawn turf, environmentalists advocate permitting natural ecological succession within decommissioned canals, rooftop terraces, and post-industrial brownfields. Preliminary empirical data collected across Western European capitals indicates that allowing indigenous flora to proliferate naturally mitigates the urban heat island effect, reduces municipal stormwater runoff by up to forty percent, and re-establishes ecological corridors for threatened insect populations. However, the initiative frequently confronts municipal skepticism regarding aesthetic tidiness and public safety concerns, necessitating sustained educational campaigns to persuade civic authorities that ecological resilience often appears untamed.",
-            "question": "What obstacle do urban rewilding initiatives frequently encounter from municipal authorities?",
+            "reading_text": "In historic European city centers such as Venice, Barcelona, and Amsterdam, the unchecked proliferation of short-term holiday rentals has ignited intense debate over housing affordability. While residential tourism brings substantial revenue to local hospitality businesses, long-term residents argue that converting residential apartments into lucrative tourist accommodation has driven rental prices to unsustainable levels. Young families and public sector workers find themselves priced out of neighborhoods their families inhabited for generations, eroding community ties and replacing local bakeries and bookshops with souvenir outlets. To preserve community life, several municipal councils have introduced strict quotas on holiday rental permits and imposed higher visitor taxes to fund affordable social housing.",
+            "question": "What major negative consequence of short-term holiday rentals for local communities is highlighted in the text?",
             "options": [
-                "Skepticism concerning aesthetic tidiness and public safety.",
-                "A total lack of native plant species adaptable to urban soils.",
-                "Excessive financial costs compared to traditional concrete construction.",
-                "Opposition from international ecological conservation charities."
+                "It drives housing costs up and forces long-term residents out of their traditional neighborhoods.",
+                "It completely stops international visitors from spending money in neighborhood cafes.",
+                "It prevents municipal public transportation networks from operating morning schedules.",
+                "It requires residential property owners to convert private living rooms into souvenir shops."
             ],
-            "correct_answer": "Skepticism concerning aesthetic tidiness and public safety.",
-            "explanation": "The passage highlights that rewilding 'frequently confronts municipal skepticism regarding aesthetic tidiness and public safety concerns'.",
+            "correct_answer": "It drives housing costs up and forces long-term residents out of their traditional neighborhoods.",
+            "explanation": "The passage explains that converting residential flats into tourist rentals drives up housing costs, pricing out families and eroding local community life.",
         },
         {
             "type": "grammar",
-            "question": "Complete the sentence using inversion: 'Not only _______ the prestigious international design award, but she also secured private funding for her research laboratory.'",
-            "options": ["did she win", "she won", "she did win", "won she"],
-            "correct_answer": "did she win",
-            "explanation": "Negative adverbials placed at the beginning of a clause ('Not only...') trigger subject-auxiliary inversion ('did she win').",
+            "question": "Complete the sentence using inversion: 'Not only _______ the prestigious international marathon, but she also raised thousands of pounds for a local children's hospital.'",
+            "options": ["did she complete", "she completed", "she did complete", "completed she"],
+            "correct_answer": "did she complete",
+            "explanation": "Negative adverbials placed at the beginning of a clause ('Not only...') trigger subject-auxiliary inversion ('did she complete').",
         },
         {
             "type": "grammar",
-            "question": "Complete the third conditional: 'If the software engineers _______ the security vulnerability during initial beta testing, the data breach would never have occurred.'",
-            "options": ["had identified", "identified", "would identify", "have identified"],
-            "correct_answer": "had identified",
-            "explanation": "Third conditional past counterfactual uses 'If + Past Perfect (had identified), would have + participle'.",
+            "question": "Complete the third conditional sentence: 'If Marcus _______ the job offer in Edinburgh ten years ago, he would never have met his future wife at the neighborhood arts festival.'",
+            "options": ["hadn't accepted", "wouldn't accept", "didn't accept", "hasn't accepted"],
+            "correct_answer": "hadn't accepted",
+            "explanation": "Third conditional past counterfactual uses 'If + Past Perfect (hadn't accepted), would have + participle'.",
         },
         {
             "type": "vocabulary",
-            "question": "Choose the word that best completes the sentence: 'The CEO's restructuring strategy was widely commended for striking a delicate _______ between aggressive expansion and environmental responsibility.'",
+            "question": "Choose the word that best completes the sentence: 'After months of exhausting overtime, Clara decided to change jobs to strike a healthier _______ between her career and personal life.'",
             "options": ["balance", "compromise", "equilibrium", "proportion"],
             "correct_answer": "balance",
             "explanation": "'Strike a balance' is the established natural English collocation.",
         },
         {
             "type": "vocabulary",
-            "question": "Choose the most appropriate academic adjective: 'The scientific panel warned that rising ocean acidity could produce _______ consequences for shallow coral ecosystems.'",
-            "options": ["detrimental", "negligible", "tentative", "fleeting"],
-            "correct_answer": "detrimental",
-            "explanation": "'Detrimental' means causing damage or harm, fitting academic discussions of ecological risk.",
+            "question": "Choose the most appropriate adjective: 'Even during the stressful relocation to a new country, Liam remained remarkably _______ and handled each unexpected complication with calm patience.'",
+            "options": ["resilient", "negligible", "tentative", "fleeting"],
+            "correct_answer": "resilient",
+            "explanation": "'Resilient' describes the capacity to recover quickly from difficulties and maintain emotional balance.",
         },
         {
             "type": "listening",
-            "audio_text": "Podcast Interviewer: Professor Miller, in your recent monograph on urban sociology, you argue that third places—such as independent neighborhood cafes, community workshops, and public libraries—are indispensable for civil society. Could you elaborate on why commercialized online forums frequently fail to cultivate the same quality of spontaneous civic dialogue as tangible physical gathering spaces?",
-            "question": "What core argument regarding 'third places' is raised by the interviewer?",
+            "audio_text": "Podcast Host: In today's episode on holistic well-being, we welcome clinical psychologist Dr. Elena Foster. Dr. Foster explains that regular engagement with music—whether singing in a choir or listening to soothing acoustic compositions—lowers cortisol levels and stimulates dopamine pathways, providing significant therapeutic relief for chronic work stress and anxiety.",
+            "question": "According to Dr. Foster, how does musical engagement support mental well-being?",
             "options": [
-                "Physical communal gathering spots cultivate civic dialogue that digital forums struggle to replicate.",
-                "Online commercial forums have rendered all neighborhood community centers obsolete.",
-                "Public libraries should be replaced by privately funded commercial shopping centers.",
-                "Urban sociology monographs should focus exclusively on digital social networks."
+                "It lowers stress hormone levels and stimulates neurotransmitters associated with relaxation.",
+                "It completely replaces the physiological necessity for sleep and physical exercise.",
+                "It causes individuals to avoid social interaction and live in total acoustic solitude.",
+                "It permanently eliminates the requirement for balanced nutrition in daily life."
             ],
-            "correct_answer": "Physical communal gathering spots cultivate civic dialogue that digital forums struggle to replicate.",
-            "explanation": "The interviewer explores why physical third places foster spontaneous civic engagement that commercial online spaces fail to match.",
+            "correct_answer": "It lowers stress hormone levels and stimulates neurotransmitters associated with relaxation.",
+            "explanation": "Dr. Foster notes that music lowers cortisol levels and stimulates dopamine, alleviating chronic work stress.",
         },
         {
             "type": "listening",
-            "audio_text": "Keynote Speaker: Distinguished colleagues, let us turn our attention to algorithmic liability in autonomous navigation. As machine learning models replace deterministic rule-based algorithms, establishing legal accountability in collision mitigation scenarios necessitates coherent international regulatory frameworks uniting automotive engineers, software developers, and legal scholars.",
-            "question": "What primary challenge in autonomous navigation does the speaker address?",
+            "audio_text": "Radio Counselor: Welcome back. Listener Sarah from Leeds calls in regarding a life dilemma. She has received a major promotion that requires traveling abroad for eight months each year, but her longtime partner wants to settle down and purchase a family home in their hometown. Reconciling individual career aspiration with shared relational commitment is one of the most defining personal crossroads in adult life.",
+            "question": "What core personal dilemma is Sarah navigating according to the radio broadcast?",
             "options": [
-                "Establishing legal accountability and regulatory liability frameworks for machine learning models.",
-                "Reducing the battery charging time of electric freight trucks in cold climates.",
-                "Manufacturing cheaper microprocessors for consumer infotainment dashboards.",
-                "Restricting autonomous vehicle operation exclusively to private test tracks."
+                "Balancing a demanding international career opportunity with her relationship and shared life goals.",
+                "Choosing between opening a bakery or starting a commercial bookstore.",
+                "Deciding whether to move into a university dormitory after retirement.",
+                "Selecting an appropriate training regimen for an upcoming athletic triathlon."
             ],
-            "correct_answer": "Establishing legal accountability and regulatory liability frameworks for machine learning models.",
-            "explanation": "The keynote focuses on establishing legal accountability and liability frameworks for autonomous vehicle algorithms.",
+            "correct_answer": "Balancing a demanding international career opportunity with her relationship and shared life goals.",
+            "explanation": "Sarah is weighing a promotion requiring extensive travel against settling down and buying a home with her partner.",
         },
         {
             "type": "writing",
-            "question": "Write an analytical paragraph in English (70 to 110 words) discussing how artificial intelligence and digital automation are reshaping modern workplaces, weighing both productivity benefits and potential risks for professionals.",
+            "question": "Write an analytical paragraph in English (70 to 110 words) about how modern work-life balance is evolving, discussing whether flexible routines and prioritizing personal well-being improve family relationships and overall life satisfaction.",
             "options": [],
             "correct_answer": "",
-            "explanation": "Evaluated on CEFR B2 written production (up to 10 points): complex grammatical structures and agreement, subordinate sentence variety, precise academic/professional vocabulary, cohesive argumentation, and task completion (punctuation errors excluded).",
+            "explanation": "Evaluated on CEFR B2 written production (up to 10 points): complex grammatical structures and agreement, subordinate sentence variety, precise everyday/professional vocabulary, cohesive argumentation, and task completion (punctuation errors excluded).",
             "min_words": 70,
             "max_words": 110,
         },
         {
             "type": "speaking",
-            "question": "Please speak in English for 45 to 70 seconds: Evaluate how historic European cities can strike an effective balance between promoting tourism revenue and protecting the residential quality of life for local inhabitants.",
+            "question": "Please speak in English for 45 to 70 seconds: Describe an important life decision or turning point that significantly influenced your personal perspective or daily routine, explaining what you learned from the experience.",
             "options": ["Record your voice response in English"],
             "correct_answer": "Record your voice response in English",
-            "explanation": "Evaluated on CEFR B2 systematic presentation of points, highlighting significant aspects, and expressing nuanced viewpoints.",
+            "explanation": "Evaluated on CEFR B2 systematic presentation of points, highlighting significant aspects, and expressing nuanced personal viewpoints.",
             "min_seconds": 45,
             "max_seconds": 80,
         },
@@ -900,7 +900,7 @@ FALLBACK_QUESTION_BANKS: Dict[str, List[Dict[str, Any]]] = {
     "C1": [
         {
             "type": "reading",
-            "reading_text": "The epistemological dilemma posed by generative foundation models centers not merely on mechanical mimicry, but on the profound blurring of intentionality in communicative discourse. Historically, hermeneutic textual interpretation operated under the premise that behind every syntactical construct lay a conscious author possessing lived phenomenological experience, ethical accountability, and contextual awareness. When sophisticated neural architectures generate seemingly erudite treatises on jurisprudence, bioethics, or aesthetic theory without possessing internal semantic comprehension or existential stakes, readers are confronted with what philosophers term semantic dissociation. The proliferation of syntactically impeccable yet ethically unmoored prose threatens to debase public deliberation unless rigorous provenance frameworks and verification protocols are systematically embedded into digital dissemination channels.",
+            "reading_text": "The existential dilemma posed by hyper-mobile contemporary careerism centers not merely on geographic displacement, but on the gradual erosion of long-term civic ties and communal roots. Historically, hermeneutic textual interpretation operated under the premise that behind every syntactical construct lay a conscious author possessing lived phenomenological experience, ethical accountability, and contextual awareness. When sophisticated neural architectures generate seemingly erudite treatises on jurisprudence, bioethics, or aesthetic theory without possessing internal semantic comprehension or existential stakes, readers are confronted with what philosophers term semantic dissociation. The proliferation of syntactically impeccable yet ethically unmoored prose threatens to debase public deliberation unless rigorous provenance frameworks and verification protocols are systematically embedded into digital dissemination channels.",
             "question": "What philosophical concern regarding AI-generated text is highlighted in the excerpt?",
             "options": [
                 "The semantic dissociation between syntactical eloquence and conscious authorial intentionality.",
@@ -980,7 +980,7 @@ FALLBACK_QUESTION_BANKS: Dict[str, List[Dict[str, Any]]] = {
         },
         {
             "type": "writing",
-            "question": "Write a well-structured critical paragraph in English (90 to 140 words) evaluating the extent to which algorithmic recommendation systems in digital media influence public discourse and intellectual diversity.",
+            "question": "Write a well-structured critical paragraph in English (90 to 140 words) evaluating how the transition from lifelong physical community living to hyper-mobile global careerism influences personal identity, loneliness, and intergenerational social solidarity.",
             "options": [],
             "correct_answer": "",
             "explanation": "Evaluated on CEFR C1 written production (up to 10 points): advanced syntactic structures and agreement, sophisticated sentence construction, idiomatic and academic lexical precision, seamless discursive cohesion, and task completion (punctuation errors excluded).",
@@ -989,7 +989,7 @@ FALLBACK_QUESTION_BANKS: Dict[str, List[Dict[str, Any]]] = {
         },
         {
             "type": "speaking",
-            "question": "Please speak in English for 60 to 90 seconds: Deliver an elaborate, structured exposition on how academic institutions should navigate the dual imperatives of rapid technological automation and the preservation of humanistic inquiry.",
+            "question": "Please speak in English for 60 to 90 seconds: Deliver an elaborate, structured exposition on how modern cities can preserve intergenerational social spaces where younger and older generations regularly interact, share skills, and prevent social isolation.",
             "options": ["Record your voice response in English"],
             "correct_answer": "Record your voice response in English",
             "explanation": "Evaluated on CEFR C1 ability to synthesize complex philosophical arguments with nuanced subsidiary points and clear conclusions.",
@@ -1465,6 +1465,11 @@ class ExamGeneratorService:
                     options = [correct, "Alternative B", "Alternative C", "Alternative D"]
                 if correct not in options:
                     options[0] = correct
+                # Garante que as alternativas sejam embaralhadas para que o gabarito
+                # nunca fique previsivelmente fixado na primeira opção (Letra A)
+                opts_shuffled = [str(opt) for opt in options]
+                random.shuffle(opts_shuffled)
+                options = opts_shuffled
 
             min_sec = int(q.get("min_seconds") or specs["speaking_min_seconds"]) if q_type == "speaking" else None
             max_sec = int(q.get("max_seconds") or specs["speaking_limit_seconds"]) if q_type == "speaking" else None
