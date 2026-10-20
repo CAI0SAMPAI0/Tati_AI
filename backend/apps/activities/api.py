@@ -983,15 +983,27 @@ def upload_flashcard_image(request: HttpRequest, file: UploadedFile = File(...))
     return {"url": url}
 
 
+class UploadImageUrlPayload(Schema):
+    url: str
+
+
+class GenerateAiImagePayload(Schema):
+    prompt: Optional[str] = None
+    front: Optional[str] = None
+    back: Optional[str] = None
+    topic: Optional[str] = None
+    explanation: Optional[str] = None
+
+
 @flashcard_assets_router.post("/upload-image-from-url", auth=auth_required)
-def upload_flashcard_image_from_url(request: HttpRequest, payload: dict):
+def upload_flashcard_image_from_url(request: HttpRequest, payload: UploadImageUrlPayload):
     """
     Salva imagem no Cloudinary a partir de uma URL ou retorna a própria URL se Cloudinary falhar.
     """
     require_teacher(request.auth)
     from .assets_service import CloudinaryService
 
-    image_url = (payload.get("url") or "").strip()
+    image_url = (payload.url or "").strip()
     if not image_url:
         raise HttpError(400, "URL é obrigatória.")
     try:
@@ -1003,18 +1015,18 @@ def upload_flashcard_image_from_url(request: HttpRequest, payload: dict):
 
 
 @flashcard_assets_router.post("/ai-image", auth=auth_required)
-def generate_flashcard_ai_image(request: HttpRequest, payload: dict):
+def generate_flashcard_ai_image(request: HttpRequest, payload: GenerateAiImagePayload):
     """
     Gera imagem específica e direta com IA (FLUX.1-dev / Unsplash) sem spoilers e sem imagens aleatórias.
     """
     require_teacher(request.auth)
     from .image_service import ImageResolverService
 
-    prompt = (payload.get("prompt") or "").strip()
-    front = (payload.get("front") or "").strip()
-    back = (payload.get("back") or "").strip()
-    topic = (payload.get("topic") or "").strip() or None
-    explanation = (payload.get("explanation") or "").strip() or None
+    prompt = (payload.prompt or "").strip()
+    front = (payload.front or "").strip()
+    back = (payload.back or "").strip()
+    topic = (payload.topic or "").strip() or None
+    explanation = (payload.explanation or "").strip() or None
 
     term = front or prompt
     if not term:

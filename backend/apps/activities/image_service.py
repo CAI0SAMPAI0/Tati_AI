@@ -35,13 +35,35 @@ CURATED_THEME_FALLBACKS: Dict[str, str] = {
     "clothes": "https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?auto=format&fit=crop&w=800&q=80",
     "weather": "https://images.unsplash.com/photo-1516912481808-3406841bd33c?auto=format&fit=crop&w=800&q=80",
     "education": "https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=800&q=80",
+    "music": "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=800&q=80",
+    "song": "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=800&q=80",
+    "radio": "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?auto=format&fit=crop&w=800&q=80",
+    "technology": "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=800&q=80",
+    "phone": "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=800&q=80",
+    "trend": "https://images.unsplash.com/photo-1483478550801-ceba5fe50e8e?auto=format&fit=crop&w=800&q=80",
+    "trends": "https://images.unsplash.com/photo-1483478550801-ceba5fe50e8e?auto=format&fit=crop&w=800&q=80",
+    "popular": "https://images.unsplash.com/photo-1483478550801-ceba5fe50e8e?auto=format&fit=crop&w=800&q=80",
+    "communication": "https://images.unsplash.com/photo-1577563908411-5077b6dc7624?auto=format&fit=crop&w=800&q=80",
+    "car": "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=800&q=80",
     "default": "https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&w=800&q=80",
 }
 
 
 class ImageResolverService:
-    @staticmethod
+    METAPHORICAL_TOKENS = {
+        "trophy", "medal", "award", "shelf", "puzzle", "symbol", "concept", "icon",
+        "altar", "shrine", "oratory", "podium", "graphic", "diagram", "statue"
+    }
+    ABSTRACT_TERMS = {
+        "popular", "most popular", "becoming popular", "least popular",
+        "trend", "trends", "common", "rare", "changing", "today", "yesterday",
+        "always", "never", "sometimes", "hardly", "difficult", "easy", "important",
+        "essential", "useful", "convenient", "inconvenient", "frequent", "recently"
+    }
+
+    @classmethod
     def compose_search_query(
+        cls,
         term: str,
         topic: Optional[str] = None,
         search_query: Optional[str] = None,
@@ -49,17 +71,47 @@ class ImageResolverService:
     ) -> str:
         """
         Compõe query de busca estruturada e específica para o sujeito visual real do card.
-        Evita poluir termos específicos com tópicos genéricos (ex: não junta 'health' a 'diet/salad').
+        Evita poluir termos específicos com tópicos genéricos e bloqueia símbolos metafóricos (ex: troféu/oratório).
         """
         clean_term = term.strip()
+        lower_term = clean_term.lower()
 
-        # Se houver search_query explícito e específico
-        if search_query and len(search_query.strip()) >= 3:
+        # Verifica se search_query contém termos metafóricos irrelevantes (troféu, estátua, oratório)
+        has_metaphor = bool(search_query and any(tok in search_query.lower() for tok in cls.METAPHORICAL_TOKENS))
+        is_abstract = lower_term in cls.ABSTRACT_TERMS or any(t in lower_term for t in ["popular", "trend", "common", "changing"])
+
+        # Se for termo abstrato com exemplo prático (ex: "This song is the most popular on the radio.")
+        # extrai os substantivos concretos da frase de exemplo para ilustrar a situação real.
+        if is_abstract and explanation and len(explanation.strip()) >= 5:
+            stop_words_expanded = {
+                "to", "a", "an", "the", "in", "on", "at", "of", "for", "with", "and", "is", "are",
+                "this", "that", "these", "those", "my", "your", "his", "her", "their", "our",
+                "it", "they", "we", "you", "i", "he", "she", "was", "were", "be", "been", "being",
+                "have", "has", "had", "do", "does", "did", "can", "could", "will", "would",
+                "very", "more", "most", "popular", "common", "trend", "trends", "today", "now",
+                "many", "much", "all", "some", "any", "not", "so", "as", "one", "people"
+            }
+            exp_tokens = [w.strip(".,;:?!\"'") for w in explanation.split()]
+            concrete_tokens = [w for w in exp_tokens if w.lower() not in stop_words_expanded and len(w) > 2]
+            if concrete_tokens:
+                extracted = " ".join(concrete_tokens[:3])
+                if any(k in extracted.lower() for k in ["song", "radio", "music"]):
+                    return "vintage radio playing music"
+                if any(k in extracted.lower() for k in ["diet", "food", "salad", "meal", "fruit", "nutrition"]):
+                    return f"healthy fresh food {extracted}".strip()
+                if any(k in extracted.lower() for k in ["car", "cars", "electric"]):
+                    return "modern electric car"
+                if any(k in extracted.lower() for k in ["shopping", "online"]):
+                    return "person online shopping"
+                if any(k in extracted.lower() for k in ["weather", "sky", "cloud"]):
+                    return "weather sky clouds"
+                return extracted
+
+        # Se houver search_query explícito, válido e não-metafórico
+        if search_query and len(search_query.strip()) >= 3 and not has_metaphor and not is_abstract:
             sq = search_query.strip()
-            # Se já possui keywords concretas (2+ palavras), usa diretamente
             if len(sq.split()) >= 2:
                 return sq
-            # Se for palavra única de comida/dieta, adiciona contexto de alimentos saudáveis sem 'health'
             if any(k in sq.lower() for k in ["diet", "food", "salad", "meal", "fruit", "nutrition"]):
                 return f"healthy fresh food {sq}"
             if topic and topic.lower() not in sq.lower():
@@ -75,6 +127,9 @@ class ImageResolverService:
         combined_text = f"{clean_term} {explanation or ''}".lower()
         if any(w in combined_text for w in ["diet", "nutrition", "food", "salad", "meal", "eating", "fruit", "vegetable"]):
             return f"healthy fresh food {term_keywords}".strip()
+
+        if any(w in combined_text for w in ["song", "radio", "music"]):
+            return "vintage radio playing music"
 
         extra_keywords = []
         if explanation:
@@ -295,6 +350,15 @@ class ImageResolverService:
         search_str = f"{topic or ''} {term or ''}".lower()
         if any(w in search_str for w in ["diet", "nutrition", "food", "salad", "meal", "eating", "fruit", "vegetable", "snack"]):
             return CURATED_THEME_FALLBACKS["diet"]
+
+        if any(w in search_str for w in ["radio", "song", "music", "podcast"]):
+            return CURATED_THEME_FALLBACKS["radio"]
+
+        if any(w in search_str for w in ["phone", "smartphone", "technology"]):
+            return CURATED_THEME_FALLBACKS["phone"]
+
+        if any(w in search_str for w in ["trend", "popular"]):
+            return CURATED_THEME_FALLBACKS["trend"]
 
         for key, url in CURATED_THEME_FALLBACKS.items():
             if key != "default" and key in search_str:
