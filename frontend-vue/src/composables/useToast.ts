@@ -27,6 +27,10 @@ export function useToast() {
     show(text, 'error', duration);
   }
 
+  function info(text: string, duration?: number) {
+    show(text, 'info', duration);
+  }
+
   function remove(id: string) {
     toasts.value = toasts.value.filter((t) => t.id !== id);
   }
@@ -36,6 +40,8 @@ export function useToast() {
     show,
     success,
     error,
+    info,
     remove,
   };
 }
+

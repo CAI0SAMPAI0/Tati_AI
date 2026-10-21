@@ -58,9 +58,14 @@ export function getStoredSession(): StoredSession | null {
   if (typeof window === 'undefined') return null;
   try {
     const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) return null;
     const rawUser = localStorage.getItem(USER_KEY);
-    if (!token || !rawUser) return null;
-    const user = JSON.parse(rawUser) as User;
+    let user: User;
+    try {
+      user = rawUser ? (JSON.parse(rawUser) as User) : ({ username: 'student' } as User);
+    } catch {
+      user = { username: 'student' } as User;
+    }
     const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
     return { token, user, refreshToken };
   } catch {
@@ -91,3 +96,4 @@ export function clearStoredSession(): void {
     document.cookie = 'auth_token=; path=/; max-age=0; SameSite=Lax';
   } catch {}
 }
+

@@ -239,6 +239,8 @@ class DashboardService:
         results = []
         for u in users:
             st = u.streak_data if isinstance(u.streak_data, dict) else {}
+            prof = u.profile if isinstance(u.profile, dict) else {}
+            last_prof_active = prof.get("last_active") or prof.get("last_seen")
             last_study_at = st.get("last_study_at")
             last_study_date = st.get("last_study_date")
             last_msg = latest_msgs.get(u.username)
@@ -252,6 +254,7 @@ class DashboardService:
             dt_candidates = [
                 d
                 for d in [
+                    parse_dt_to_sp(last_prof_active),
                     parse_dt_to_sp(last_study_at),
                     parse_dt_to_sp(last_study_date),
                     parse_dt_to_sp(last_msg),
@@ -292,6 +295,7 @@ class DashboardService:
                     "role": u.role or "student",
                     "level": u.level or "A1",
                     "focus": focus_val,
+                    "avatar_url": getattr(u, "avatar_url", "") or "",
                     "total_xp": u.total_xp,
                     "streak_count": u.streak_count,
                     "current_streak": u.streak_count,

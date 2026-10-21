@@ -28,6 +28,7 @@ class LoginInput(BaseModel):
 class GoogleAuthInput(BaseModel):
     credential: str
     is_hub_only: bool = False
+    access_token: Optional[str] = None
 
 
 class RefreshTokenInput(BaseModel):

@@ -146,7 +146,16 @@ export interface ExamHistoryItem {
   id: string;
   level: string;
   score: number;
+  total_questions?: number;
   completed_at: string;
   status: string;
   summary?: string;
+  passed?: boolean;
+  feedback?: string;
+  summary_feedback?: string;
+  corrections?: any[];
+  can_do_statements?: string[];
+  skills_breakdown?: any;
+  points_to_improve?: string[];
 }
+

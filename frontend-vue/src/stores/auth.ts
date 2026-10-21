@@ -6,7 +6,7 @@ import {
   saveStoredSession,
   clearStoredSession,
 } from '../api/auth';
-import { apiGet, registerUnauthorizedHandler } from '../api/client';
+import { apiGet, apiPut, registerUnauthorizedHandler } from '../api/client';
 import { ENDPOINTS } from '../api/endpoints';
 import { DEFAULT_ACCENT, getStoredAccent, saveStoredAccent } from '../constants/accents';
 import { DEFAULT_AVATAR_URL } from '../constants/user';
@@ -47,6 +47,10 @@ export const useAuthStore = defineStore('auth', () => {
       apiGet<User>(ENDPOINTS.PROFILE)
         .then((fresh) => {
           user.value = normalizeUserAvatar(fresh);
+          if (fresh.preferred_accent) {
+            accent.value = fresh.preferred_accent;
+            saveStoredAccent(fresh.preferred_accent);
+          }
           saveStoredSession({
             token: session.token,
             user: user.value,
@@ -73,6 +77,25 @@ export const useAuthStore = defineStore('auth', () => {
       accent.value = normalized.preferred_accent;
       saveStoredAccent(normalized.preferred_accent);
     }
+
+    // Immediately fetch full fresh profile in background so avatar, name, and level are always populated
+    apiGet<User>(ENDPOINTS.PROFILE)
+      .then((fresh) => {
+        if (fresh) {
+          const freshNormalized = normalizeUserAvatar(fresh);
+          user.value = freshNormalized;
+          if (fresh.preferred_accent) {
+            accent.value = fresh.preferred_accent;
+            saveStoredAccent(fresh.preferred_accent);
+          }
+          saveStoredSession({
+            token: newToken,
+            user: freshNormalized,
+            refreshToken: newRefreshToken,
+          });
+        }
+      })
+      .catch((err) => console.debug('[Auth] Failed to fetch fresh profile after setSession:', err));
   }
 
   function logout() {
@@ -85,6 +108,7 @@ export const useAuthStore = defineStore('auth', () => {
   function setAccent(newAccent: string) {
     accent.value = newAccent;
     saveStoredAccent(newAccent);
+    apiPut('/profile', { preferred_accent: newAccent, accent: newAccent }).catch(() => {});
   }
 
   function updateUserData(updated: Partial<User>) {
@@ -113,3 +137,4 @@ export const useAuthStore = defineStore('auth', () => {
     updateUserData,
   };
 });
+

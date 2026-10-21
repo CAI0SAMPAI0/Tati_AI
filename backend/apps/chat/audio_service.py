@@ -57,10 +57,10 @@ VOICE_ACCENT_MAP = {
     "en-SG": "en-SG-LunaNeural",
     "en-PH": "en-PH-RosaNeural",
     "en-NG": "en-NG-EzinneNeural",
-    "en-CN": "zh-CN-XiaoxiaoNeural",
     "en-HK": "en-HK-YanNeural",
-    "en-KR": "ko-KR-SunHiNeural",
-    "en-JP": "ja-JP-NanamiNeural",
+    "en-CN": "en-HK-YanNeural",
+    "en-KR": "en-SG-LunaNeural",
+    "en-JP": "en-SG-LunaNeural",
 }
 
 
@@ -179,6 +179,18 @@ NOISE_STRINGS = {
     "thank you.",
     "thank you",
     "subtitles by",
+    "verbatim transcription.",
+    "verbatim transcription",
+    "verbatim transcription...",
+    "verbatim transcription....",
+    "transcription.",
+    "transcription",
+    "and, ah......",
+    "and, ah...",
+    "and ah",
+    "and, ah",
+    "ah......",
+    "and, ah.",
 }
 
 
@@ -186,7 +198,14 @@ def is_noise_or_hallucination(text: str) -> bool:
     if not text:
         return True
     cleaned = text.strip()
-    return bool(NOISE_PATTERN.match(cleaned) or cleaned.lower() in NOISE_STRINGS)
+    low = cleaned.lower()
+    if low in NOISE_STRINGS:
+        return True
+    if low.startswith("verbatim transcription") or low.startswith("transcription:"):
+        return True
+    if re.match(r"^(?:and[,\s]+)?(?:ah|\.+|\s)+$", low):
+        return True
+    return bool(NOISE_PATTERN.match(cleaned))
 
 
 class AudioService:
@@ -393,13 +412,9 @@ class AudioService:
 
         try:
             models_to_try = [
-                os.getenv("GEMINI_AUDIO_MODEL", "gemini-flash-latest"),
-                "gemini-flash-latest",
-                "gemini-3.8-flash",
-                "gemini-3.5-flash",
-                "gemini-3.1-flash-lite",
-                "gemini-2.5-flash-lite",
-                "gemini-2.5-flash",
+                os.getenv("GEMINI_AUDIO_MODEL", "gemini-flash-lite-latest"),
+                "gemini-flash-lite-latest",
+                "gemini-3.5-flash-lite",
             ]
             unique_models = []
             for m in models_to_try:
@@ -427,7 +442,7 @@ class AudioService:
                             contents=contents,
                             config=types.GenerateContentConfig(temperature=0.0),
                         ),
-                        timeout=12.0,
+                        timeout=3.5,
                     )
                     if not resp or not resp.candidates:
                         continue
@@ -489,7 +504,7 @@ class AudioService:
                             create_kwargs["prompt"] = prompt
                         else:
                             create_kwargs["prompt"] = (
-                                "English and Brazilian Portuguese conversation practice. Verbatim transcription."
+                                "English and Brazilian Portuguese conversation practice."
                             )
 
                         resp = await asyncio.wait_for(
@@ -498,6 +513,7 @@ class AudioService:
                         )
                         if resp:
                             text = str(resp).strip()
+                            text = re.sub(r"^(?:verbatim\s+)?transcription[:\s.]*", "", text, flags=re.IGNORECASE).strip()
                             if is_noise_or_hallucination(text):
                                 logger.info(f"[AudioService] Whisper ruído ignorado: {text}")
                                 return ""
@@ -578,6 +594,11 @@ class AudioService:
                 if gemini_text and not is_noise_or_hallucination(gemini_text):
                     logger.info(f"[AudioService] Transcrito com Gemini STT: '{gemini_text[:40]}...'")
                     return gemini_text
+            # Fallback resiliente imediato para Groq Whisper caso Gemini falhe ou 503
+            groq_text = await cls._transcribe_groq_async(audio_bytes=audio_bytes, prompt=prompt)
+            if groq_text and not is_noise_or_hallucination(groq_text):
+                logger.info(f"[AudioService] Fallback imediato Groq Whisper: '{groq_text[:40]}...'")
+                return groq_text
 
             # Fallback para Groq Whisper
             groq_text = await cls._transcribe_groq_async(audio_bytes=audio_bytes, prompt=prompt)

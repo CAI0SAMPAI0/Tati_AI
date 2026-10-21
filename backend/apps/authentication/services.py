@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, timezone, timedelta
+from django.utils import timezone as django_timezone
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from ninja.errors import HttpError
@@ -114,6 +115,16 @@ class AuthService:
             print(f"[Auth] Senha invalida para: '{user.username}'")
             logger.info(f"[Auth] Senha inválida para: {user.username}")
             raise HttpError(401, "Usuário ou senha incorretos.")
+
+        now = django_timezone.now()
+        prof = user.profile if isinstance(user.profile, dict) else {}
+        prof["last_active"] = now.isoformat()
+        user.profile = prof
+        user.updated_at = now
+        try:
+            user.save(update_fields=["updated_at", "profile"])
+        except Exception:
+            pass
 
         if temp_ok:
             user.temp_password = None
@@ -324,43 +335,81 @@ class AuthService:
         return cls._build_user_out(user)
 
     @classmethod
-    def google_login(cls, credential: str, is_hub_only: bool = False) -> TokenResponse:
+    def google_login(
+        cls,
+        credential: str,
+        is_hub_only: bool = False,
+        access_token: str | None = None,
+    ) -> TokenResponse:
         id_info = None
-        # 1. Tenta validar como Google ID Token (JWT)
-        try:
-            google_client_id = getattr(settings, "GOOGLE_CLIENT_ID", "")
-            allowed_audiences = [
-                cid
-                for cid in [
-                    google_client_id,
-                    "180033452403-sdrigagekhqpi9l937fpg3knkfgjgf1p.apps.googleusercontent.com",
-                ]
-                if cid
+        google_client_id = getattr(settings, "GOOGLE_CLIENT_ID", "")
+        allowed_audiences = [
+            cid
+            for cid in [
+                google_client_id,
+                "180033452403-sdrigagekhqpi9l937fpg3knkfgjgf1p.apps.googleusercontent.com",
             ]
+            if cid
+        ]
+
+        # 1. Tenta validar como Google ID Token (JWT) com tolerância a clock skew (300s / 5 min)
+        try:
             id_info = id_token.verify_oauth2_token(
                 credential,
                 google_requests.Request(),
                 audience=allowed_audiences if allowed_audiences else None,
+                clock_skew_in_seconds=300,
             )
         except Exception as e:
             logger.info(
-                f"[Auth] Não é ID Token ou falhou verificação JWT ({e}). Tentando como Access Token..."
+                f"[Auth] id_token.verify_oauth2_token local falhou ({e}). Tentando validação remota via Google tokeninfo..."
             )
 
-        # 2. Fallback: Se for Google Access Token (obtido direto do celular via google_sign_in)
-        if not id_info:
+        # 2. Fallback 1: Validação remota do ID Token diretamente na API do Google (oauth2/v3/tokeninfo)
+        # Esse endpoint é avaliado nos servidores do Google, eliminando qualquer problema de relógio local
+        if not id_info and credential:
             try:
                 import httpx
 
                 resp = httpx.get(
-                    "https://www.googleapis.com/oauth2/v3/userinfo",
-                    headers={"Authorization": f"Bearer {credential}"},
+                    "https://oauth2.googleapis.com/tokeninfo",
+                    params={"id_token": credential},
                     timeout=8.0,
                 )
                 if resp.status_code == 200:
-                    id_info = resp.json()
+                    data = resp.json()
+                    aud = data.get("aud")
+                    if not allowed_audiences or aud in allowed_audiences:
+                        id_info = data
+                        logger.info(f"[Auth] ID Token validado com sucesso via tokeninfo remoto do Google (aud={aud})")
+                    else:
+                        logger.warning(f"[Auth] Google tokeninfo retornou aud inesperado: {aud}")
             except Exception as e:
-                logger.warning(f"[Auth] Validação via Google userinfo falhou: {e}")
+                logger.warning(f"[Auth] Validação remota via Google tokeninfo falhou: {e}")
+
+        # 3. Fallback 2: Se possuir Access Token ou se a própria credencial for um Access Token
+        if not id_info:
+            candidate_tokens = []
+            if access_token:
+                candidate_tokens.append(access_token)
+            if credential and credential != access_token:
+                candidate_tokens.append(credential)
+
+            for token_cand in candidate_tokens:
+                try:
+                    import httpx
+
+                    resp = httpx.get(
+                        "https://www.googleapis.com/oauth2/v3/userinfo",
+                        headers={"Authorization": f"Bearer {token_cand}"},
+                        timeout=8.0,
+                    )
+                    if resp.status_code == 200:
+                        id_info = resp.json()
+                        logger.info("[Auth] Dados do usuário obtidos com sucesso via Google userinfo (Access Token)")
+                        break
+                except Exception as e:
+                    logger.warning(f"[Auth] Validação via Google userinfo falhou: {e}")
 
         if not id_info:
             raise HttpError(401, "Token do Google inválido ou expirado.")
@@ -429,6 +478,16 @@ class AuthService:
                 user.profile = user_prof
                 user.save(update_fields=["profile"])
 
+        now = django_timezone.now()
+        user_prof = user.profile if isinstance(user.profile, dict) else {}
+        user_prof["last_active"] = now.isoformat()
+        user.profile = user_prof
+        user.updated_at = now
+        try:
+            user.save(update_fields=["updated_at", "profile"])
+        except Exception:
+            pass
+
         return cls.build_token_response(user)
 
     @classmethod
@@ -441,5 +500,10 @@ class AuthService:
         user = User.objects.filter(username=username).first()
         if not user:
             raise HttpError(401, "Usuário não encontrado.")
+
+        try:
+            User.objects.filter(username=user.username).update(updated_at=django_timezone.now())
+        except Exception:
+            pass
 
         return cls.build_token_response(user)

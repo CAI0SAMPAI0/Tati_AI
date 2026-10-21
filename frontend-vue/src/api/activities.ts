@@ -24,3 +24,4 @@ export async function getPodcasts(): Promise<any[]> {
 export async function getAccessControl(): Promise<any> {
   return apiGet<any>(ENDPOINTS.ACCESS_CONTROL);
 }
+

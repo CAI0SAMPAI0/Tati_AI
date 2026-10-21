@@ -33,3 +33,4 @@ export function saveStoredAccent(accentId: string): void {
     window.dispatchEvent(new CustomEvent('tati_accent_changed', { detail: accentId }));
   } catch (_) {}
 }
+

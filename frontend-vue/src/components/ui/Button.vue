@@ -3,7 +3,7 @@ import { computed } from 'vue';
 
 const props = withDefaults(
   defineProps<{
-    variant?: 'primary' | 'outline' | 'ghost' | 'danger';
+    variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
     size?: 'sm' | 'md' | 'lg';
     loading?: boolean;
     disabled?: boolean;
@@ -26,6 +26,7 @@ const classes = computed(() => {
 
   const variants = {
     primary: 'bg-primary text-white shadow-glow hover:bg-primary-hover hover:shadow-lg',
+    secondary: 'border border-border bg-surface text-text hover:bg-surface-hover hover:border-primary',
     outline: 'border border-border bg-surface text-text hover:bg-surface-hover hover:border-primary',
     ghost: 'text-text-muted hover:text-text hover:bg-surface-hover',
     danger: 'bg-danger text-white hover:opacity-90 shadow-sm',
@@ -62,3 +63,4 @@ const classes = computed(() => {
     <slot />
   </button>
 </template>
+

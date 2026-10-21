@@ -351,6 +351,18 @@ def submit_developer_bug_report(request: HttpRequest, payload: DeveloperBugRepor
     return DeveloperBugService.create_bug_report(user_info, payload.dict())
 
 
+@activities_router.post("/upload-bug-screenshot", auth=auth_optional)
+def upload_bug_screenshot(request: HttpRequest, file: UploadedFile = File(...)):
+    """
+    Permite upload de captura de tela para anexar ao relatório de bug sem restrições.
+    """
+    from .assets_service import CloudinaryService
+
+    content = file.read()
+    url = CloudinaryService.upload_file(content, file.name)
+    return {"url": url}
+
+
 
 #    HUB DE MATERIAIS & PREMIUM                                         
 

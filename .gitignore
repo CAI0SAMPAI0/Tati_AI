@@ -204,3 +204,6 @@ test_playwright_e2e.js
 test_word_tooltip.js
 
 docker-compose1.yml
+
+test-results/
+playwright-report/

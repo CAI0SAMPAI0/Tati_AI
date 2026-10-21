@@ -16,8 +16,13 @@ export async function getCurrentExam(): Promise<ExamActive> {
 
 export async function submitExam(payload: {
   exam_id: string;
-  answers: Record<string, any>;
+  answers: Array<{
+    question_id: string;
+    answer: string;
+    audio_data?: string;
+  }>;
 }): Promise<{
+  exam_id?: string;
   score: number;
   level: string;
   total_questions: number;
@@ -26,7 +31,18 @@ export async function submitExam(payload: {
   can_do_statements?: string[];
   points_to_improve?: string[];
   summary?: string;
+  summary_feedback?: string;
   passed: boolean;
+  corrections?: Array<{
+    question_id: string;
+    question: string;
+    type: string;
+    student_answer: string;
+    correct_answer: string;
+    is_correct: boolean;
+    points_earned: number;
+    explanation: string;
+  }>;
 }> {
   return apiPost(ENDPOINTS.EXAMS_TRIMESTRAL_SUBMIT, payload);
 }
@@ -42,3 +58,4 @@ export async function resetExam(): Promise<{ message: string }> {
 export async function getTtsAudio(text: string, accent: string = 'en-US'): Promise<{ audio_b64: string }> {
   return apiPost<{ audio_b64: string }>(ENDPOINTS.CHAT_TTS, { text, accent });
 }
+

@@ -17,3 +17,4 @@ export async function getStreak(): Promise<{ current_streak: number; is_active: 
 export async function getXp(): Promise<{ xp: number }> {
   return apiGet<{ xp: number }>(ENDPOINTS.XP);
 }
+

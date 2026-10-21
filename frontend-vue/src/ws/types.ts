@@ -1,0 +1,80 @@
+export type WsMessageType =
+  | 'pong'
+  | 'audio_received'
+  | 'transcription'
+  | 'status'
+  | 'stream_start'
+  | 'stream_token'
+  | 'stream_end'
+  | 'audio_response'
+  | 'drill_start'
+  | 'drill_result'
+  | 'free_warning'
+  | 'new_title'
+  | 'pdf_generated'
+  | 'document_generated'
+  | 'simulation_state'
+  | 'message_id_update'
+  | 'streak_update'
+  | 'error';
+
+export type WsOrigin = 'chat' | 'voice';
+
+export interface WsIncomingMessage {
+  type: WsMessageType;
+  content?: string;
+  token?: string;
+  text?: string;
+  title?: string;
+  conversation_id?: string;
+  audio?: string;
+  pdf_b64?: string;
+  filename?: string;
+  document?: {
+    id: string;
+    title: string;
+    filename: string;
+    format: string;
+    url: string;
+    preview_url?: string;
+    size: string;
+    pdf_b64?: string;
+  };
+  format?: string;
+  url?: string;
+  preview_url?: string;
+  size?: string;
+  result?: unknown;
+  message?: string;
+  completed_objectives?: string[];
+  real_id?: string | number;
+  role?: 'user' | 'assistant';
+  current_streak?: number;
+  longest_streak?: number;
+  trophies_earned?: number;
+  total_trophies?: number;
+}
+
+export interface WsOutgoingMessage {
+  type: 'text' | 'message' | 'audio' | 'file' | 'files' | 'ping' | 'stop';
+  content?: string;
+  audio?: string;
+  filename?: string;
+  files?: Array<{ filename: string; base64: string; type?: string }>;
+  file?: string;
+  caption?: string;
+  origin?: WsOrigin;
+  conv_id?: string | null;
+  conversation_id?: string | null;
+  new_conversation?: boolean;
+  accent?: string;
+}
+
+export interface WsConnectionConfig {
+  origin: WsOrigin;
+  simulationId?: string;
+  onMessage: (msg: WsIncomingMessage) => void;
+  onOpen?: () => void;
+  onClose?: () => void;
+  onError?: (error: Event) => void;
+}

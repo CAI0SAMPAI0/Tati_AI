@@ -5,6 +5,7 @@ from urllib.parse import parse_qs
 from typing import Optional, Dict, Any
 from ninja import Router, File, UploadedFile
 from django.http import HttpRequest
+from django.utils import timezone as django_timezone
 from .models import User
 from ninja.errors import HttpError
 
@@ -113,7 +114,7 @@ def google_auth(request: HttpRequest, payload: GoogleAuthInput):
     """
     Autenticação social via Google OAuth2 (Web popup ou mobile com id_token).
     """
-    return AuthService.google_login(payload.credential, payload.is_hub_only)
+    return AuthService.google_login(payload.credential, payload.is_hub_only, access_token=payload.access_token)
 
 
 def _get_google_redirect_uri(request: HttpRequest) -> str:
@@ -388,14 +389,19 @@ def google_oauth_callback(
                 )
         else:
             tokens = resp.json()
-            id_token_str = tokens.get("id_token")
-            if not id_token_str:
+            id_token_str = tokens.get("id_token") or ""
+            access_token_str = tokens.get("access_token") or ""
+            if not id_token_str and not access_token_str:
                 return HttpResponse(
                     "<h3>Token de identidade não retornado pelo Google. Pode fechar esta janela.</h3>",
                     status=400,
                 )
 
-            token_res = AuthService.google_login(id_token_str)
+            token_res = AuthService.google_login(
+                credential=id_token_str or access_token_str,
+                is_hub_only=False,
+                access_token=access_token_str,
+            )
             user_dict = (
                 token_res.user.dict()
                 if hasattr(token_res.user, "dict")
@@ -660,9 +666,31 @@ def get_me(request: HttpRequest):
 def get_profile(request: HttpRequest):
     """
     Retorna o perfil do usuário logado (usado no bootstrap do frontend).
+    Atualiza timestamp de atividade para indicar presença no dashboard.
     """
     user: User = request.auth
+    now = django_timezone.now()
+    try:
+        User.objects.filter(username=user.username).update(updated_at=now)
+    except Exception as e:
+        logger.debug(f"[Profile] Erro ao atualizar updated_at: {e}")
     return AuthService._build_user_out(user)
+
+
+@profile_router.post("/heartbeat", auth=auth_required)
+@auth_router.post("/heartbeat", auth=auth_required)
+def user_heartbeat(request: HttpRequest):
+    """
+    Heartbeat leve enviado periodicamente pelo frontend enquanto o aluno
+    está ativo para manter o status 'Using now' no dashboard em tempo real.
+    """
+    user: User = request.auth
+    now = django_timezone.now()
+    try:
+        User.objects.filter(username=user.username).update(updated_at=now)
+    except Exception as e:
+        logger.debug(f"[Heartbeat] Erro ao atualizar presença: {e}")
+    return {"ok": True, "active": True, "timestamp": now.isoformat()}
 
 
 @profile_router.put("", response=UserOut, auth=auth_required)

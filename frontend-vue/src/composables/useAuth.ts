@@ -19,3 +19,4 @@ export function useAuth() {
     updateUserData: store.updateUserData,
   };
 }
+

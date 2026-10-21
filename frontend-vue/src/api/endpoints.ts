@@ -12,8 +12,19 @@ export const ENDPOINTS = {
   // Permissions
   ACCESS_CONTROL: '/users/permissions/access',
 
+  // Onboarding
+  ONBOARDING: '/users/onboarding',
+
+  // Weekly plan
+  WEEKLY_PLAN: '/users/weekly-plan',
+  WEEKLY_PLAN_TRANSITION: '/users/weekly-plan/transition',
+
   // Progress & Gamification
   PROGRESS: '/users/progress',
+  PROGRESS_WEEKLY: '/users/progress/reports/weekly',
+  PROGRESS_MONTHLY: '/users/progress/reports/monthly',
+  PROGRESS_WEEKLY_PLAN: '/users/progress/weekly-plan',
+  PROGRESS_WEEKLY_PLAN_PROGRESS: '/users/progress/weekly-plan/progress',
   STREAK: '/users/streak',
   XP: '/users/xp',
   GOALS: '/users/goals',
@@ -25,11 +36,24 @@ export const ENDPOINTS = {
   CONVERSATION_MESSAGES: (id: string) => `/chat/conversations/${id}/messages`,
   EDIT_MESSAGE: (convId: string, msgId: string) => `/chat/conversations/${convId}/messages/${msgId}`,
   CONVERSATION_SUMMARY: (id: string) => `/chat/conversations/${id}/summary`,
+  CHAT_MESSAGE: '/chat/message',
+  CHAT_DOWNLOAD_REPORT: '/chat/download_report',
   CHAT_TTS: '/chat/tts',
   CHAT_WS: '/chat/ws',
   LEVELING_START: '/chat/leveling/start',
   LEVELING_STATUS: '/chat/leveling/status',
   LEVELING_FINISH: '/chat/leveling/finish',
+  LEVELING_PUBLIC_START: '/chat/leveling/public/start',
+  LEVELING_PUBLIC_STEP: '/chat/leveling/public/step',
+  LEVELING_PUBLIC_SUBMIT: '/chat/leveling/public/submit',
+  WORD_LOOKUP: '/chat/word-lookup',
+
+  // Avatar
+  AVATAR_FRAMES: '/avatar/frames',
+
+  // Payments
+  PAYMENTS_SUBSCRIBE: '/payments/subscribe',
+  PAYMENTS_STATUS: '/payments/status',
 
   // Notifications
   NOTIFICATIONS: '/notifications',
@@ -49,6 +73,10 @@ export const ENDPOINTS = {
   ACTIVITIES_PODCASTS_WARMUP: '/activities/podcasts/warmup',
   ACTIVITIES_PODCASTS_RECOMMENDATIONS: '/activities/podcasts/recommendations',
   ACTIVITIES_PODCAST_DETAIL: (id: string) => `/activities/podcasts/${id}`,
+  ACTIVITIES_PODCASTS_EXERCISES: (id: string) => `/activities/podcasts/${id}/exercises`,
+  ACTIVITIES_PODCASTS_EVALUATE: '/activities/podcasts/evaluate',
+  ACTIVITIES_PODCASTS_PROGRESS: '/activities/podcasts/progress',
+  ACTIVITIES_PODCASTS_COMPLETE: (id: string) => `/activities/podcasts/${id}/complete`,
 
   // Trimestral Exams
   EXAMS_TRIMESTRAL_STATUS: '/exams/trimestral/status',
@@ -59,6 +87,22 @@ export const ENDPOINTS = {
   EXAMS_TRIMESTRAL_RESET: '/exams/trimestral/reset',
 
   // Admin & Dashboard
+  DASHBOARD_STATS: '/dashboard/stats',
+  DASHBOARD_STUDENTS: '/dashboard/students',
+  DASHBOARD_DIFFICULTIES: '/dashboard/difficulties',
+  DASHBOARD_BUYERS: '/dashboard/buyers',
   ADMIN_STUDENTS: '/dashboard/students',
   ADMIN_SIMULATIONS: '/dashboard/simulations',
+  ADMIN_GAMES: '/dashboard/games',
+  ADMIN_NEWS: '/dashboard/news',
+  ADMIN_FLASHCARDS_GENERATE: '/dashboard/flashcards/generate',
+  ADMIN_PREMIUM: '/admin/premium',
+  ADMIN_PREMIUM_UPLOAD: '/admin/premium/upload',
+
+  TEST_ENGLISH_CONTENT: (level: string, category: string) =>
+    `/activities/test-english/content?level=${level}&category=${category}`,
+
+  // Keep-alive
+  CORS_TEST: '/cors-test',
 } as const;
+

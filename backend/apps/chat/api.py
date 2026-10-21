@@ -219,6 +219,14 @@ def edit_message(
     )
 
 
+@chat_router.delete("/conversations", auth=auth_required)
+def delete_all_conversations(request: HttpRequest):
+    """
+    Remove todas as conversas do aluno logado de forma atômica e rápida.
+    """
+    return ConversationService.delete_all_conversations(request.auth)
+
+
 @chat_router.delete("/conversations/{conversation_id}", auth=auth_required)
 def delete_conversation(request: HttpRequest, conversation_id: str):
     """

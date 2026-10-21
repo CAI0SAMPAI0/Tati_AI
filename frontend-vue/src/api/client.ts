@@ -126,7 +126,27 @@ async function request<T>(
   }
 
   if (!response.ok) {
-    const message = responseData?.detail || responseData?.message || `Request failed with status ${response.status}`;
+    let message = `Request failed with status ${response.status}`;
+    if (responseData) {
+      if (typeof responseData === 'string') {
+        message = responseData;
+      } else if (typeof responseData.detail === 'string') {
+        message = responseData.detail;
+      } else if (typeof responseData.message === 'string') {
+        message = responseData.message;
+      } else if (typeof responseData.error === 'string') {
+        message = responseData.error;
+      } else if (Array.isArray(responseData.detail)) {
+        message = responseData.detail
+          .map((d: any) => (typeof d === 'string' ? d : d.msg || JSON.stringify(d)))
+          .join(', ');
+      } else if (typeof responseData === 'object') {
+        const firstVal = Object.values(responseData)[0];
+        if (typeof firstVal === 'string') message = firstVal;
+        else if (Array.isArray(firstVal) && typeof firstVal[0] === 'string') message = firstVal[0];
+        else message = JSON.stringify(responseData);
+      }
+    }
     throw new ApiClientError(message, response.status, path, responseData);
   }
 
@@ -156,3 +176,25 @@ export function apiDelete<T>(path: string, options?: RequestOptions): Promise<T>
 export function apiPostForm<T>(path: string, form: URLSearchParams | FormData, options?: RequestOptions): Promise<T> {
   return request<T>('POST', path, form, options);
 }
+
+export function apiUpload<T>(path: string, form: FormData, options?: RequestOptions): Promise<T> {
+  return request<T>('POST', path, form, options);
+}
+
+export async function apiFetch(path: string, options: RequestOptions = {}): Promise<Response> {
+  const url = resolvePath(path);
+  const headers: Record<string, string> = {
+    ...options.headers,
+  };
+
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  if (options.auth !== false && token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  return fetch(url, {
+    headers,
+    ...options,
+  });
+}
+

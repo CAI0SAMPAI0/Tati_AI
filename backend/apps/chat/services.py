@@ -460,8 +460,8 @@ class ConversationService:
         try:
             msg_uuid = uuid.UUID(str(message_id))
             msg = Message.objects.filter(session_id=conversation_id, id=msg_uuid).first()
-        except (ValueError, TypeError):
-            msg = Message.objects.filter(session_id=conversation_id, id=message_id).first()
+        except Exception:
+            msg = None
 
         if not msg:
             raise HttpError(404, "Mensagem não encontrada.")
@@ -501,6 +501,16 @@ class ConversationService:
             "audio_b64": reply_res.get("audio_b64"),
             "assistant_message_id": reply_res.get("id"),
         }
+
+    @staticmethod
+    def delete_all_conversations(user: User) -> dict:
+        user_conv_ids = list(
+            Conversation.objects.filter(username=user.username).values_list("id", flat=True)
+        )
+        if user_conv_ids:
+            Message.objects.filter(session_id__in=user_conv_ids).delete()
+            Conversation.objects.filter(id__in=user_conv_ids).delete()
+        return {"ok": True, "message": "Todas as conversas foram removidas com sucesso."}
 
     @staticmethod
     def delete_conversation(user: User, conversation_id: str) -> dict:

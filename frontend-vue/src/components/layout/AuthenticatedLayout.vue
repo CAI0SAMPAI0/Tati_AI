@@ -3,31 +3,35 @@ import { ref, computed } from 'vue';
 import { useRoute } from 'vue-router';
 import { useAuth } from '@/composables/useAuth';
 import MainHeader from './MainHeader.vue';
-import Sidebar from './Sidebar.vue';
 import SidebarActivities from './SidebarActivities.vue';
 import ToastContainer from '../ui/ToastContainer.vue';
 
 const route = useRoute();
-const { isAuthenticated, isLoaded } = useAuth();
-const isSidebarOpen = ref(false);
+const { isLoaded } = useAuth();
+const isSidebarOpen = ref(true);
 
-const isActivitiesArea = computed(() => {
+const isStandaloneLayout = computed(() => {
   return (
-    route.path.startsWith('/activities') ||
-    route.path.startsWith('/exams') ||
-    route.path.startsWith('/history') ||
-    route.path.startsWith('/progress') ||
-    route.path.startsWith('/goals') ||
-    route.path.startsWith('/achievements') ||
-    route.path.startsWith('/competitions')
+    route.path === '/chat' ||
+    route.path.startsWith('/chat/') ||
+    route.path === '/dashboard' ||
+    route.path === '/voice' ||
+    route.path.startsWith('/voice') ||
+    route.path.startsWith('/activities/hub') ||
+    route.path.startsWith('/flashcards/') ||
+    route.path === '/payment' ||
+    route.path.startsWith('/payment') ||
+    route.path === '/receipt' ||
+    route.path.startsWith('/receipt') ||
+    route.path === '/shop' ||
+    route.path === '/profile' ||
+    route.path.startsWith('/profile') ||
+    route.path === '/settings' ||
+    route.path.startsWith('/settings') ||
+    route.path === '/exams/doing' ||
+    route.path.startsWith('/exams/doing')
   );
 });
-
-const isChatPage = computed(() => route.path === '/chat' || route.path.startsWith('/chat/'));
-
-function toggleSidebar() {
-  isSidebarOpen.value = !isSidebarOpen.value;
-}
 </script>
 
 <template>
@@ -43,32 +47,30 @@ function toggleSidebar() {
       <p class="font-display font-bold text-sm text-text-muted">Carregando Teacher Taty...</p>
     </div>
 
-    <!-- Main Authenticated Layout -->
+    <!-- Main Authenticated View -->
     <div v-else class="flex-1 flex flex-col h-screen overflow-hidden">
-      <!-- Top Header for non-chat pages or pages requiring global header -->
-      <MainHeader v-if="!isChatPage" @toggle-menu="toggleSidebar" />
+      <!-- 1. Dedicated layout pages (Chat & Dashboard have their own sidebars & headers) -->
+      <router-view v-if="isStandaloneLayout" />
 
-      <!-- Body Area with Sidebar and Content -->
-      <div class="flex-1 flex overflow-hidden">
-        <!-- Sidebar for Activities -->
+      <!-- 2. Hub / Activities pages (Exams, Activities, History, Progress, Goals, Achievements, Vocab, Profile) -->
+      <div v-else class="flex-1 flex overflow-hidden relative">
         <SidebarActivities
-          v-if="isActivitiesArea && !isChatPage"
           :is-open="isSidebarOpen"
           @close="isSidebarOpen = false"
         />
 
-        <!-- General Sidebar for Dashboard/Profile -->
-        <Sidebar
-          v-else-if="!isChatPage"
-          :is-open="isSidebarOpen"
-          @close="isSidebarOpen = false"
-        />
+        <div
+          class="flex-1 flex flex-col min-w-0 transition-all duration-300 h-screen overflow-hidden"
+          :class="isSidebarOpen ? 'md:ml-[280px]' : 'md:ml-0'"
+        >
+          <MainHeader @toggle-menu="isSidebarOpen = !isSidebarOpen" />
 
-        <!-- Main Content View -->
-        <main class="flex-1 overflow-y-auto relative bg-bg flex flex-col">
-          <router-view />
-        </main>
+          <main class="flex-1 overflow-y-auto relative bg-bg custom-scrollbar flex flex-col">
+            <router-view />
+          </main>
+        </div>
       </div>
     </div>
   </div>
 </template>
+

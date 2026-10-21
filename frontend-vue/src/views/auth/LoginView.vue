@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { Bug, ArrowLeft } from 'lucide-vue-next';
 import { useAuth } from '@/composables/useAuth';
@@ -64,11 +64,61 @@ function switchTab(tab: Tab) {
   clearMessages();
 }
 
+async function handleGoogleCredential(response: { credential: string }) {
+  clearMessages();
+  loading.value = true;
+  try {
+    const res = await loginWithGoogle(response.credential);
+    setSession(res.access_token, res.user, res.refresh_token);
+    const isHub = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('access') === 'hub';
+    if (isHub || (res.user as any)?.is_hub_only) {
+      window.location.href = import.meta.env.VITE_HUB_SITE_URL || 'http://localhost:3001/materiais';
+    } else {
+      router.push('/chat');
+    }
+  } catch (err: any) {
+    error.value = err?.data?.detail || err?.message || 'Error authenticating with Google.';
+  } finally {
+    loading.value = false;
+  }
+}
+
+function handleGoogleMessage(event: MessageEvent) {
+  if (event.data && event.data.type === 'GOOGLE_AUTH_SUCCESS' && event.data.token) {
+    const isHub = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('access') === 'hub';
+    setSession(
+      event.data.token,
+      event.data.user || { username: 'student' },
+      event.data.refreshToken || event.data.refresh_token
+    );
+    if (isHub || event.data.user?.is_hub_only) {
+      window.location.href = import.meta.env.VITE_HUB_SITE_URL || 'http://localhost:3001/materiais';
+    } else {
+      router.replace('/chat');
+    }
+  }
+}
+
 onMounted(() => {
-  // Check for google callback tokens in query params
-  const token = route.query.token as string | undefined;
-  const refreshToken = route.query.refresh_token as string | undefined;
-  const userParam = route.query.user as string | undefined;
+  if (typeof window !== 'undefined') {
+    window.addEventListener('message', handleGoogleMessage);
+  }
+
+  // Check for google callback tokens in query params or directly in window.location.search
+  const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+  const token = (route.query.token as string | undefined) || searchParams?.get('token') || undefined;
+  const refreshToken = (route.query.refresh_token as string | undefined) || searchParams?.get('refresh_token') || undefined;
+  const userParam = (route.query.user as string | undefined) || searchParams?.get('user') || undefined;
+  const credential = (route.query.credential as string | undefined) || searchParams?.get('credential') || undefined;
+  const isHub = route.query.access === 'hub' || searchParams?.get('access') === 'hub';
+
+  if (credential) {
+    handleGoogleCredential({ credential });
+    if (typeof window !== 'undefined') {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+    return;
+  }
 
   if (token) {
     let userObj: any = null;
@@ -80,19 +130,65 @@ onMounted(() => {
           userObj = JSON.parse(decodeURIComponent(userParam));
         }
       }
-    } catch {}
+    } catch (_) {}
+
+    if (typeof window !== 'undefined') {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
 
     setSession(token, userObj || { username: 'student' }, refreshToken);
-    router.replace('/chat');
+    if (isHub || userObj?.is_hub_only) {
+      window.location.href = import.meta.env.VITE_HUB_SITE_URL || 'http://localhost:3001/materiais';
+    } else {
+      router.replace('/chat');
+    }
+  }
+});
+
+onUnmounted(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('message', handleGoogleMessage);
   }
 });
 
 function handleGoogleLogin() {
   clearMessages();
   loading.value = true;
+  error.value = '';
+
+  if (typeof window !== 'undefined') {
+    const isFlutter = (window as any).isFlutterApp || (window as any).flutter_inappwebview;
+    if (isFlutter && (window as any).flutter_inappwebview?.callHandler) {
+      (window as any).flutter_inappwebview
+        .callHandler('googleLogin')
+        .then(async (res: any) => {
+          try {
+            if (res && res.token && res.user) {
+              setSession(res.token, res.user, res.refreshToken || res.refresh_token);
+              router.push('/chat');
+            } else if (res && res.success) {
+              router.push('/chat');
+            } else {
+              loading.value = false;
+            }
+          } catch (sessionErr) {
+            console.error('[Login] Flutter google session error:', sessionErr);
+            loading.value = false;
+            error.value = 'Erro ao salvar sessão.';
+          }
+        })
+        .catch(() => {
+          loading.value = false;
+        });
+      return;
+    }
+  }
+
   const base = API_BASE || '';
-  const origin = encodeURIComponent(window.location.origin);
-  const targetUrl = `${base.replace(/\/+$/, '')}/auth/google/login?origin=${origin}`;
+  const origin = typeof window !== 'undefined' ? encodeURIComponent(window.location.origin) : '';
+  const isHub = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('access') === 'hub';
+  const hubParam = isHub ? '&access=hub' : '';
+  const targetUrl = `${base.replace(/\/+$/, '')}/auth/google/login?origin=${origin}${hubParam}`;
   window.location.href = targetUrl;
 }
 
@@ -422,3 +518,4 @@ async function handleResetSubmit() {
     </div>
   </main>
 </template>
+

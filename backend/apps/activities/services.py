@@ -2785,13 +2785,10 @@ class SpeechService:
             base_prompt += f"\n\nObservação de sotaque preferido pelo aluno: {accent}. Adapte a tolerância fonética ao dialeto correspondente."
 
 
-        # Prioriza modelos modernos ativos de alta performance e disponibilidade
-        env_model = os.getenv("GEMINI_AUDIO_MODEL", "gemini-flash-latest")
+        # Prioriza modelos rápidos e ativos sem travar a requisição
         models_to_try = [
-            env_model,
-            "gemini-flash-latest",
-            "gemini-3.8-flash",
-            "gemini-3.1-flash-lite",
+            "gemini-flash-lite-latest",
+            "gemini-3.5-flash-lite",
         ]
         unique_models = []
         for m in models_to_try:
@@ -2816,7 +2813,7 @@ class SpeechService:
                         contents=contents,
                         config=config,
                     ),
-                    timeout=8.0,
+                    timeout=3.5,
                 )
 
                 if resp and resp.text:
@@ -2824,11 +2821,9 @@ class SpeechService:
                     if isinstance(parsed, dict) and "score" in parsed:
                         return parsed
             except Exception as e:
-                err_str = str(e)
                 logger.warning(f"[SpeechService] Tentativa multimodal com modelo {model} falhou: {e}")
-                if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "quota" in err_str.lower():
-                    logger.warning("[SpeechService] Quota Gemini esgotada (429). Interrompendo tentativas e acionando Groq Whisper diretamente.")
-                    break
+                # Falha rápida para acionar Groq Whisper imediatamente
+                break
         return None
 
 
@@ -3043,7 +3038,7 @@ class SubmissionService:
 
 class ExternalContentService:
     DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
-    TE_LEVELS = ["A1", "A2", "B1", "B1+", "B2", "C1"]
+    TE_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"]
     TE_CATEGORIES = {
         "grammar": "grammar-points",
         "vocabulary": "vocabulary",
@@ -3070,20 +3065,30 @@ class ExternalContentService:
 
         enriched = []
         if level.lower() in ("all", "any"):
-            for lvl in cls.TE_LEVELS:
-                lvl_path = "b1-b2" if lvl in ("B1+", "B1-B2") else lvl.lower()
+            for lvl in ["A1", "A2", "B1", "B2", "C1"]:
+                lvl_path = "b1-b2" if lvl == "B1" else lvl.lower()
                 for it in cat_data.get(lvl, []):
                     slug = it.get("slug", "")
                     if slug in ("grammar-points", "vocabulary", "listening", "reading", ""):
                         slug = it.get("title", "").lower().replace(":", "").replace("'", "").replace("?", "").replace(" ", "-")
                     url = it.get("url") or f"https://test-english.com/{cat_slug}/{lvl_path}/{slug}/"
                     enriched.append({**it, "url": url, "level": lvl})
+                if lvl == "B1":
+                    for it in (cat_data.get("B1+") or cat_data.get("B1-B2") or []):
+                        slug = it.get("slug", "")
+                        if slug in ("grammar-points", "vocabulary", "listening", "reading", ""):
+                            slug = it.get("title", "").lower().replace(":", "").replace("'", "").replace("?", "").replace(" ", "-")
+                        url = it.get("url") or f"https://test-english.com/{cat_slug}/b1-b2/{slug}/"
+                        enriched.append({**it, "url": url, "level": "B1"})
         else:
             level_code = level.upper().strip()
-            items = cat_data.get(level_code) or []
-            if not items and level_code in ("B1+", "B1-PLUS", "B1_PLUS", "B1-B2", "B1_B2"):
-                items = cat_data.get("B1+") or cat_data.get("B1-B2") or []
-            lvl_path = "b1-b2" if level_code in ("B1+", "B1-PLUS", "B1-B2") else level_code.lower()
+            items = list(cat_data.get(level_code) or [])
+            if level_code == "B1":
+                items.extend(cat_data.get("B1+") or cat_data.get("B1-B2") or [])
+            elif level_code == "C2" and not items:
+                items = list(cat_data.get("C1") or [])
+
+            lvl_path = "b1-b2" if level_code in ("B1", "B1+", "B1-PLUS", "B1-B2") else level_code.lower()
             for it in items:
                 slug = it.get("slug", "")
                 if slug in ("grammar-points", "vocabulary", "listening", "reading", ""):

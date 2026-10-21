@@ -12,11 +12,19 @@ export function useAudioRecorder() {
       throw new Error('Microphone access is not supported on this browser.');
     }
 
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
+    });
     audioChunks = [];
     recordingDuration.value = 0;
 
-    const mimeType = MediaRecorder.isTypeSupported('audio/webm')
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+      ? 'audio/webm;codecs=opus'
+      : MediaRecorder.isTypeSupported('audio/webm')
       ? 'audio/webm'
       : MediaRecorder.isTypeSupported('audio/mp4')
       ? 'audio/mp4'
@@ -25,12 +33,13 @@ export function useAudioRecorder() {
     mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
 
     mediaRecorder.ondataavailable = (event) => {
-      if (event.data.size > 0) {
+      if (event.data && event.data.size > 0) {
         audioChunks.push(event.data);
       }
     };
 
-    mediaRecorder.start();
+    // Continuous 200ms slicing guarantees data chunks in buffer
+    mediaRecorder.start(200);
     isRecording.value = true;
 
     timerInterval = window.setInterval(() => {
@@ -100,3 +109,4 @@ export function useAudioRecorder() {
     cancelRecording,
   };
 }
+

@@ -143,6 +143,8 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
             from apps.chat.audio_service import AudioService
 
             raw_audio = content.get("audio") or ""
+            # Confirmação imediata de recebimento do áudio ao frontend para cancelar watchdog de fallback HTTP
+            await self.send_json({"type": "audio_received", "conversation_id": conv_id})
             try:
                 text_content = await AudioService.transcribe_audio_async(raw_audio)
             except Exception as e:

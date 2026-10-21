@@ -48,3 +48,4 @@ export function levelLabel(raw: string | null | undefined): string {
   const code = normalizeLevel(raw);
   return CEFR_LABEL_MAP[code] ?? code;
 }
+
