@@ -2,17 +2,16 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-RUN apk add --no-cache libc6-compat
-
 COPY package.json package-lock.json* ./
 
 RUN npm ci
 
 COPY . .
 
-ARG NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
-ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
-ENV NEXT_TELEMETRY_DISABLED=1
+ARG VITE_API_BASE_URL=http://localhost:8000
+ARG VITE_WS_BASE_URL=ws://localhost:8000
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+ENV VITE_WS_BASE_URL=$VITE_WS_BASE_URL
 ENV NODE_ENV=production
 
 RUN npm run build
@@ -22,15 +21,12 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/next.config.js ./next.config.js
+RUN npm install -g serve
+
+COPY --from=builder /app/dist ./dist
 
 EXPOSE 3000
 
-CMD ["npm", "start"]
+CMD ["serve", "-s", "dist", "-l", "3000"]

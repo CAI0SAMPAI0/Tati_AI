@@ -2,11 +2,8 @@ import type { Config } from 'tailwindcss';
 
 const config: Config = {
   content: [
-    './pages/**/*.{js,ts,jsx,tsx,mdx}',
-    './components/**/*.{js,ts,jsx,tsx,mdx}',
-    './app/**/*.{js,ts,jsx,tsx,mdx}',
-    './providers/**/*.{js,ts,jsx,tsx,mdx}',
-    './hooks/**/*.{js,ts,jsx,tsx,mdx}',
+    './index.html',
+    './src/**/*.{vue,js,ts,jsx,tsx}',
   ],
   darkMode: ['class'],
   theme: {
@@ -62,7 +59,7 @@ const config: Config = {
         display: ['var(--font-display)', 'Sora', 'sans-serif'],
         editorial: ['var(--font-lora)', 'Lora', 'Georgia', 'serif'],
         lora: ['var(--font-lora)', 'Lora', 'Georgia', 'serif'],
-        body: ['var(--font-body)', 'DM Sans', 'sans-serif'],
+        body: ['var(--font-body)', 'DM Sans', 'Inter', 'sans-serif'],
         mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
       },
       fontSize: {
