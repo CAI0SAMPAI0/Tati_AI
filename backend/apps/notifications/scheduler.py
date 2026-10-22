@@ -67,7 +67,7 @@ def _release_db_advisory_lock(lock_key: str) -> None:
 class BackgroundNotificationRunner:
     """
     Executa um daemon leve em segundo plano no processo do Django para:
-    1. Manter o WAHA (Render) acordado com ping periódico (evita suspensão no Render).
+    1. Aquecer o WAHA (Railway Serverless) às 17h50 BRT para acordar o container antes dos disparos.
     2. Disparar notificações agendadas pontualmente no Horário de Brasília (BRT):
        - 18:00 BRT: Lembrete diário de ofensiva (Streak) via Email, Push e WhatsApp.
        - 14:00 BRT: Lembrete de inatividade para alunos ausentes.
@@ -106,9 +106,9 @@ class BackgroundNotificationRunner:
                 tick += 1
                 now_brt = datetime.now(BRT_ZONE)
 
-                # 1. Manter o WAHA na Render (a cada 10 minutos / 20 ticks de 30s)
-                if tick % 20 == 1:
-                    cls._ping_waha()
+                # 1. Aquecimento do WAHA na Railway às 17h50 BRT (acorda o container serverless)
+                if now_brt.hour == 17 and now_brt.minute >= 50:
+                    cls._warmup_waha_for_streak(now_brt)
 
                 # 2. Lembrete diário de ofensiva (Janela das 18h BR)
                 if now_brt.hour == 18:
@@ -164,12 +164,28 @@ class BackgroundNotificationRunner:
                 pass
 
     @classmethod
-    def _ping_waha(cls):
+    def _warmup_waha_for_streak(cls, now_brt):
+        """
+        Envia uma requisição às 17h50 BRT para acordar o container serverless do WAHA na Railway
+        e iniciar a sessão default, garantindo prontidão para os envios das 18h BRT.
+        """
+        lock_key = f"cron_lock_waha_warmup_{now_brt.date().isoformat()}"
+        if not cache.add(lock_key, "locked", timeout=86400):
+            return
+
+        if not _acquire_db_advisory_lock(lock_key):
+            logger.info(f"[Scheduler] Tarefa {lock_key} já possui lock de banco ativo em outro worker. Pulando.")
+            return
+
         try:
             from apps.notifications.waha_service import WahaService
-            WahaService.ping_keepalive()
+            logger.info("[Scheduler] Aquecendo container WAHA na Railway às 17h50 BRT...")
+            res = WahaService.start_session("default")
+            logger.info(f"[Scheduler] Aquecimento WAHA concluído: {res}")
         except Exception as e:
-            logger.debug(f"[Scheduler] Erro no ping keepalive: {e}")
+            logger.warning(f"[Scheduler] Falha ao aquecer WAHA: {e}")
+        finally:
+            _release_db_advisory_lock(lock_key)
 
     @classmethod
     def _run_daily_streak(cls, now_brt):
@@ -194,9 +210,18 @@ class BackgroundNotificationRunner:
                 logger.info("[Scheduler] Lembretes de streak já foram processados hoje no banco. Pulando.")
                 return
 
-            logger.info("[Scheduler] Disparando lembretes de streak das 17:00 BRT...")
+            logger.info("[Scheduler] Disparando lembretes de streak das 18:00 BRT...")
             res = NotificationSchedulerService.send_daily_streak_reminders_to_all_active_students()
             logger.info(f"[Scheduler] Streak concluído: {res}")
+
+            # Desliga a sessão do WAHA para permitir que o container entre em sleep na Railway
+            try:
+                from apps.notifications.waha_service import WahaService
+                logger.info("[Scheduler] Finalizando sessão WAHA para liberar o container ao modo sleep na Railway...")
+                stop_res = WahaService.stop_session("default")
+                logger.info(f"[Scheduler] Sessão WAHA parada: {stop_res}")
+            except Exception as waha_err:
+                logger.warning(f"[Scheduler] Falha ao parar sessão WAHA pós-streak: {waha_err}")
         except Exception as e:
             logger.error(f"[Scheduler] Erro ao enviar lembretes de streak: {e}")
         finally:

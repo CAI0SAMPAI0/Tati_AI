@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   ArrowLeft,
@@ -826,8 +826,44 @@ function handleRetrySentence(item: SavedHistoryItem) {
     inputMode.value = 'custom';
   }
 
+  // No mobile, rola a visualização suavemente ao topo para praticar imediatamente
   if (window.innerWidth < 1024) {
-    isHistorySidebarOpen.value = false;
+    if (mainScrollContainerRef.value) {
+      mainScrollContainerRef.value.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+}
+
+const historySectionRef = ref<HTMLElement | null>(null);
+const mainScrollContainerRef = ref<HTMLElement | null>(null);
+
+function handleToggleHistory() {
+  if (window.innerWidth < 1024) {
+    if (!isHistorySidebarOpen.value) {
+      isHistorySidebarOpen.value = true;
+      nextTick(() => {
+        historySectionRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+      return;
+    }
+
+    if (historySectionRef.value) {
+      const rect = historySectionRef.value.getBoundingClientRect();
+      // Se a seção de histórico já estiver visível no topo da tela, volta ao topo suavemente
+      if (rect.top <= 120 && rect.bottom > 200) {
+        if (mainScrollContainerRef.value) {
+          mainScrollContainerRef.value.scrollTo({ top: 0, behavior: 'smooth' });
+        } else {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      } else {
+        historySectionRef.value.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+  } else {
+    isHistorySidebarOpen.value = !isHistorySidebarOpen.value;
   }
 }
 
@@ -879,7 +915,7 @@ onUnmounted(() => {
       </div>
 
       <!-- Botão para alternar painel lateral de histórico -->
-      <button type="button" @click="isHistorySidebarOpen = !isHistorySidebarOpen"
+      <button type="button" @click="handleToggleHistory"
         class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-sm active:scale-95"
         :class="isHistorySidebarOpen ? 'bg-primary text-white border-primary shadow-primary/20' : 'bg-surface border-border text-text hover:border-primary/40'"
         title="Toggle practice history">
@@ -892,9 +928,9 @@ onUnmounted(() => {
       </button>
     </header>
 
-    <div class="flex-1 min-h-0 flex flex-col lg:flex-row w-full overflow-hidden">
+    <div ref="mainScrollContainerRef" class="flex-1 min-h-0 flex flex-col lg:flex-row w-full overflow-y-auto lg:overflow-hidden scroll-smooth">
       <!-- Painel principal de gravação e leitura -->
-      <div class="flex-1 flex flex-col items-center p-4 md:p-8 overflow-y-auto custom-scrollbar w-full">
+      <div class="w-full lg:flex-1 flex flex-col items-center p-4 md:p-8 lg:overflow-y-auto custom-scrollbar shrink-0 lg:shrink">
         <div class="w-full max-w-2xl space-y-4">
           <!-- Seletor do modo de entrada -->
           <div class="flex gap-2 mb-3 w-full">
@@ -1236,7 +1272,7 @@ onUnmounted(() => {
               <!-- Provedor de análise fonética -->
               <div v-if="result.phonetic?.provider" class="text-[0.65rem] text-text-muted">
                 Phonetic provider: {{ result.phonetic.provider }}
-              </div><div class="flex-1 flex flex-col items-center justify-center p-4 md:p-8 overflow-y-auto custom-scrollbar w-full"></div>
+              </div>
             </div>
           </div>
 
@@ -1244,9 +1280,9 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!-- Barra lateral fixa / gaveta de histórico de pronúncia -->
-      <aside v-if="isHistorySidebarOpen"
-        class="w-full lg:w-96 border-t lg:border-t-0 lg:border-l border-border bg-bg-secondary/30 backdrop-blur-sm flex flex-col h-auto lg:h-full shrink-0 transition-all shadow-2xl">
+      <!-- Barra lateral / seção de histórico de pronúncia -->
+      <aside ref="historySectionRef" v-if="isHistorySidebarOpen"
+        class="w-full lg:w-96 border-t lg:border-t-0 lg:border-l border-border bg-bg-secondary/30 backdrop-blur-sm flex flex-col shrink-0 lg:h-full transition-all shadow-2xl lg:shadow-none pb-12 lg:pb-0">
         <!-- Topo da barra lateral -->
         <div class="p-4 border-b border-border flex items-center justify-between shrink-0 bg-surface/60">
           <div class="flex items-center gap-2">
@@ -1257,14 +1293,14 @@ onUnmounted(() => {
               {{ savedHistory.length }}
             </span>
           </div>
-          <button type="button" @click="isHistorySidebarOpen = false"
-            class="lg:hidden p-1.5 rounded-lg text-text-muted hover:text-text hover:bg-surface" title="Close panel">
+          <button type="button" @click="handleToggleHistory"
+            class="lg:hidden p-1.5 rounded-lg text-text-muted hover:text-text hover:bg-surface cursor-pointer" title="Scroll to top">
             <X :size="16" />
           </button>
         </div>
 
         <!-- Lista de treinos anteriores -->
-        <div class="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">
+        <div class="p-3 space-y-3 lg:flex-1 lg:overflow-y-auto custom-scrollbar">
           <div v-if="isLoadingHistory" class="py-8 text-center text-xs text-text-muted">
             <RotateCcw :size="18" class="animate-spin mx-auto mb-2 text-primary" />
             Loading history...

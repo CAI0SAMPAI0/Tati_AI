@@ -36,7 +36,8 @@ class WahaService:
         api_url = cls._get_api_url()
         headers = cls._get_headers()
         try:
-            with httpx.Client(timeout=10.0) as client:
+            # Timeout estendido (35s) para permitir cold start quando o container estiver em sleep serverless
+            with httpx.Client(timeout=35.0) as client:
                 # 1. Verifica status atual da sessão no WAHA
                 status_res = client.get(f"{api_url}/api/sessions/{session_name}", headers=headers)
                 current_status = None
@@ -88,7 +89,8 @@ class WahaService:
         api_url = cls._get_api_url()
         headers = cls._get_headers()
         try:
-            with httpx.Client(timeout=10.0) as client:
+            # Timeout estendido (35s) para permitir cold start quando o container estiver em sleep serverless
+            with httpx.Client(timeout=35.0) as client:
                 res = client.post(f"{api_url}/api/sessions/{session_name}/restart", headers=headers)
                 if res.status_code in (200, 201):
                     return {"success": True, "session": session_name, "status": "STARTING", "data": res.json()}
@@ -109,7 +111,8 @@ class WahaService:
     def stop_session(cls, session_name: str = "default") -> dict[str, Any]:
         url = f"{cls._get_api_url()}/api/sessions/{session_name}/stop"
         try:
-            with httpx.Client(timeout=10.0) as client:
+            # Timeout estendido (35s) para permitir cold start quando o container estiver em sleep serverless
+            with httpx.Client(timeout=35.0) as client:
                 res = client.post(url, headers=cls._get_headers())
                 return {"success": True, "status": "STOPPED"}
         except Exception as e:
@@ -140,7 +143,8 @@ class WahaService:
         if not api_url or "localhost" in api_url:
             return False
         try:
-            with httpx.Client(timeout=10.0) as client:
+            # Timeout estendido (35s) para permitir cold start quando o container estiver em sleep serverless
+            with httpx.Client(timeout=35.0) as client:
                 res = client.get(f"{api_url}/api/sessions", headers=cls._get_headers())
                 logger.info(f"[WAHA KeepAlive] Render WAHA ping response: {res.status_code}")
                 return res.status_code == 200
