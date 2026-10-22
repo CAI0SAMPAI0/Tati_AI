@@ -23,9 +23,9 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
+# Copia dependências e fontes para suportar tanto produção ('serve') quanto desenvolvimento ('vite')
+COPY --from=builder /app ./
 RUN npm install -g serve
-
-COPY --from=builder /app/dist ./dist
 
 EXPOSE 3000
 
