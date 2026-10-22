@@ -677,7 +677,7 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!-- Accent Picker Modal via Teleport to body -->
+      <!-- Modal seletor de sotaques via Teleport to body -->
       <Teleport to="body">
         <div v-if="isAccentMenuOpen"
           class="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/75 dark:bg-black/85 animate-in fade-in duration-200">
@@ -902,7 +902,7 @@ onUnmounted(() => {
       </footer>
     </div>
 
-    <!-- Word Tooltip -->
+    <!-- Dica da palavra -->
     <WordTooltip v-if="activeWord" :word="activeWord" :position="tooltipPos" @close="activeWord = null" />
   </div>
 </template>

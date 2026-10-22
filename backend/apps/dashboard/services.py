@@ -1458,7 +1458,46 @@ class DashboardService:
                 },
             ],
         }
+        
+    @staticmethod
+    def get_student_pronunciation_practice(username: str) -> dict:
+        u = User.objects.filter(username=username).first()
+        if not u:
+            raise HttpError(404, "Estudante não encontrado.")
+        
+        from apps.activities.models import PronunciationHistory
+        
+        pronunciations = PronunciationHistory.objects.filter(username=username).order_by("-created_at")
+        pronunciation_list = [
+            {
+                "id": str(p.id),
+                "target_phrase": p.target_phrase,
+                "spoken_phrase": p.spoken_phrase,
+                "score": p.score,
+                "accuracy_score": p.accuracy_score,
+                "words_result": p.words_result,
+                "feedback": p.feedback,
+                "accent": p.accent,
+                "mode": p.mode,
+                "created_at": p.created_at.isoformat() if p.created_at else None,
+            }
+            for p in pronunciations[:20]
+        ]
+        
+        last_item = pronunciations.first()
+        last_practice_date = last_item.created_at.isoformat() if last_item and last_item.created_at else None
 
+        return {
+            "pronunciation_list": pronunciation_list,
+            "total_pronunciations": pronunciations.count(),
+            "pronunciation_completed": pronunciations.filter(score__gte=70).count(),
+            "last_practice_date": last_practice_date,
+            "current_level": u.level or "A1",
+            "messages_count": Message.objects.filter(username=username, role="user").count(),
+            "exercises_completed": ActivitySubmission.objects.filter(username=username).count(),
+        }
+    
+    
     @staticmethod
     def update_student(username: str, data: dict) -> dict:
         u = User.objects.filter(username=username).first()

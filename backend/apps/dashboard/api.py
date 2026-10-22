@@ -166,6 +166,16 @@ def get_student_recommendations(
     require_staff_user(request)
     return DashboardService.get_student_recommendations(username, lang)
 
+@dashboard_router.get("/students/{username}/pronunciation-practice", auth=auth_required)
+def get_student_pronunciation_practice(
+    request: HttpRequest, username: str
+):
+    """
+    Retorna se o estudante praticou pelo Pronunciation Practice no dia.
+    """
+    require_staff_user(request)
+    return DashboardService.get_student_pronunciation_practice(username)
+
 
 class StudentUpdateInput(BaseModel):
     level: Optional[str] = None

@@ -2582,7 +2582,11 @@ class SpeechService:
         # 🔄 2. Fallback resiliente (caso não haja áudio ou o Gemini esteja inacessível)
         if audio_b64 and not spoken_phrase:
             try:
-                spoken_phrase = await AudioService.transcribe_audio_async(audio_b64) or ""
+                spoken_phrase = await AudioService.transcribe_audio_async(
+                    audio_b64,
+                    prompt=f"English pronunciation practice of sentence: {target_phrase}" if target_phrase else "English speech verbatim transcription.",
+                    language="en",
+                ) or ""
             except Exception as e:
                 logger.warning(f"Error transcribing pronunciation audio: {e}")
                 spoken_phrase = ""
@@ -2785,10 +2789,11 @@ class SpeechService:
             base_prompt += f"\n\nObservação de sotaque preferido pelo aluno: {accent}. Adapte a tolerância fonética ao dialeto correspondente."
 
 
-        # Prioriza modelos rápidos e ativos sem travar a requisição
+        # Prioriza modelos rápidos e ativos com timeout adequado para processamento de áudio
         models_to_try = [
-            "gemini-flash-lite-latest",
+            os.getenv("GEMINI_AUDIO_MODEL", "gemini-3.5-flash-lite"),
             "gemini-3.5-flash-lite",
+            "gemini-flash-lite-latest",
         ]
         unique_models = []
         for m in models_to_try:
@@ -2813,7 +2818,7 @@ class SpeechService:
                         contents=contents,
                         config=config,
                     ),
-                    timeout=3.5,
+                    timeout=15.0,
                 )
 
                 if resp and resp.text:
@@ -2821,9 +2826,8 @@ class SpeechService:
                     if isinstance(parsed, dict) and "score" in parsed:
                         return parsed
             except Exception as e:
-                logger.warning(f"[SpeechService] Tentativa multimodal com modelo {model} falhou: {e}")
-                # Falha rápida para acionar Groq Whisper imediatamente
-                break
+                logger.warning(f"[SpeechService] Tentativa multimodal com modelo {model} falhou ({type(e).__name__}): {e}")
+                continue
         return None
 
 

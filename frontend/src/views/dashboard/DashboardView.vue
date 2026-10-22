@@ -9,21 +9,8 @@ import {
   ShoppingBag,
   Zap,
   ChevronRight,
-  Sparkles,
-  Layers,
-  Drama,
-  Gamepad2,
-  Newspaper,
-  BookOpen,
-  MessageCircle,
-  QrCode,
-  CheckCircle2,
-  AlertCircle,
-  Plus,
-  Play,
-  RotateCcw,
 } from 'lucide-vue-next';
-import { apiGet, apiPost } from '@/api/client';
+import { apiGet } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
 import { useAuth } from '@/composables/useAuth';
 import { canAccessDashboard, formatLastActive, isUserActiveNow } from '@/utils';
@@ -58,7 +45,7 @@ watch([isLoaded, hasAccess], ([loaded, access]) => {
   }
 });
 
-// Active section synchronization with URL
+// Sincronização da seção ativa com a URL
 const validSections: DashSection[] = [
   'overview',
   'students',
@@ -109,7 +96,7 @@ onMounted(() => {
   }
 });
 
-// Data fetching
+// Carregamento de dados
 const stats = ref<any>(null);
 const students = ref<any[]>([]);
 const searchQuery = ref('');
@@ -163,17 +150,17 @@ onMounted(() => {
   }
   loadDashboardData();
 
-  // Refresh clock every 5s for reactive 'Using now'
+  // Atualiza o relógio a cada 10s para o indicador reativo 'Using now'
   clockInterval = setInterval(() => {
     currentNow.value = Date.now();
-  }, 5000);
+  }, 10000);
 
-  // Refetch every 10 seconds for real-time presence & metrics
+  // Atualiza a cada 10 segundos para presença e métricas em tempo real
   pollInterval = setInterval(() => {
     loadDashboardData(true);
   }, 10000);
 
-  // Revalidate immediately on focus / connect / tab visible
+  // Revalida imediatamente ao focar / reconectar / aba visível
   window.addEventListener('focus', handleRevalidate);
   window.addEventListener('online', handleRevalidate);
   document.addEventListener('visibilitychange', () => {

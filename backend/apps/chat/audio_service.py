@@ -7,7 +7,7 @@ import asyncio
 import time
 import hashlib
 from asgiref.sync import async_to_sync
-from typing import List
+from typing import List, Optional
 from groq import AsyncGroq
 import edge_tts
 import edge_tts.constants
@@ -401,7 +401,7 @@ class AudioService:
 
     @classmethod
     async def _transcribe_gemini_async(
-        cls, audio_bytes: bytes, mime_type: str, prompt: str = ""
+        cls, audio_bytes: bytes, mime_type: str, prompt: str = "", language: Optional[str] = None
     ) -> str:
         """
         Transcreve áudio via Google Gemini STT em memória (Inline Data).
@@ -412,9 +412,9 @@ class AudioService:
 
         try:
             models_to_try = [
-                os.getenv("GEMINI_AUDIO_MODEL", "gemini-flash-lite-latest"),
-                "gemini-flash-lite-latest",
+                os.getenv("GEMINI_AUDIO_MODEL", "gemini-3.5-flash-lite"),
                 "gemini-3.5-flash-lite",
+                "gemini-flash-lite-latest",
             ]
             unique_models = []
             for m in models_to_try:
@@ -423,8 +423,11 @@ class AudioService:
 
             instruction = (
                 prompt
-                or "Transcribe the audio speech verbatim and accurately, preserving ESL pronunciation, accents, and mixed English/Portuguese without translating or normalizing words. "
-                "Output only the verbatim spoken words without markdown, introductions or commentary."
+                or (
+                    "Transcribe the audio speech verbatim and accurately in English. Do not translate to Portuguese. Output only the verbatim spoken words without markdown, introductions or commentary."
+                    if language == "en"
+                    else "Transcribe the audio speech verbatim and accurately, preserving ESL pronunciation, accents, and mixed English/Portuguese without translating or normalizing words. Output only the verbatim spoken words without markdown, introductions or commentary."
+                )
             )
 
             for model in unique_models:
@@ -442,7 +445,7 @@ class AudioService:
                             contents=contents,
                             config=types.GenerateContentConfig(temperature=0.0),
                         ),
-                        timeout=3.5,
+                        timeout=15.0,
                     )
                     if not resp or not resp.candidates:
                         continue
@@ -459,7 +462,7 @@ class AudioService:
                                 if text_found:
                                     return text_found
                 except Exception as mod_err:
-                    logger.warning(f"[AudioService] Gemini STT ({model}) falhou: {mod_err}")
+                    logger.warning(f"[AudioService] Gemini STT ({model}) falhou ({type(mod_err).__name__}): {mod_err}")
 
             return ""
         except Exception as e:
@@ -468,7 +471,7 @@ class AudioService:
 
     @classmethod
     async def _transcribe_groq_async(
-        cls, audio_bytes: bytes, prompt: str = ""
+        cls, audio_bytes: bytes, prompt: str = "", language: Optional[str] = None
     ) -> str:
         """
         Transcreve áudio com Groq Whisper com failover multi-chaves e modelos rápidos.
@@ -500,11 +503,15 @@ class AudioService:
                             "response_format": "text",
                             "temperature": 0.0,
                         }
+                        if language:
+                            create_kwargs["language"] = language
                         if prompt:
                             create_kwargs["prompt"] = prompt
                         else:
                             create_kwargs["prompt"] = (
-                                "English and Brazilian Portuguese conversation practice."
+                                "English pronunciation and speech practice."
+                                if language == "en"
+                                else "English and Brazilian Portuguese conversation practice."
                             )
 
                         resp = await asyncio.wait_for(
@@ -524,7 +531,7 @@ class AudioService:
 
     @classmethod
     async def transcribe_audio_async(
-        cls, audio_data: str | bytes, prompt: str = ""
+        cls, audio_data: str | bytes, prompt: str = "", language: Optional[str] = None
     ) -> str:
         """
         Transcreve áudio de forma nativamente assíncrona.
@@ -568,7 +575,7 @@ class AudioService:
 
         # 1. Se provedor primário for Groq Whisper (padrão de alta performance: ~0.7s)
         if provider != "gemini":
-            groq_text = await cls._transcribe_groq_async(audio_bytes=audio_bytes, prompt=prompt)
+            groq_text = await cls._transcribe_groq_async(audio_bytes=audio_bytes, prompt=prompt, language=language)
             if groq_text and not is_noise_or_hallucination(groq_text):
                 logger.info(f"[AudioService] Transcrito com Groq Whisper: '{groq_text[:40]}...'")
                 return groq_text
@@ -578,7 +585,7 @@ class AudioService:
                 mime_type = detect_audio_mime_type(audio_bytes)
                 logger.info("[AudioService] Fallback para Google Gemini STT...")
                 gemini_text = await cls._transcribe_gemini_async(
-                    audio_bytes=audio_bytes, mime_type=mime_type, prompt=prompt
+                    audio_bytes=audio_bytes, mime_type=mime_type, prompt=prompt, language=language
                 )
                 if gemini_text and not is_noise_or_hallucination(gemini_text):
                     logger.info(f"[AudioService] Transcrito com Gemini STT: '{gemini_text[:40]}...'")
@@ -589,19 +596,19 @@ class AudioService:
                 mime_type = detect_audio_mime_type(audio_bytes)
                 logger.info("[AudioService] Utilizando Gemini STT como motor primário...")
                 gemini_text = await cls._transcribe_gemini_async(
-                    audio_bytes=audio_bytes, mime_type=mime_type, prompt=prompt
+                    audio_bytes=audio_bytes, mime_type=mime_type, prompt=prompt, language=language
                 )
                 if gemini_text and not is_noise_or_hallucination(gemini_text):
                     logger.info(f"[AudioService] Transcrito com Gemini STT: '{gemini_text[:40]}...'")
                     return gemini_text
             # Fallback resiliente imediato para Groq Whisper caso Gemini falhe ou 503
-            groq_text = await cls._transcribe_groq_async(audio_bytes=audio_bytes, prompt=prompt)
+            groq_text = await cls._transcribe_groq_async(audio_bytes=audio_bytes, prompt=prompt, language=language)
             if groq_text and not is_noise_or_hallucination(groq_text):
                 logger.info(f"[AudioService] Fallback imediato Groq Whisper: '{groq_text[:40]}...'")
                 return groq_text
 
             # Fallback para Groq Whisper
-            groq_text = await cls._transcribe_groq_async(audio_bytes=audio_bytes, prompt=prompt)
+            groq_text = await cls._transcribe_groq_async(audio_bytes=audio_bytes, prompt=prompt, language=language)
             if groq_text and not is_noise_or_hallucination(groq_text):
                 logger.info(f"[AudioService] Fallback para Groq Whisper: '{groq_text[:40]}...'")
                 return groq_text

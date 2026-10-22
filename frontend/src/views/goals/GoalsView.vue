@@ -14,7 +14,6 @@ import {
   Users,
   CheckCircle2,
   Target,
-  RefreshCw,
 } from 'lucide-vue-next';
 import { apiGet } from '@/api/client';
 
@@ -211,7 +210,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- Filter Tabs & Section Header -->
+    <!-- Abas de filtro & Section Header -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4">
       <div>
         <h2 class="text-lg font-bold text-text">Activity Goals</h2>

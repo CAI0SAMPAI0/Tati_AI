@@ -6,7 +6,7 @@ const { toasts, remove } = useToast();
 </script>
 
 <template>
-  <div class="fixed top-4 right-4 z-[99999999] flex flex-col gap-2 max-w-sm w-full pointer-events-none">
+  <div class="fixed top-4 left-4 right-4 sm:left-auto sm:right-4 z-[99999999] flex flex-col gap-2 max-w-[calc(100vw-2rem)] sm:max-w-sm sm:w-full pointer-events-none">
     <transition-group
       enter-active-class="transform ease-out duration-300 transition"
       enter-from-class="translate-y-[-10px] opacity-0 sm:translate-y-0 sm:translate-x-4"
@@ -25,16 +25,16 @@ const { toasts, remove } = useToast();
           'bg-surface/95 border-border text-text': toast.type === 'info',
         }"
       >
-        <div class="flex items-center gap-2.5">
+        <div class="flex items-center gap-2.5 min-w-0 flex-1">
           <CheckCircle2 v-if="toast.type === 'success'" class="w-5 h-5 flex-shrink-0 text-success" />
           <AlertCircle v-else-if="toast.type === 'error'" class="w-5 h-5 flex-shrink-0 text-danger" />
           <Info v-else class="w-5 h-5 flex-shrink-0 text-primary" />
-          <span class="text-xs sm:text-sm font-semibold">{{ toast.text }}</span>
+          <span class="text-xs sm:text-sm font-semibold break-words leading-tight">{{ toast.text }}</span>
         </div>
         <button
           type="button"
           @click="remove(toast.id)"
-          class="text-text-muted hover:text-text p-1 transition-colors"
+          class="text-text-muted hover:text-text p-1 transition-colors flex-shrink-0"
         >
           <X class="w-4 h-4" />
         </button>

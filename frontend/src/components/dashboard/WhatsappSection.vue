@@ -475,7 +475,7 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!-- Search & Status Filter Tabs -->
+      <!-- Search & Status Abas de filtro -->
       <div class="p-4 sm:p-6 border-b border-border flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between bg-bg-secondary/20">
         <div class="relative flex-1 max-w-md">
           <Search class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-text-subtle" />
@@ -487,7 +487,7 @@ onUnmounted(() => {
           />
         </div>
 
-        <!-- Filter tabs -->
+        <!-- Abas de filtro -->
         <div class="flex items-center gap-1.5 p-1 bg-surface border border-border rounded-xl overflow-x-auto">
           <button
             type="button"

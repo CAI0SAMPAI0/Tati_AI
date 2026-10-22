@@ -63,6 +63,7 @@ export const ENDPOINTS = {
 
   // Speech & Pronunciation
   SPEECH_VERIFY_PRONUNCIATION: '/speech/verify-pronunciation',
+  SPEECH_PRONUNCIATION_HISTORY: '/speech/pronunciation-history',
 
   // Activities
   ACTIVITIES_MODULES: '/activities/flashcards/my',
@@ -105,4 +106,5 @@ export const ENDPOINTS = {
   // Keep-alive
   CORS_TEST: '/cors-test',
 } as const;
+
 

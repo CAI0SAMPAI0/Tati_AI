@@ -351,3 +351,20 @@ class TrimestralExam(models.Model):
         return f"TrimestralExam {self.username} [{self.level}] - {self.status} ({self.score}%)"
 
 
+class PronunciationHistory(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    username = models.CharField(max_length=150, db_index=True)
+    target_phrase = models.TextField()
+    spoken_phrase = models.TextField(blank=True, default="")
+    score = models.FloatField(default=0.0)
+    accuracy_score = models.FloatField(default=0.0)
+    fluency_score = models.FloatField(default=0.0)
+    words_result = models.JSONField(default=list, blank=True)
+    feedback = models.TextField(blank=True, default="")
+    accent = models.CharField(max_length=50, default="en-US")
+    mode = models.CharField(max_length=50, default="preset")  # preset, custom, free
+    user_audio_b64 = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    class Meta:
+        db_table = "pronunciation_history"
+        ordering = ["-created_at"]

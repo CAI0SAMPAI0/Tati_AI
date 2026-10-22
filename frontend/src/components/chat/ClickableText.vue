@@ -111,7 +111,7 @@ const wordTokens = computed(() => {
 </script>
 
 <template>
-  <!-- If word tooltips are disabled, just display plain text -->
+  <!-- If Dica da palavras are disabled, just display plain text -->
   <div v-if="!wordTooltipEnabled" class="whitespace-pre-wrap leading-relaxed" :class="className">
     {{ content }}
   </div>

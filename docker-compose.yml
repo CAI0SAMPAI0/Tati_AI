@@ -25,15 +25,17 @@ services:
       - PORT=8000
       - DJANGO_SETTINGS_MODULE=app.settings.development
       - DEBUG=True
-      - WATCHFILES_FORCE_POLLING=true
+      - PYTHONDONTWRITEBYTECODE=1
     ports:
       - '8000:8000'
     volumes:
-      - ./backend:/app
+      - ./backend:/app:delegated 
       - ./backend/media:/app/media
+      - /app/.pytest_cache
+      - /app/__pycache__
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
-      interval: 10s
+      interval: 15s
       timeout: 5s
       retries: 5
       start_period: 25s
@@ -58,12 +60,12 @@ services:
       - VITE_API_BASE_URL=http://localhost:8000
       - VITE_WS_BASE_URL=ws://localhost:8000
       - NODE_ENV=development
-      - CHOKIDAR_USEPOLLING=true
     ports:
       - '3000:3000'
     volumes:
-      - ./frontend:/app
+      - ./frontend:/app:delegated
       - /app/node_modules
+      - /app/.vite
 
   celery_worker:
     build:
@@ -76,7 +78,7 @@ services:
         "watchfiles",
         "--filter",
         "python",
-        "celery -A app worker -l info --concurrency=2",
+        "celery -A app worker -l info --concurrency=1",
         "/app",
       ]
     healthcheck:
@@ -85,7 +87,7 @@ services:
       - .env
     environment:
       - DJANGO_SETTINGS_MODULE=app.settings.development
-      - WATCHFILES_FORCE_POLLING=true
+      - PYTHONDONTWRITEBYTECODE=1
     volumes:
       - ./backend:/app
     depends_on:

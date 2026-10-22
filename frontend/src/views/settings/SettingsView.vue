@@ -293,7 +293,7 @@ async function handleSave() {
             <h2 class="font-bold text-sm uppercase tracking-wider text-text">Chat Preferences</h2>
           </div>
           <div class="p-6 space-y-6">
-            <!-- Word Tooltip Checkbox -->
+            <!-- Dica da palavra Checkbox -->
             <label class="flex items-center justify-between cursor-pointer">
               <div>
                 <p class="text-sm font-bold text-text">Word Tooltip</p>

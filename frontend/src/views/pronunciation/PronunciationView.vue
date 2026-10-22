@@ -17,9 +17,12 @@ import {
   MessageSquare,
   X,
   Globe,
+  History,
+  Play,
+  Pause,
 } from 'lucide-vue-next';
 import { useAuth } from '@/composables/useAuth';
-import { apiPost } from '@/api/client';
+import { apiPost, apiGet } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
 
 interface WordResult {
@@ -59,19 +62,24 @@ interface PracticeSentence {
 type InputMode = 'preset' | 'custom' | 'free';
 
 const PRACTICE_SENTENCES: PracticeSentence[] = [
-  // A1 - Basic introductions, everyday objects, simple needs
+  // A1 - Apresentações básicas, objetos cotidianos e necessidades simples (ordenadas do mais básico ao progressivo)
   { text: 'Hello, my name is Maria.', level: 'A1', tip: "Focus on clear 'H' and 'L' sounds." },
   { text: 'I am a student from Brazil.', level: 'A1', tip: "Short 'a' in 'am' — don't draw it out." },
   { text: 'I live in a small apartment.', level: 'A1', tip: "The 'v' in 'live' touches your upper teeth." },
   { text: 'This is my friend, John.', level: 'A1', tip: "The 'th' in 'this' — tongue between teeth." },
-  { text: 'I like coffee and bread.', level: 'A1', tip: "Stress 'cof-fee' on the first syllable." },
+  { text: 'I like coffee and fresh bread.', level: 'A1', tip: "Stress 'cof-fee' on the first syllable." },
   { text: 'She goes to school by bus.', level: 'A1', tip: "The 's' in 'bus' is sharp, not like 'z'." },
-  { text: 'We have two cats at home.', level: 'A1', tip: "Short 'a' in 'cats' — keep it quick." },
-  { text: 'He works in a big hospital.', level: 'A1', tip: "Stress 'HOS-pi-tal' on the first syllable." },
-  { text: 'The book is on the table.', level: 'A1', tip: "Clear 't' at the start of 'table'." },
-  { text: 'It is a sunny day today.', level: 'A1', tip: "Double 'n' in 'sunny' — one smooth sound." },
+  { text: 'We have two friendly cats at home.', level: 'A1', tip: "Short 'a' in 'cats' — keep it quick." },
+  { text: 'He works in a big city hospital.', level: 'A1', tip: "Stress 'HOS-pi-tal' on the first syllable." },
+  { text: 'The notebook is on the wooden table.', level: 'A1', tip: "Clear 't' at the start of 'table'." },
+  { text: 'It is a warm sunny day today.', level: 'A1', tip: "Double 'n' in 'sunny' — one smooth sound." },
+  { text: 'Where is the train station?', level: 'A1', tip: "Clear 'w' sound with rounded lips." },
+  { text: 'I drink water every morning.', level: 'A1', tip: "The 'r' in 'water' and 'drink' should be smooth." },
+  { text: 'They play soccer in the park.', level: 'A1', tip: "Crisp 'k' at the end of 'park'." },
+  { text: 'My sister is twenty years old.', level: 'A1', tip: "Pronounce 'twen-ty' clearly without dropping 't'." },
+  { text: 'Can I have a cup of tea, please?', level: 'A1', tip: "Polite rising tone at the end of the sentence." },
 
-  // A2 - Daily routines, travel, personal experiences
+  // A2 - Rotinas diárias, viagens e experiências pessoais
   { text: "I usually wake up at seven o'clock.", level: 'A2', tip: "The 's' in 'usually' sounds like 'zh'." },
   { text: "She doesn't like to wake up early.", level: 'A2', tip: "The 'ea' in 'early' is one long sound." },
   { text: 'I have been learning English for three years.', level: 'A2', tip: 'TH sound: place tongue between teeth.' },
@@ -82,8 +90,13 @@ const PRACTICE_SENTENCES: PracticeSentence[] = [
   { text: 'My brother is taller than me.', level: 'A2', tip: "The 'th' in 'than' — tongue between teeth." },
   { text: 'It rained a lot during our vacation.', level: 'A2', tip: "The 'ai' in 'rained' is a long sound." },
   { text: 'Can you tell me where the station is?', level: 'A2', tip: "The 's' in 'station' sounds like 'sh'." },
+  { text: 'We cooked dinner together yesterday evening.', level: 'A2', tip: "Pronounce '-ed' in 'cooked' as a crisp 't'." },
+  { text: 'She visited her grandparents last Saturday.', level: 'A2', tip: "Stress 'grand-par-ents' on the first syllable." },
+  { text: 'How much does this pair of shoes cost?', level: 'A2', tip: "Link 'pair of' smoothly into one unit." },
+  { text: 'I took the subway because the traffic was heavy.', level: 'A2', tip: "Short 'u' in 'subway' and clear 'v' in 'heavy'." },
+  { text: 'He forgot his umbrella at the office.', level: 'A2', tip: "Stress 'um-BREL-la' on the second syllable." },
 
-  // B1 - Opinions, experiences, work, future plans
+  // B1 - Opiniões, experiências, trabalho e planos futuros
   { text: 'I think we should take a break now.', level: 'B1', tip: "The 'th' in 'think' is unvoiced — tongue out." },
   { text: 'I would have gone if I had known about it.', level: 'B1', tip: 'Past conditionals: rhythm matters more than speed.' },
   { text: 'The weather has been particularly warm this month.', level: 'B1', tip: "Link words smoothly: 'has been', 'this month'." },
@@ -94,8 +107,13 @@ const PRACTICE_SENTENCES: PracticeSentence[] = [
   { text: 'We are looking forward to the weekend trip.', level: 'B1', tip: "Phrasal verb stress: 'LOOK-ing for-WARD'." },
   { text: 'He apologized for arriving late to the meeting.', level: 'B1', tip: "Stress 'a-PO-lo-gized' on the second syllable." },
   { text: 'The movie was not as good as I expected.', level: 'B1', tip: "The 'x' in 'expected' sounds like 'ks'." },
+  { text: 'I have never travelled abroad on my own before.', level: 'B1', tip: "Clear 'v' in 'travelled' and open vowel in 'abroad'." },
+  { text: 'Could you give me some advice on my resume?', level: 'B1', tip: "Pronounce 'ad-VICE' with an unvoiced 's' sound." },
+  { text: 'If it rains tomorrow, we will stay at home.', level: 'B1', tip: "First conditional: emphasize condition and result." },
+  { text: 'She explained the process very clearly to everyone.', level: 'B1', tip: "Pronounce '-ed' in 'explained' as 'd'." },
+  { text: 'I am used to getting up early every day.', level: 'B1', tip: "Pronounce 'used to' as 'yoost to'." },
 
-  // B2 - Abstract ideas, debates, professional topics
+  // B2 - Ideias abstratas, debates e temas profissionais
   { text: "The instructions were quite straightforward, weren't they?", level: 'B2', tip: 'Tag questions rise at the end for real questions.' },
   { text: 'If I were you, I would reconsider the entire approach.', level: 'B2', tip: "Subjunctive 'were' — don't skip it." },
   { text: 'The committee has decided to postpone the project indefinitely.', level: 'B2', tip: 'Multi-syllable words: give each syllable space.' },
@@ -106,8 +124,13 @@ const PRACTICE_SENTENCES: PracticeSentence[] = [
   { text: 'The outbreak of the pandemic changed everything overnight.', level: 'B2', tip: "The 'p' in 'pandemic' is aspirated (puff of air)." },
   { text: 'We need to foster a culture of innovation and collaboration.', level: 'B2', tip: "The 't' in 'culture' sounds like 'ch'." },
   { text: 'The phenomenon is not as straightforward as it seems.', level: 'B2', tip: "Stress 'phe-NO-me-non' on the second syllable." },
+  { text: 'He managed to articulate his arguments with compelling clarity.', level: 'B2', tip: "Stress 'ar-TIC-u-late' and 'com-PEL-ling'." },
+  { text: 'The sudden economic downturn took many investors by surprise.', level: 'B2', tip: "Compound noun stress: 'DOWN-turn'." },
+  { text: 'She handled the critical feedback with admirable grace and composure.', level: 'B2', tip: "Stress 'AD-mir-a-ble' on the first syllable." },
+  { text: 'Environmental sustainability requires collective responsibility.', level: 'B2', tip: "Long words: 'sus-tain-a-BIL-i-ty', 're-spon-si-BIL-i-ty'." },
+  { text: 'There is a subtle distinction between confidence and arrogance.', level: 'B2', tip: "The 'b' in 'subtle' is completely silent." },
 
-  // C1 - Complex topics, professional discourse, nuanced expression
+  // C1 - Tópicos complexos, discurso profissional e nuances avançadas
   { text: 'The pharmaceutical industry has undergone substantial regulatory reforms.', level: 'C1', tip: "Focus on word stress: 'phar-ma-CEU-ti-cal', 're-GU-la-to-ry'." },
   { text: 'Nevertheless, the implications of this socioeconomic phenomenon remain contentious.', level: 'C1', tip: 'Long words: break into syllables and maintain rhythm.' },
   { text: "The government's austerity measures have precipitated widespread public dissent.", level: 'C1', tip: "Consonant clusters: 'stri-ty', 'pre-CI-pi-ta-ted'." },
@@ -118,8 +141,13 @@ const PRACTICE_SENTENCES: PracticeSentence[] = [
   { text: 'The correlation between diet and cognitive function is well documented.', level: 'C1', tip: "Stress 'cor-re-LA-tion' and 'COG-ni-tive'." },
   { text: 'Her unequivocal stance on the matter surprised many of her colleagues.', level: 'C1', tip: "The 'qu' in 'unequivocal' sounds like 'kw'." },
   { text: 'The unprecedented scale of the challenge requires a coordinated global response.', level: 'C1', tip: "Stress 'un-PRE-ce-den-ted' — five clear syllables." },
+  { text: 'The empirical data corroborated our initial scientific hypothesis.', level: 'C1', tip: "Stress 'cor-ROB-o-ra-ted' and 'hy-POTH-e-sis'." },
+  { text: 'He displayed an extraordinary capacity for strategic foresight.', level: 'C1', tip: "Pronounce 'ex-TRAOR-di-nar-y' with natural British or American rhythm." },
+  { text: 'Public infrastructure projects frequently encounter bureaucratic hurdles.', level: 'C1', tip: "Pronounce 'bu-reau-CRAT-ic' with crisp plosives." },
+  { text: 'Her dissertation examines the philosophical underpinnings of ethical dilemmas.', level: 'C1', tip: "Consonant transition: 'un-der-PIN-nings'." },
+  { text: 'The technological disruption obsolete traditional manufacturing paradigms.', level: 'C1', tip: "Stress 'tech-no-LOG-i-cal' and 'PAR-a-digms'." },
 
-  // C2 - Highly abstract, specialized terminology, sophisticated structures
+  // C2 - Altamente abstrato, terminologia especializada e estruturas sofisticadas
   { text: 'The epistemological foundations of postmodernist discourse are inherently paradoxical.', level: 'C2', tip: "Master complex word stress: 'e-pis-te-MO-lo-gi-cal', 'pos-TMO-dern-ist'." },
   { text: 'Notwithstanding the aforementioned caveats, the extrapolation remains justifiable.', level: 'C2', tip: "Smooth linking between long words — don't pause between them." },
   { text: 'The phenomenological approach to research elucidates subjective experiential realities.', level: 'C2', tip: "Natural rhythm: 'phe-no-me-no-LO-gi-cal', 'e-LU-ci-dates'." },
@@ -127,22 +155,27 @@ const PRACTICE_SENTENCES: PracticeSentence[] = [
   { text: 'The quintessence of her argument lies in the ontological distinction she draws.', level: 'C2', tip: "Stress 'quin-TES-sence' and 'on-to-LO-gi-cal'." },
   { text: 'The juxtaposition of these two ideologies creates a fascinating dialectic.', level: 'C2', tip: "Stress 'jux-ta-po-SI-tion' on the fourth syllable." },
   { text: 'Her magnum opus constitutes an invaluable contribution to sociolinguistic theory.', level: 'C2', tip: "Latin phrases: 'MAG-num O-pus' — maintain original pronunciation." },
-  { text: 'The inscrutable nature of the data renders any definitive conclusion untenable.', level: 'C2', tip: "Stress 'in-SCRU-ta-ble' and 'un-TE-na-ble'." },
+  { text: 'The Computerized inscrutable nature of the data renders any definitive conclusion untenable.', level: 'C2', tip: "Stress 'in-SCRU-ta-ble' and 'un-TE-na-ble'." },
   { text: 'The proliferation of disinformation necessitates a paradigm shift in media literacy.', level: 'C2', tip: "Stress 'pro-li-fe-RA-tion' — six syllables with clear rhythm." },
-  { text: 'His peripatetic career has encompassed a panoply of interdisciplinary endeavors.', level: 'C2', tip: "Stress 'pe-ri-pa-TE-tic' and 'PAN-o-ply'." },
+  { text: 'An ubiquitous sense of disillusionment permeated the intellectual zeitgeist of the era.', level: 'C2', tip: "Stress 'u-BIQ-ui-tous' and foreign loanword 'ZEIT-geist'." },
+  { text: 'Hermeneutic interpretations often oscillate between intentionality and linguistic determinism.', level: 'C2', tip: "Stress 'her-me-NEU-tic' and 'OS-cil-late'." },
+  { text: 'The idiosyncratic vernacular of the subculture resisted conventional lexicographical categorization.', level: 'C2', tip: "Stress 'id-i-o-syn-CRAT-ic' and 'lex-i-co-GRAPH-i-cal'." },
+  { text: 'Her disquisition on constitutional law exhibited consummate erudition and eloquence.', level: 'C2', tip: "Stress 'dis-qui-SI-tion' and 'CON-sum-mate'." },
+  { text: 'Such unmitigated hubris inevitably invites catastrophic geopolitical ramifications.', level: 'C2', tip: "Stress 'un-MIT-i-ga-ted' and 'ram-i-fi-CA-tions'." },
+  { text: 'The ostensibly benign rhetoric cloaked deeply entrenched hegemony and subjugation.', level: 'C2', tip: "Stress 'os-TEN-si-bly' and 'he-GEM-o-ny'." },
 ];
 
 const ACCENTS = [
-  { id: 'en-US', flag: '🇺🇸', label: 'American', shortLabel: 'US', desc: 'United States' },
-  { id: 'en-GB', flag: '🇬🇧', label: 'British', shortLabel: 'UK', desc: 'United Kingdom' },
-  { id: 'en-AU', flag: '🇦🇺', label: 'Australian', shortLabel: 'AU', desc: 'Australia' },
-  { id: 'en-CA', flag: '🇨🇦', label: 'Canadian', shortLabel: 'CA', desc: 'Canada' },
-  { id: 'en-IE', flag: '🇮🇪', label: 'Irish', shortLabel: 'IE', desc: 'Ireland' },
-  { id: 'en-IN', flag: '🇮🇳', label: 'Indian', shortLabel: 'IN', desc: 'India' },
-  { id: 'en-ZA', flag: '🇿🇦', label: 'South African', shortLabel: 'ZA', desc: 'South Africa' },
-  { id: 'en-NZ', flag: '🇳🇿', label: 'New Zealand', shortLabel: 'NZ', desc: 'New Zealand' },
-  { id: 'en-CN', flag: '🇨🇳', label: 'Chinese', shortLabel: 'CN', desc: 'Chinese English' },
-  { id: 'en-KR', flag: '🇰🇷', label: 'Korean', shortLabel: 'KR', desc: 'Korean English' },
+  { id: 'en-US', flag: 'US', label: 'American', shortLabel: 'US', desc: 'United States' },
+  { id: 'en-GB', flag: 'UK', label: 'British', shortLabel: 'UK', desc: 'United Kingdom' },
+  { id: 'en-AU', flag: 'AU', label: 'Australian', shortLabel: 'AU', desc: 'Australia' },
+  { id: 'en-CA', flag: 'CA', label: 'Canadian', shortLabel: 'CA', desc: 'Canada' },
+  { id: 'en-IE', flag: 'IE', label: 'Irish', shortLabel: 'IE', desc: 'Ireland' },
+  { id: 'en-IN', flag: 'IN', label: 'Indian', shortLabel: 'IN', desc: 'India' },
+  { id: 'en-ZA', flag: 'ZA', label: 'South African', shortLabel: 'ZA', desc: 'South Africa' },
+  { id: 'en-NZ', flag: 'NZ', label: 'New Zealand', shortLabel: 'NZ', desc: 'New Zealand' },
+  { id: 'en-CN', flag: 'CN', label: 'Chinese', shortLabel: 'CN', desc: 'Chinese English' },
+  { id: 'en-KR', flag: 'KR', label: 'Korean', shortLabel: 'KR', desc: 'Korean English' },
 ];
 
 function uint8ToBase64(bytes: Uint8Array): string {
@@ -188,7 +221,6 @@ function handleSelectAccent(accId: string) {
   isAccentModalOpen.value = false;
 }
 
-const currentIndex = ref(0);
 const isRecording = ref(false);
 const isEvaluating = ref(false);
 const result = ref<PronunciationResult | null>(null);
@@ -222,26 +254,58 @@ function setUserAudioBlobUrl(url: string | null) {
 
 const levelOrder = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
 
-const filteredSentences = computed(() => {
-  const uIdx = Math.max(0, levelOrder.indexOf(userLevel.value));
-  return PRACTICE_SENTENCES.filter((s) => {
-    const sIdx = levelOrder.indexOf(s.level);
-    return Math.abs(sIdx - uIdx) <= 1;
-  }).sort((a, b) => {
-    const aIdx = levelOrder.indexOf(a.level);
-    const bIdx = levelOrder.indexOf(b.level);
-    const aDist = Math.abs(aIdx - uIdx);
-    const bDist = Math.abs(bIdx - uIdx);
-    if (aDist !== bDist) return aDist - bDist;
-    return aIdx - bIdx;
+// Frases de prática estritamente ordenadas do nível mais básico (A1) ao mais avançado (C2)
+const allOrderedSentences = computed(() => {
+  return [...PRACTICE_SENTENCES].sort((a, b) => {
+    return levelOrder.indexOf(a.level) - levelOrder.indexOf(b.level);
   });
 });
 
-const displaySentence = computed(() => {
-  const list = filteredSentences.value;
-  if (!list.length) return PRACTICE_SENTENCES[0];
-  return list[currentIndex.value % list.length] || PRACTICE_SENTENCES[0];
+// Define o índice inicial correspondente ao nível atual do usuário
+const initialLevelIndex = computed(() => {
+  const uLevel = userLevel.value;
+  const idx = allOrderedSentences.value.findIndex((s) => s.level === uLevel);
+  return idx !== -1 ? idx : 0;
 });
+
+const currentIndex = ref(0);
+
+// Inicializa currentIndex quando o nível do usuário for carregado
+watch(
+  userLevel,
+  (lvl) => {
+    const idx = allOrderedSentences.value.findIndex((s) => s.level === lvl);
+    if (idx !== -1 && currentIndex.value === 0) {
+      currentIndex.value = idx;
+    }
+  },
+  { immediate: true }
+);
+
+const displaySentence = computed(() => {
+  const list = allOrderedSentences.value;
+  if (!list.length) return PRACTICE_SENTENCES[0];
+  const safeIdx = ((currentIndex.value % list.length) + list.length) % list.length;
+  return list[safeIdx] || PRACTICE_SENTENCES[0];
+});
+
+// Navega em direção ao nível mais fácil/básico (A1)
+function goPrev() {
+  result.value = null;
+  selectedWord.value = null;
+  setUserAudioBlobUrl(null);
+  const list = allOrderedSentences.value;
+  currentIndex.value = (currentIndex.value - 1 + list.length) % list.length;
+}
+
+// Navega em direção ao nível mais difícil/avançado (C2)
+function goNext() {
+  result.value = null;
+  selectedWord.value = null;
+  setUserAudioBlobUrl(null);
+  const list = allOrderedSentences.value;
+  currentIndex.value = (currentIndex.value + 1) % list.length;
+}
 
 function getActiveText(): string {
   if (inputMode.value === 'custom') return customText.value.trim();
@@ -546,6 +610,7 @@ async function evaluatePronunciation(audioBase64: string, referenceText: string)
       }
 
       result.value = data;
+      loadPronunciationHistory();
       history.value.push({
         sentence: referenceText || '(free speech)',
         score: data.score,
@@ -612,21 +677,6 @@ async function playWordAudio(wordToPlay: string) {
   }
 }
 
-function goNext() {
-  result.value = null;
-  selectedWord.value = null;
-  setUserAudioBlobUrl(null);
-  currentIndex.value = (currentIndex.value + 1) % filteredSentences.value.length;
-}
-
-function goPrev() {
-  result.value = null;
-  selectedWord.value = null;
-  setUserAudioBlobUrl(null);
-  currentIndex.value =
-    (currentIndex.value - 1 + filteredSentences.value.length) % filteredSentences.value.length;
-}
-
 function scoreColor(score: number) {
   if (score >= 85) return 'text-green-400';
   if (score >= 60) return 'text-yellow-400';
@@ -651,7 +701,138 @@ function handleAccentSync() {
   selectedAccent.value = getInitialAccent();
 }
 
+
+interface SavedHistoryItem {
+  id: string;
+  target_phrase: string;
+  spoken_phrase: string;
+  score: number;
+  accuracy_score: number;
+  words_result: WordResult[];
+  feedback: string;
+  accent: string;
+  mode: string;
+  user_audio_b64?: string;
+  created_at: string;
+}
+
+const savedHistory = ref<SavedHistoryItem[]>([]);
+const isLoadingHistory = ref(false);
+const isHistorySidebarOpen = ref(true);
+const playingHistoryAudioId = ref<string | null>(null);
+let historyAudioPlayer: HTMLAudioElement | null = null;
+const selectedHistoryModalItem = ref<SavedHistoryItem | null>(null);
+const isPlayingTatiReference = ref(false);
+
+function openHistorySummaryModal(item: SavedHistoryItem) {
+  selectedHistoryModalItem.value = item;
+}
+
+async function playTatiHistoryReference(text: string, accent?: string) {
+  if (!text || isPlayingTatiReference.value) return;
+  isPlayingTatiReference.value = true;
+  try {
+    const res = await apiPost<any>(ENDPOINTS.CHAT_TTS || '/chat/tts', {
+      text,
+      accent: accent || selectedAccent.value || 'en-US',
+    });
+    const audioB64 = res?.data?.audio || res?.audio || res?.audio_b64;
+    if (audioB64) {
+      const audio = new Audio(`data:audio/mp3;base64,${audioB64}`);
+      audio.onended = () => { isPlayingTatiReference.value = false; };
+      audio.onerror = () => { isPlayingTatiReference.value = false; };
+      await audio.play();
+    } else {
+      isPlayingTatiReference.value = false;
+    }
+  } catch (err) {
+    console.error('Error playing reference audio:', err);
+    isPlayingTatiReference.value = false;
+  }
+}
+
+async function loadPronunciationHistory() {
+  isLoadingHistory.value = true;
+  try {
+    const list = await apiGet<SavedHistoryItem[]>(ENDPOINTS.SPEECH_PRONUNCIATION_HISTORY);
+    if (Array.isArray(list)) {
+      savedHistory.value = list;
+    }
+  } catch (err) {
+    console.error('Error loading pronunciation history:', err);
+  } finally {
+    isLoadingHistory.value = false;
+  }
+}
+
+function playHistoryAudio(item: SavedHistoryItem) {
+  if (playingHistoryAudioId.value === item.id) {
+    if (historyAudioPlayer) {
+      historyAudioPlayer.pause();
+      historyAudioPlayer = null;
+    }
+    playingHistoryAudioId.value = null;
+    return;
+  }
+
+  if (historyAudioPlayer) {
+    historyAudioPlayer.pause();
+    historyAudioPlayer = null;
+  }
+
+  if (!item.user_audio_b64) return;
+
+  const audioSrc = item.user_audio_b64.startsWith('data:')
+    ? item.user_audio_b64
+    : `data:audio/webm;base64,${item.user_audio_b64}`;
+
+  historyAudioPlayer = new Audio(audioSrc);
+  playingHistoryAudioId.value = item.id;
+
+  historyAudioPlayer.onended = () => {
+    playingHistoryAudioId.value = null;
+    historyAudioPlayer = null;
+  };
+
+  historyAudioPlayer.onerror = () => {
+    playingHistoryAudioId.value = null;
+    historyAudioPlayer = null;
+  };
+
+  historyAudioPlayer.play().catch(() => {
+    playingHistoryAudioId.value = null;
+    historyAudioPlayer = null;
+  });
+}
+
+function handleRetrySentence(item: SavedHistoryItem) {
+  result.value = null;
+  selectedWord.value = null;
+  setUserAudioBlobUrl(null);
+  selectedHistoryModalItem.value = null;
+
+  // Frase a ser praticada novamente
+  const phraseToPractice = (item.target_phrase || item.spoken_phrase || '').trim();
+  customText.value = phraseToPractice;
+
+  const foundIndex = allOrderedSentences.value.findIndex(
+    (s) => s.text.trim().toLowerCase() === phraseToPractice.toLowerCase()
+  );
+
+  if (foundIndex !== -1 && item.mode !== 'custom' && item.mode !== 'free') {
+    inputMode.value = 'preset';
+    currentIndex.value = foundIndex;
+  } else {
+    inputMode.value = 'custom';
+  }
+
+  if (window.innerWidth < 1024) {
+    isHistorySidebarOpen.value = false;
+  }
+}
+
 onMounted(() => {
+  loadPronunciationHistory();
   window.addEventListener('tati_accent_changed', handleAccentSync);
   window.addEventListener('storage', handleAccentSync);
 });
@@ -665,8 +846,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-bg flex flex-col">
-    <!-- Header -->
+  <div class="h-screen bg-bg flex flex-col overflow-hidden">
+    <!-- Cabeçalho -->
     <header class="border-b border-border bg-bg-secondary/50 backdrop-blur-sm px-4 py-3 flex items-center gap-3">
       <button type="button" @click="router.back()"
         class="p-2 rounded-lg hover:bg-surface-hover transition-colors text-text">
@@ -681,498 +862,754 @@ onUnmounted(() => {
         <p class="text-xs text-text-muted">Read aloud, write your own text, or just speak freely</p>
       </div>
 
-      <!-- Accent Selector Button -->
+      <!-- Botão seletor de sotaque -->
       <button type="button" @click="isAccentModalOpen = true"
         class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-surface border border-border hover:border-primary/40 text-xs font-bold text-text transition-all shadow-sm active:scale-95 shrink-0"
         title="Change Teacher Tati's accent">
-        <span class="text-base">{{ currentAccentObj.flag }}</span>
+        <span
+          class="text-[10px] font-black tracking-wider uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">{{
+            currentAccentObj.shortLabel }}</span>
         <span class="hidden sm:inline">{{ currentAccentObj.shortLabel }}</span>
         <Globe :size="13" class="text-text-muted ml-0.5" />
       </button>
 
-      <div v-if="history.length > 0" class="text-right">
+      <div v-if="history.length > 0" class="text-right hidden sm:block">
         <div :class="['text-lg font-bold', scoreColor(avgScore)]">{{ avgScore }}%</div>
         <div class="text-[0.6rem] text-text-muted">Avg. Score</div>
       </div>
+
+      <!-- Botão para alternar painel lateral de histórico -->
+      <button type="button" @click="isHistorySidebarOpen = !isHistorySidebarOpen"
+        class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-sm active:scale-95"
+        :class="isHistorySidebarOpen ? 'bg-primary text-white border-primary shadow-primary/20' : 'bg-surface border-border text-text hover:border-primary/40'"
+        title="Toggle practice history">
+        <History :size="15" />
+        <span class="hidden md:inline">History</span>
+        <span v-if="savedHistory.length" class="px-1.5 py-0.2 rounded-full text-[0.65rem] font-black"
+          :class="isHistorySidebarOpen ? 'bg-white/20 text-white' : 'bg-primary/10 text-primary'">
+          {{ savedHistory.length }}
+        </span>
+      </button>
     </header>
 
-    <div class="flex-1 flex flex-col items-center justify-center p-4 md:p-8 max-w-2xl mx-auto w-full">
-      <!-- Input mode selector -->
-      <div class="flex gap-2 mb-3 w-full">
-        <button type="button" @click="inputMode = 'preset'" :class="[
-          'flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition-all',
-          inputMode === 'preset'
-            ? 'bg-primary text-white shadow-lg shadow-primary/20'
-            : 'bg-surface border border-border text-text-muted hover:bg-surface-hover',
-        ]">
-          <BookOpen :size="14" />
-          Preset Sentences
-        </button>
-
-        <button type="button" @click="inputMode = 'custom'" :class="[
-          'flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition-all',
-          inputMode === 'custom'
-            ? 'bg-primary text-white shadow-lg shadow-primary/20'
-            : 'bg-surface border border-border text-text-muted hover:bg-surface-hover',
-        ]">
-          <PenLine :size="14" />
-          Write Your Own
-        </button>
-
-        <button type="button" @click="inputMode = 'free'" :class="[
-          'flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition-all',
-          inputMode === 'free'
-            ? 'bg-primary text-white shadow-lg shadow-primary/20'
-            : 'bg-surface border border-border text-text-muted hover:bg-surface-hover',
-        ]">
-          <MessageSquare :size="14" />
-          Free Speech
-        </button>
-      </div>
-
-      <!-- Accent Bar -->
-      <div class="w-full flex items-center justify-between gap-2 mb-5 px-1 overflow-x-hidden">
-        <span
-          class="text-[0.7rem] font-bold text-text-subtle uppercase tracking-wider flex items-center gap-1.5 shrink-0">
-          <Globe :size="12" class="text-primary" />
-          Accent:
-        </span>
-        <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 max-w-full">
-          <button v-for="acc in ACCENTS.slice(0, 5)" :key="acc.id" type="button" @click="handleSelectAccent(acc.id)"
-            :class="[
-              'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold transition-all shrink-0 active:scale-95 cursor-pointer',
-              acc.id === selectedAccent
-                ? 'bg-primary text-white shadow-sm shadow-primary/30'
-                : 'bg-surface border border-border text-text-muted hover:text-text hover:border-primary/30',
-            ]" :title="acc.desc">
-            <span>{{ acc.flag }}</span>
-            <span>{{ acc.shortLabel }}</span>
-          </button>
-
-          <button type="button" @click="isAccentModalOpen = true"
-            class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-surface border border-border text-primary hover:bg-surface-hover shrink-0 cursor-pointer"
-            title="View all accents">
-            More...
-          </button>
-        </div>
-      </div>
-
-      <!-- Sentence card / Custom input / Free speech -->
-      <template v-if="inputMode === 'preset'">
-        <div :class="[
-          'px-3 py-1 rounded-full text-xs font-bold mb-6',
-          displaySentence.level === 'A1'
-            ? 'bg-green-500/20 text-green-400'
-            : displaySentence.level === 'A2'
-              ? 'bg-green-500/15 text-green-300'
-              : displaySentence.level === 'B1'
-                ? 'bg-blue-500/20 text-blue-400'
-                : 'bg-purple-500/20 text-purple-400',
-        ]">
-          {{ displaySentence.level }}
-        </div>
-
-        <div class="w-full bg-surface border border-border rounded-2xl p-6 md:p-8 mb-6 text-center">
-          <p class="text-xl md:text-2xl font-display font-bold text-text leading-relaxed mb-4">
-            {{ displaySentence.text }}
-          </p>
-          <p class="text-xs text-text-muted italic">
-            💡 {{ displaySentence.tip }}
-          </p>
-        </div>
-      </template>
-
-      <div v-else-if="inputMode === 'custom'"
-        class="w-full bg-surface border border-border rounded-2xl p-6 md:p-8 mb-6">
-        <label class="text-xs font-bold text-text-subtle uppercase tracking-wider mb-2 block">
-          Type or paste the text you want to practice
-        </label>
-        <textarea v-model="customText" placeholder="e.g. The quick brown fox jumps over the lazy dog..."
-          class="w-full h-32 bg-bg border border-border rounded-xl p-4 text-text text-base resize-none outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all"
-          maxlength="500" />
-        <div class="flex justify-between items-center mt-2">
-          <p class="text-[0.65rem] text-text-muted">{{ customText.length }}/500 characters</p>
-          <button v-if="customText.trim()" type="button" @click="customText = ''"
-            class="text-[0.65rem] text-primary hover:underline">
-            Clear
-          </button>
-        </div>
-      </div>
-
-      <div v-else class="w-full bg-surface border border-border rounded-2xl p-6 md:p-8 mb-6 text-center">
-        <div class="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto mb-4">
-          <MessageSquare :size="28" />
-        </div>
-        <p class="text-lg font-bold text-text mb-2">Free Speech Mode</p>
-        <p class="text-sm text-text-muted">
-          Just tap the microphone and speak naturally. Tati will transcribe and analyze your pronunciation.
-        </p>
-      </div>
-
-      <!-- Controls -->
-      <div class="flex items-center gap-4 mb-6">
-        <button v-if="inputMode === 'preset'" type="button" @click="goPrev"
-          class="p-3 rounded-full bg-surface border border-border hover:bg-surface-hover transition-colors text-text">
-          <ChevronLeft :size="20" />
-        </button>
-
-        <button type="button" @click="playReference" :disabled="!getActiveText() || isRecording || isEvaluating" :class="[
-          'p-4 rounded-full bg-surface border border-border hover:bg-surface-hover transition-colors text-primary',
-          (!getActiveText() || isRecording || isEvaluating) && 'opacity-40 cursor-not-allowed',
-        ]">
-          <Volume2 :size="24" />
-        </button>
-
-        <button type="button" @click="isRecording ? stopRecording() : startRecording()" :disabled="isEvaluating" :class="[
-          'p-5 rounded-full shadow-lg transition-all duration-300',
-          isRecording
-            ? 'bg-red-500 shadow-red-500/30 animate-pulse scale-110'
-            : 'bg-primary shadow-primary/20 hover:scale-105 active:scale-95',
-          isEvaluating && 'opacity-50 cursor-not-allowed',
-        ]">
-          <Square v-if="isRecording" :size="28" class="text-white" />
-          <Mic v-else :size="28" class="text-white" />
-        </button>
-
-        <button type="button" @click="
-          result = null;
-        recordingError = null;
-        "
-          class="p-3 rounded-full bg-surface border border-border hover:bg-surface-hover transition-colors text-text">
-          <RotateCcw :size="20" />
-        </button>
-
-        <button v-if="inputMode === 'preset'" type="button" @click="goNext"
-          class="p-3 rounded-full bg-surface border border-border hover:bg-surface-hover transition-colors text-text">
-          <ChevronRight :size="20" />
-        </button>
-      </div>
-
-      <!-- Recording indicator -->
-      <div v-if="isRecording" class="mb-4 flex flex-col items-center animate-fade-in">
-        <div class="flex items-center gap-2 text-red-400 text-sm font-bold">
-          <div class="w-2 h-2 bg-red-400 rounded-full animate-pulse" />
-          Recording — speak now...
-        </div>
-        <canvas ref="canvasRef" width="300" height="60" class="mt-2 rounded-lg" />
-      </div>
-
-      <!-- Recording error -->
-      <div v-if="recordingError" class="mb-4 w-full animate-fade-in">
-        <div class="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-sm text-red-400 text-center">
-          {{ recordingError }}
-        </div>
-      </div>
-
-      <!-- Evaluating indicator -->
-      <div v-if="isEvaluating" class="mb-4 flex items-center gap-2 text-primary text-sm animate-fade-in">
-        <Sparkles :size="16" class="animate-spin" />
-        Analyzing your pronunciation...
-      </div>
-
-      <!-- Results -->
-      <div v-if="result" class="w-full animate-fade-in">
-        <div class="bg-surface border border-border rounded-2xl p-6 space-y-4">
-          <!-- Score -->
-          <div class="text-center">
-            <div :class="['text-5xl font-black', scoreColor(result.score)]">
-              {{ result.score }}%
-            </div>
-            <p class="text-xs text-text-subtle mt-1 font-medium">
-              {{
-                result.score >= 85
-                  ? 'Excelente articulação e clareza!'
-                  : result.score >= 60
-                    ? 'Bom esforço! Ajuste os fonemas destacados.'
-                    : 'Vamos praticar novamente ouvindo a Teacher Tati.'
-              }}
-            </p>
-          </div>
-
-          <!-- Player Comparativo: Sua Voz vs Teacher Tati -->
-          <div class="grid grid-cols-2 gap-3 pt-1">
-            <button type="button" @click="playUserAudio" :disabled="!userAudioUrl"
-              class="flex items-center justify-center gap-2 px-4 py-2.5 bg-primary/10 hover:bg-primary/20 disabled:opacity-40 disabled:cursor-not-allowed text-primary rounded-xl text-xs font-bold transition-all">
-              <Volume2 :size="16" />
-              Listen to your own voice
+    <div class="flex-1 min-h-0 flex flex-col lg:flex-row w-full overflow-hidden">
+      <!-- Painel principal de gravação e leitura -->
+      <div class="flex-1 flex flex-col items-center p-4 md:p-8 overflow-y-auto custom-scrollbar w-full">
+        <div class="w-full max-w-2xl space-y-4">
+          <!-- Seletor do modo de entrada -->
+          <div class="flex gap-2 mb-3 w-full">
+            <button type="button" @click="inputMode = 'preset'" :class="[
+              'flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition-all',
+              inputMode === 'preset'
+                ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                : 'bg-surface border border-border text-text-muted hover:bg-surface-hover',
+            ]">
+              <BookOpen :size="14" />
+              Preset Sentences
             </button>
-            <button type="button" @click="playCorrectAudio" :disabled="!result.correct_audio"
-              class="flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-500/10 hover:bg-purple-500/20 disabled:opacity-40 disabled:cursor-not-allowed text-purple-600 dark:text-purple-400 rounded-xl text-xs font-bold transition-all">
-              <Volume2 :size="16" />
-              Teacher Tati
+
+            <button type="button" @click="inputMode = 'custom'" :class="[
+              'flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition-all',
+              inputMode === 'custom'
+                ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                : 'bg-surface border border-border text-text-muted hover:bg-surface-hover',
+            ]">
+              <PenLine :size="14" />
+              Write Your Own
+            </button>
+
+            <button type="button" @click="inputMode = 'free'" :class="[
+              'flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition-all',
+              inputMode === 'free'
+                ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                : 'bg-surface border border-border text-text-muted hover:bg-surface-hover',
+            ]">
+              <MessageSquare :size="14" />
+              Free Speech
             </button>
           </div>
 
-          <!-- Frase sugerida pela Teacher Tati -->
-          <div v-if="result.suggested_sentence"
-            class="p-3.5 bg-blue-500/10 border border-blue-500/25 rounded-2xl flex flex-col gap-1.5 text-left">
-            <div class="flex items-center justify-between">
-              <span class="text-[0.68rem] font-bold text-blue-500 uppercase tracking-wider flex items-center gap-1.5">
-                <Sparkles :size="13" />
-                Sugestão natural da Teacher Tati:
-              </span>
-              <button v-if="result.correct_audio" type="button" @click="playCorrectAudio"
-                class="text-xs text-blue-500 hover:text-blue-600 font-semibold flex items-center gap-1 transition-colors">
-                <Volume2 :size="13" />
-                Ouvir frase
+          <!-- Barra de sotaques -->
+          <div class="w-full flex items-center justify-between gap-2 mb-5 px-1 overflow-x-hidden">
+            <span
+              class="text-[0.7rem] font-bold text-text-subtle uppercase tracking-wider flex items-center gap-1.5 shrink-0">
+              <Globe :size="12" class="text-primary" />
+              Accent:
+            </span>
+            <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 max-w-full">
+              <button v-for="acc in ACCENTS.slice(0, 5)" :key="acc.id" type="button" @click="handleSelectAccent(acc.id)"
+                :class="[
+                  'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold transition-all shrink-0 active:scale-95 cursor-pointer',
+                  acc.id === selectedAccent
+                    ? 'bg-primary text-white shadow-sm shadow-primary/30'
+                    : 'bg-surface border border-border text-text-muted hover:text-text hover:border-primary/30',
+                ]" :title="acc.desc">
+                <span class="text-[9px] font-black tracking-wider uppercase">{{ acc.shortLabel }}</span>
+              </button>
+
+              <button type="button" @click="isAccentModalOpen = true"
+                class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-surface border border-border text-primary hover:bg-surface-hover shrink-0 cursor-pointer"
+                title="View all accents">
+                More...
               </button>
             </div>
-            <p class="text-xs md:text-sm font-semibold text-text leading-relaxed">
-              &ldquo;{{ result.suggested_sentence }}&rdquo;
+          </div>
+
+          <!-- Cartão de frase / Entrada personalizada / Fala livre -->
+          <template v-if="inputMode === 'preset'">
+            <div :class="[
+              'px-3 py-1 rounded-full text-xs font-bold mb-6',
+              displaySentence.level === 'A1'
+                ? 'bg-green-500/20 text-green-400'
+                : displaySentence.level === 'A2'
+                  ? 'bg-green-500/15 text-green-300'
+                  : displaySentence.level === 'B1'
+                    ? 'bg-blue-500/20 text-blue-400'
+                    : 'bg-purple-500/20 text-purple-400',
+            ]">
+              {{ displaySentence.level }}
+            </div>
+
+            <div class="w-full bg-surface border border-border rounded-2xl p-6 md:p-8 mb-6 text-center">
+              <p class="text-xl md:text-2xl font-display font-bold text-text leading-relaxed mb-4">
+                {{ displaySentence.text }}
+              </p>
+              <p class="text-xs text-text-muted italic">
+                <span class="text-primary font-bold mr-1">Tip:</span>{{ displaySentence.tip }}
+              </p>
+            </div>
+          </template>
+
+          <div v-else-if="inputMode === 'custom'"
+            class="w-full bg-surface border border-border rounded-2xl p-6 md:p-8 mb-6">
+            <label class="text-xs font-bold text-text-subtle uppercase tracking-wider mb-2 block">
+              Type or paste the text you want to practice
+            </label>
+            <textarea v-model="customText" placeholder="e.g. The quick brown fox jumps over the lazy dog..."
+              class="w-full h-32 bg-bg border border-border rounded-xl p-4 text-text text-base resize-none outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all"
+              maxlength="500" />
+            <div class="flex justify-between items-center mt-2">
+              <p class="text-[0.65rem] text-text-muted">{{ customText.length }}/500 characters</p>
+              <button v-if="customText.trim()" type="button" @click="customText = ''"
+                class="text-[0.65rem] text-primary hover:underline">
+                Clear
+              </button>
+            </div>
+          </div>
+
+          <div v-else class="w-full bg-surface border border-border rounded-2xl p-6 md:p-8 mb-6 text-center">
+            <div
+              class="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto mb-4">
+              <MessageSquare :size="28" />
+            </div>
+            <p class="text-lg font-bold text-text mb-2">Free Speech Mode</p>
+            <p class="text-sm text-text-muted">
+              Just tap the microphone and speak naturally. Tati will transcribe and analyze your pronunciation.
             </p>
           </div>
 
-          <!-- Card da Dica da Teacher Tati em Português -->
-          <div v-if="result.pedagogical_tip"
-            class="p-4 bg-primary/10 border border-primary/25 rounded-2xl flex flex-col gap-3 text-left">
-            <div class="flex items-start gap-3">
-              <div
-                class="w-9 h-9 rounded-full overflow-hidden shrink-0 border border-primary/40 mt-0.5 bg-primary text-white font-black flex items-center justify-center">
-                <img v-if="!logoError" src="/images/tati_logo.jpg" alt="Teacher Tati" class="w-full h-full object-cover"
-                  @error="logoError = true" />
-                <span v-else class="text-xs">T</span>
-              </div>
-              <div class="space-y-1">
-                <p class="text-[0.7rem] font-bold text-primary uppercase tracking-wider">
-                  Dica da Teacher Tati
-                </p>
-                <p class="text-xs md:text-sm text-text leading-relaxed">
-                  {{ result.pedagogical_tip }}
-                </p>
-              </div>
-            </div>
+          <!-- Controles principais -->
+          <div class="w-full flex items-center justify-center gap-4 mb-6">
+            <button v-if="inputMode === 'preset'" type="button" @click="goPrev"
+              class="p-3 rounded-full bg-surface border border-border hover:bg-surface-hover transition-colors text-text">
+              <ChevronLeft :size="20" />
+            </button>
 
-            <!-- Lista com TODAS as palavras com atenção ou erro -->
-            <div v-if="wordsNeedingWork.length > 0" class="pt-3 border-t border-primary/20 space-y-2">
-              <p class="text-[0.68rem] font-bold text-primary uppercase tracking-wider flex items-center gap-1.5">
-                <Sparkles :size="13" />
-                Pontos para praticar:
-              </p>
-              <div class="space-y-1.5">
-                <button v-for="(w, idx) in wordsNeedingWork" :key="idx" type="button" @click="selectedWord = w"
-                  class="w-full text-left flex items-start gap-2.5 p-2 rounded-xl bg-surface/70 hover:bg-surface border border-border/70 hover:border-primary/50 transition-all text-xs group">
-                  <span :class="[
-                    'font-bold shrink-0 px-2 py-0.5 rounded text-[0.7rem] font-mono',
-                    w.accuracy === 'needs_work'
-                      ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30'
-                      : 'bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/30',
-                  ]">
-                    {{ w.word }}
-                  </span>
-                  <span class="text-text-muted group-hover:text-text leading-relaxed flex-1">
-                    {{ w.tip || 'Ajuste a pronúncia desta palavra.' }}
-                  </span>
-                  <span
-                    class="text-[0.65rem] text-primary shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                    Ver detalhe →
-                  </span>
+            <button type="button" @click="playReference" :disabled="!getActiveText() || isRecording || isEvaluating"
+              :class="[
+                'p-4 rounded-full bg-surface border border-border hover:bg-surface-hover transition-colors text-primary',
+                (!getActiveText() || isRecording || isEvaluating) && 'opacity-40 cursor-not-allowed',
+              ]">
+              <Volume2 :size="24" />
+            </button>
+
+            <button type="button" @click="isRecording ? stopRecording() : startRecording()" :disabled="isEvaluating"
+              :class="[
+                'p-5 rounded-full shadow-lg transition-all duration-300',
+                isRecording
+                  ? 'bg-red-500 shadow-red-500/30 animate-pulse scale-110'
+                  : 'bg-primary shadow-primary/20 hover:scale-105 active:scale-95',
+                isEvaluating && 'opacity-50 cursor-not-allowed',
+              ]">
+              <Square v-if="isRecording" :size="28" class="text-white" />
+              <Mic v-else :size="28" class="text-white" />
+            </button>
+
+            <button type="button" @click="
+              result = null;
+            recordingError = null;
+            " class="p-3 rounded-full bg-surface border border-border hover:bg-surface-hover transition-colors text-text">
+              <RotateCcw :size="20" />
+            </button>
+
+            <button v-if="inputMode === 'preset'" type="button" @click="goNext"
+              class="p-3 rounded-full bg-surface border border-border hover:bg-surface-hover transition-colors text-text">
+              <ChevronRight :size="20" />
+            </button>
+          </div>
+
+          <!-- Indicador de gravação -->
+          <div v-if="isRecording" class="mb-4 flex flex-col items-center animate-fade-in">
+            <div class="flex items-center gap-2 text-red-400 text-sm font-bold">
+              <div class="w-2 h-2 bg-red-400 rounded-full animate-pulse" />
+              Recording — speak now...
+            </div>
+            <canvas ref="canvasRef" width="300" height="60" class="mt-2 rounded-lg" />
+          </div>
+
+          <!-- Erro de gravação -->
+          <div v-if="recordingError" class="mb-4 w-full animate-fade-in">
+            <div class="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-sm text-red-400 text-center">
+              {{ recordingError }}
+            </div>
+          </div>
+
+          <!-- Indicador de avaliação -->
+          <div v-if="isEvaluating" class="mb-4 flex items-center gap-2 text-primary text-sm animate-fade-in">
+            <Sparkles :size="16" class="animate-spin" />
+            Analyzing your pronunciation...
+          </div>
+
+          <!-- Resultados da pronúncia -->
+          <div v-if="result" class="w-full animate-fade-in">
+            <div class="bg-surface border border-border rounded-2xl p-6 space-y-4">
+              <!-- Pontuação geral -->
+              <div class="text-center">
+                <div :class="['text-5xl font-black', scoreColor(result.score)]">
+                  {{ result.score }}%
+                </div>
+                <p class="text-xs text-text-subtle mt-1 font-medium">
+                  {{
+                    result.score >= 85
+                      ? 'Excellent articulation and clarity!'
+                      : result.score >= 60
+                        ? 'Good effort! Focus on the highlighted sounds.'
+                        : "Let's practice again listening to Teacher Tati."
+                  }}
+                </p>
+              </div>
+
+              <!-- Player Comparativo: Sua Voz vs Teacher Tati -->
+              <div class="grid grid-cols-2 gap-3 pt-1">
+                <button type="button" @click="playUserAudio" :disabled="!userAudioUrl"
+                  class="flex items-center justify-center gap-2 px-4 py-2.5 bg-primary/10 hover:bg-primary/20 disabled:opacity-40 disabled:cursor-not-allowed text-primary rounded-xl text-xs font-bold transition-all">
+                  <Volume2 :size="16" />
+                  Listen to your own voice
+                </button>
+                <button type="button" @click="playCorrectAudio" :disabled="!result.correct_audio"
+                  class="flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-500/10 hover:bg-purple-500/20 disabled:opacity-40 disabled:cursor-not-allowed text-purple-600 dark:text-purple-400 rounded-xl text-xs font-bold transition-all">
+                  <Volume2 :size="16" />
+                  Teacher Tati
                 </button>
               </div>
-            </div>
-          </div>
 
-          <!-- Feedback geral -->
-          <div v-if="result.feedback" class="bg-surface-hover/50 border border-border rounded-2xl p-4">
-            <div class="flex items-start gap-3">
-              <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0 mt-0.5">
-                <Sparkles :size="16" class="text-primary" />
-              </div>
-              <div>
-                <p class="text-xs text-text-subtle font-semibold uppercase tracking-wider mb-0.5">
-                  General Feedback
+              <!-- Frase sugerida pela Teacher Tati -->
+              <div v-if="result.suggested_sentence"
+                class="p-3.5 bg-blue-500/10 border border-blue-500/25 rounded-2xl flex flex-col gap-1.5 text-left">
+                <div class="flex items-center justify-between">
+                  <span
+                    class="text-[0.68rem] font-bold text-blue-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles :size="13" />
+                    Teacher Tati's natural suggestion:
+                  </span>
+                  <button v-if="result.correct_audio" type="button" @click="playCorrectAudio"
+                    class="text-xs text-blue-500 hover:text-blue-600 font-semibold flex items-center gap-1 transition-colors">
+                    <Volume2 :size="13" />
+                    Listen to sentence
+                  </button>
+                </div>
+                <p class="text-xs md:text-sm font-semibold text-text leading-relaxed">
+                  &ldquo;{{ result.suggested_sentence }}&rdquo;
                 </p>
-                <p class="text-sm text-text leading-relaxed italic">&quot;{{ result.feedback }}&quot;</p>
               </div>
+
+              <!-- Card da Teacher Tati's Tip em Português -->
+              <div v-if="result.pedagogical_tip"
+                class="p-4 bg-primary/10 border border-primary/25 rounded-2xl flex flex-col gap-3 text-left">
+                <div class="flex items-start gap-3">
+                  <div
+                    class="w-9 h-9 rounded-full overflow-hidden shrink-0 border border-primary/40 mt-0.5 bg-primary text-white font-black flex items-center justify-center">
+                    <img v-if="!logoError" src="/images/tati_logo.jpg" alt="Teacher Tati"
+                      class="w-full h-full object-cover" @error="logoError = true" />
+                    <span v-else class="text-xs">T</span>
+                  </div>
+                  <div class="space-y-1">
+                    <p class="text-[0.7rem] font-bold text-primary uppercase tracking-wider">
+                      Teacher Tati's Tip
+                    </p>
+                    <p class="text-xs md:text-sm text-text leading-relaxed">
+                      {{ result.pedagogical_tip }}
+                    </p>
+                  </div>
+                </div>
+
+                <!-- Lista com TODAS as palavras com atenção ou erro -->
+                <div v-if="wordsNeedingWork.length > 0" class="pt-3 border-t border-primary/20 space-y-2">
+                  <p class="text-[0.68rem] font-bold text-primary uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles :size="13" />
+                    Focus areas:
+                  </p>
+                  <div class="space-y-1.5">
+                    <button v-for="(w, idx) in wordsNeedingWork" :key="idx" type="button" @click="selectedWord = w"
+                      class="w-full text-left flex items-start gap-2.5 p-2 rounded-xl bg-surface/70 hover:bg-surface border border-border/70 hover:border-primary/50 transition-all text-xs group">
+                      <span :class="[
+                        'font-bold shrink-0 px-2 py-0.5 rounded text-[0.7rem] font-mono',
+                        w.accuracy === 'needs_work'
+                          ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30'
+                          : 'bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/30',
+                      ]">
+                        {{ w.word }}
+                      </span>
+                      <span class="text-text-muted group-hover:text-text leading-relaxed flex-1">
+                        {{ w.tip || 'Adjust the pronunciation of this word.' }}
+                      </span>
+                      <span
+                        class="text-[0.65rem] text-primary shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                        Details →
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Feedback geral -->
+              <div v-if="result.feedback" class="bg-surface-hover/50 border border-border rounded-2xl p-4">
+                <div class="flex items-start gap-3">
+                  <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0 mt-0.5">
+                    <Sparkles :size="16" class="text-primary" />
+                  </div>
+                  <div>
+                    <p class="text-xs text-text-subtle font-semibold uppercase tracking-wider mb-0.5">
+                      General Feedback
+                    </p>
+                    <p class="text-sm text-text leading-relaxed italic">&quot;{{ result.feedback }}&quot;</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Detalhamento palavra por palavra -->
+              <div v-if="result.words && result.words.length > 0">
+                <div class="flex items-center justify-between mb-2">
+                  <h3 class="text-xs font-bold text-text-subtle uppercase tracking-wider">Word-by-Word</h3>
+                  <span class="text-[0.65rem] text-text-muted">Tap word to see phonetic tip</span>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  <button v-for="(w, i) in result.words" :key="i" type="button" @click="selectedWord = w" :class="[
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono transition-all cursor-pointer hover:scale-105 active:scale-95 shadow-sm',
+                    w.accuracy === 'correct'
+                      ? 'bg-green-500/10 hover:bg-green-500/20 text-green-600 dark:text-green-400 border-green-500/30'
+                      : w.accuracy === 'needs_work'
+                        ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/40 ring-1 ring-amber-500/20'
+                        : 'bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border-red-500/40 line-through',
+                  ]">
+                    <span class="font-bold">{{ w.word }}</span>
+                    <span class="text-[0.65rem] opacity-75 font-sans">{{ Math.round(w.score) }}%</span>
+                    <span v-if="w.tip" class="text-[0.65rem] text-amber-500 font-bold">*</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Transcrição do que foi falado -->
+              <div v-if="result.transcription">
+                <h3 class="text-xs font-bold text-text-subtle uppercase tracking-wider mb-1">
+                  What Tati heard
+                </h3>
+                <p class="text-sm text-text italic">&quot;{{ result.transcription }}&quot;</p>
+              </div>
+
+              <!-- Metadados de pontuação -->
+              <div v-if="result.metadata" class="grid grid-cols-3 gap-2">
+                <div v-if="result.metadata.accuracy_score != null" class="text-center p-2 bg-bg rounded-lg">
+                  <div class="text-sm font-bold text-text">{{ Math.round(result.metadata.accuracy_score) }}%</div>
+                  <div class="text-[0.6rem] text-text-muted">Accuracy</div>
+                </div>
+                <div v-if="result.metadata.fluency_score != null" class="text-center p-2 bg-bg rounded-lg">
+                  <div class="text-sm font-bold text-text">{{ Math.round(result.metadata.fluency_score) }}%</div>
+                  <div class="text-[0.6rem] text-text-muted">Fluency</div>
+                </div>
+                <div v-if="result.metadata.completeness_score != null" class="text-center p-2 bg-bg rounded-lg">
+                  <div class="text-sm font-bold text-text">{{ Math.round(result.metadata.completeness_score) }}%</div>
+                  <div class="text-[0.6rem] text-text-muted">Completeness</div>
+                </div>
+              </div>
+
+              <!-- Provedor de análise fonética -->
+              <div v-if="result.phonetic?.provider" class="text-[0.65rem] text-text-muted">
+                Phonetic provider: {{ result.phonetic.provider }}
+              </div><div class="flex-1 flex flex-col items-center justify-center p-4 md:p-8 overflow-y-auto custom-scrollbar w-full"></div>
             </div>
           </div>
 
-          <!-- Word-level breakdown -->
-          <div v-if="result.words && result.words.length > 0">
-            <div class="flex items-center justify-between mb-2">
-              <h3 class="text-xs font-bold text-text-subtle uppercase tracking-wider">Word-by-Word</h3>
-              <span class="text-[0.65rem] text-text-muted">Toque na palavra para ver a dica</span>
-            </div>
-            <div class="flex flex-wrap gap-2">
-              <button v-for="(w, i) in result.words" :key="i" type="button" @click="selectedWord = w" :class="[
-                'flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono transition-all cursor-pointer hover:scale-105 active:scale-95 shadow-sm',
-                w.accuracy === 'correct'
-                  ? 'bg-green-500/10 hover:bg-green-500/20 text-green-600 dark:text-green-400 border-green-500/30'
-                  : w.accuracy === 'needs_work'
-                    ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/40 ring-1 ring-amber-500/20'
-                    : 'bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border-red-500/40 line-through',
+          <!-- Fim do painel de conteúdo -->
+        </div>
+      </div>
+
+      <!-- Barra lateral fixa / gaveta de histórico de pronúncia -->
+      <aside v-if="isHistorySidebarOpen"
+        class="w-full lg:w-96 border-t lg:border-t-0 lg:border-l border-border bg-bg-secondary/30 backdrop-blur-sm flex flex-col h-auto lg:h-full shrink-0 transition-all shadow-2xl">
+        <!-- Topo da barra lateral -->
+        <div class="p-4 border-b border-border flex items-center justify-between shrink-0 bg-surface/60">
+          <div class="flex items-center gap-2">
+            <History :size="16" class="text-primary" />
+            <h3 class="font-bold text-sm text-text">Practice History & Audio</h3>
+            <span v-if="savedHistory.length"
+              class="px-2 py-0.5 rounded-full text-[0.65rem] font-bold bg-primary/10 text-primary border border-primary/20">
+              {{ savedHistory.length }}
+            </span>
+          </div>
+          <button type="button" @click="isHistorySidebarOpen = false"
+            class="lg:hidden p-1.5 rounded-lg text-text-muted hover:text-text hover:bg-surface" title="Close panel">
+            <X :size="16" />
+          </button>
+        </div>
+
+        <!-- Lista de treinos anteriores -->
+        <div class="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">
+          <div v-if="isLoadingHistory" class="py-8 text-center text-xs text-text-muted">
+            <RotateCcw :size="18" class="animate-spin mx-auto mb-2 text-primary" />
+            Loading history...
+          </div>
+
+          <div v-else-if="savedHistory.length === 0"
+            class="py-12 px-4 text-center rounded-2xl border border-dashed border-border/80 text-text-muted text-xs space-y-1">
+            <p class="font-bold text-text">No practice recorded yet</p>
+            <p class="text-[0.7rem]">Record your pronunciation to start tracking your progress and listen to your
+              recordings.
+            </p>
+          </div>
+
+          <!-- Card de cada prática do histórico -->
+          <div v-for="item in savedHistory" :key="item.id" @click="openHistorySummaryModal(item)"
+            class="p-5.5 bg-surface border border-border/80 rounded-2xl space-y-2.5 transition-all hover:border-primary/50 hover:bg-surface-hover/30 shadow-xs cursor-pointer group">
+            <!-- Topo do card: frase e nota -->
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0 flex-1">
+                <p
+                  class="font-bold text-xs text-text leading-snug line-clamp-2 group-hover:text-primary transition-colors">
+                  {{ item.target_phrase || item.spoken_phrase }}
+                </p>
+                <p v-if="item.spoken_phrase && item.spoken_phrase.toLowerCase() !== item.target_phrase.toLowerCase()"
+                  class="text-[0.68rem] text-text-muted mt-0.5 line-clamp-1 italic">
+                  You said: "{{ item.spoken_phrase }}"
+                </p>
+              </div>
+              <span :class="[
+                'px-2 py-0.5 rounded-full text-xs font-black shrink-0',
+                item.score >= 80 ? 'bg-success/15 text-success border border-success/30' : item.score >= 60 ? 'bg-warning/15 text-warning border border-warning/30' : 'bg-destructive/15 text-destructive border border-destructive/30'
               ]">
-                <span class="font-bold">{{ w.word }}</span>
-                <span class="text-[0.65rem] opacity-75 font-sans">{{ Math.round(w.score) }}%</span>
-                <span v-if="w.tip" class="text-[0.65rem] text-amber-500">💡</span>
+                {{ Math.round(item.score) }}%
+              </span>
+            </div>
+
+            <!-- Palavras avaliadas com destaque de erros -->
+            <div v-if="item.words_result?.length" class="flex flex-wrap gap-1">
+              <span v-for="(w, wIdx) in item.words_result" :key="wIdx" :class="[
+                'text-[0.65rem] px-1.5 py-0.5 rounded font-medium border',
+                w.accuracy === 'correct'
+                  ? 'bg-success/10 text-success border-success/20'
+                  : 'bg-destructive/15 text-destructive border-destructive/30 font-bold'
+              ]" :title="w.tip || ''">
+                {{ w.word }}
+              </span>
+            </div>
+
+            <!-- Feedback da Professora Tatiana -->
+            <div v-if="item.feedback"
+              class="text-[0.68rem] text-text-muted bg-bg-secondary/60 p-2 rounded-xl border border-border/40 leading-relaxed">
+              {{ item.feedback }}
+            </div>
+
+            <!-- Barra de ações: ouvir áudio do aluno e refazer frase -->
+            <div class="pt-2 border-t border-border/40 flex items-center justify-between gap-2" @click.stop>
+              <div class="flex items-center gap-1.5">
+                <!-- Botão de ouvir gravação do aluno -->
+                <button v-if="item.user_audio_b64" type="button" @click.stop="playHistoryAudio(item)"
+                  class="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[0.65rem] font-bold border transition-all active:scale-95 cursor-pointer"
+                  :class="playingHistoryAudioId === item.id ? 'bg-primary text-white border-primary' : 'bg-surface hover:bg-surface-hover border-border text-text'"
+                  title="Listen to your recorded audio">
+                  <Pause v-if="playingHistoryAudioId === item.id" :size="12" />
+                  <Play v-else :size="12" />
+                  <span>{{ playingHistoryAudioId === item.id ? 'Pause' : 'My Audio' }}</span>
+                </button>
+
+                <!-- Data e hora formatadas -->
+                <span class="text-[0.6rem] text-text-muted">
+                  {{ new Date(item.created_at).toLocaleDateString() }} {{ new
+                    Date(item.created_at).toLocaleTimeString([], {
+                      hour: '2-digit', minute: '2-digit' }) }}
+                </span>
+              </div>
+
+              <!-- Botão de refazer frase -->
+              <button type="button" @click.stop="handleRetrySentence(item)"
+                class="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 text-[0.65rem] font-bold transition-all active:scale-95 cursor-pointer"
+                title="Load this sentence to practice again">
+                <RotateCcw :size="11" />
+                <span>Retry</span>
               </button>
             </div>
           </div>
+        </div>
+      </aside>
+    </div>
 
-          <!-- Transcription -->
-          <div v-if="result.transcription">
-            <h3 class="text-xs font-bold text-text-subtle uppercase tracking-wider mb-1">
-              What Tati heard
-            </h3>
-            <p class="text-sm text-text italic">&quot;{{ result.transcription }}&quot;</p>
+    <!-- Modal de fonética da palavra -->
+    <Teleport to="body">
+      <div v-if="selectedWord"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
+        @click="selectedWord = null">
+        <div @click.stop
+          class="relative w-full max-w-sm bg-surface border border-border rounded-3xl p-5 shadow-2xl space-y-4">
+          <!-- Cabeçalho do modal -->
+          <div class="flex items-center justify-between border-b border-border/60 pb-3">
+            <div class="flex items-center gap-2.5">
+              <span class="text-2xl font-black text-text font-mono tracking-tight">
+                {{ selectedWord.word }}
+              </span>
+              <span :class="[
+                'px-2.5 py-0.5 rounded-full text-xs font-bold font-sans',
+                selectedWord.accuracy === 'correct'
+                  ? 'bg-green-500/15 text-green-500 border border-green-500/30'
+                  : selectedWord.accuracy === 'needs_work'
+                    ? 'bg-amber-500/15 text-amber-500 border border-amber-500/30'
+                    : 'bg-red-500/15 text-red-500 border border-red-500/30',
+              ]">
+                {{ Math.round(selectedWord.score) }}%
+              </span>
+            </div>
+            <button type="button" @click="selectedWord = null"
+              class="p-1.5 rounded-full hover:bg-surface-hover text-text-muted hover:text-text transition-colors"
+              aria-label="Close">
+              <X :size="18" />
+            </button>
           </div>
 
-          <!-- Metadata -->
-          <div v-if="result.metadata" class="grid grid-cols-3 gap-2">
-            <div v-if="result.metadata.accuracy_score != null" class="text-center p-2 bg-bg rounded-lg">
-              <div class="text-sm font-bold text-text">{{ Math.round(result.metadata.accuracy_score) }}%</div>
-              <div class="text-[0.6rem] text-text-muted">Accuracy</div>
+          <!-- Status da pronúncia -->
+          <div class="flex items-center gap-2 text-xs font-semibold">
+            <span v-if="selectedWord.accuracy === 'correct'" class="flex items-center gap-1.5 text-green-500">
+              <CheckCircle2 :size="16" /> Natural and clear pronunciation
+            </span>
+            <span v-else-if="selectedWord.accuracy === 'needs_work'" class="flex items-center gap-1.5 text-amber-500">
+              <Sparkles :size="16" /> Understandable, but has accent
+            </span>
+            <span v-else class="flex items-center gap-1.5 text-red-500">
+              <XCircle :size="16" /> Inaccurate or missing sound
+            </span>
+          </div>
+
+          <!-- Dica pedagógica para a palavra -->
+          <div v-if="selectedWord.tip"
+            class="p-3.5 bg-primary/10 border border-primary/25 rounded-2xl flex items-start gap-3 text-left">
+            <div
+              class="w-8 h-8 rounded-full overflow-hidden shrink-0 border border-primary/40 mt-0.5 bg-primary text-white font-black flex items-center justify-center">
+              <img v-if="!logoError" src="/images/tati_logo.jpg" alt="Teacher Tati" class="w-full h-full object-cover"
+                @error="logoError = true" />
+              <span v-else class="text-xs">T</span>
             </div>
-            <div v-if="result.metadata.fluency_score != null" class="text-center p-2 bg-bg rounded-lg">
-              <div class="text-sm font-bold text-text">{{ Math.round(result.metadata.fluency_score) }}%</div>
-              <div class="text-[0.6rem] text-text-muted">Fluency</div>
-            </div>
-            <div v-if="result.metadata.completeness_score != null" class="text-center p-2 bg-bg rounded-lg">
-              <div class="text-sm font-bold text-text">{{ Math.round(result.metadata.completeness_score) }}%</div>
-              <div class="text-[0.6rem] text-text-muted">Completeness</div>
+            <div class="space-y-1">
+              <p class="text-[0.68rem] font-bold text-primary uppercase tracking-wider">
+                Teacher Tati's Tip
+              </p>
+              <p class="text-xs text-text leading-relaxed font-medium">
+                {{ selectedWord.tip }}
+              </p>
             </div>
           </div>
 
-          <!-- Phonetic provider -->
-          <div v-if="result.phonetic?.provider" class="text-[0.65rem] text-text-muted">
-            Phonetic provider: {{ result.phonetic.provider }}
+          <div v-else-if="selectedWord.accuracy === 'correct'"
+            class="p-3 bg-green-500/10 border border-green-500/20 rounded-2xl text-xs text-text-muted leading-relaxed">
+            Perfect! You articulated this word with precision and clarity.
           </div>
+
+          <!-- Botão de ouvir pronúncia da palavra -->
+          <button type="button" @click="playWordAudio(selectedWord.word)"
+            :disabled="isPlayingWord === selectedWord.word"
+            class="w-full py-2.5 px-4 bg-primary hover:opacity-95 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-md active:scale-98 disabled:opacity-50 cursor-pointer">
+            <Volume2 :size="16" :class="isPlayingWord === selectedWord.word ? 'animate-pulse' : ''" />
+            {{
+              isPlayingWord === selectedWord.word
+                ? 'Playing pronunciation...'
+                : `Listen to pronunciation of "${selectedWord.word}"`
+            }}
+          </button>
         </div>
       </div>
+    </Teleport>
 
-      <!-- Session History -->
-      <div v-if="history.length > 1" class="w-full mt-6">
-        <h3 class="text-xs font-bold text-text-subtle uppercase tracking-wider mb-2">Session History</h3>
-        <div class="flex gap-2 overflow-x-auto pb-2">
-          <div v-for="(h, i) in history" :key="i"
-            class="shrink-0 bg-surface border border-border rounded-lg p-2 text-center min-w-[80px]">
-            <div :class="['text-sm font-bold', scoreColor(h.score)]">{{ h.score }}%</div>
-            <div class="text-[0.6rem] text-text-muted truncate max-w-[70px]">
-              {{ h.sentence.substring(0, 15) }}...
+    <!-- Modal de seleção de sotaque -->
+    <Teleport to="body">
+      <div v-if="isAccentModalOpen"
+        class="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/75 dark:bg-black/85 animate-fade-in">
+        <div class="fixed inset-0 cursor-pointer" @click="isAccentModalOpen = false" />
+        <div
+          class="relative w-full sm:max-w-md bg-white dark:bg-[#111322] border border-border/80 dark:border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl p-5 sm:p-6 z-10 max-h-[85vh] flex flex-col space-y-4">
+          <div class="flex items-center justify-between border-b border-border/40 pb-3 shrink-0">
+            <div class="space-y-0.5">
+              <h3 class="text-base sm:text-lg font-black text-text flex items-center gap-2">
+                <Globe :size="18" class="text-primary" /> English Accents (Edge TTS)
+              </h3>
+              <p class="text-xs text-text-muted">Teacher Tati will practice with the selected accent</p>
             </div>
+            <button type="button" @click="isAccentModalOpen = false"
+              class="p-1.5 rounded-full hover:bg-surface-hover text-text-muted hover:text-text transition-colors cursor-pointer">
+              <X :size="18" />
+            </button>
           </div>
-        </div>
-      </div>
 
-      <!-- Modal / Tooltip de Fonética da Palavra -->
-      <Teleport to="body">
-        <div v-if="selectedWord"
-          class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
-          @click="selectedWord = null">
-          <div @click.stop
-            class="relative w-full max-w-sm bg-surface border border-border rounded-3xl p-5 shadow-2xl space-y-4">
-            <!-- Header do Modal -->
-            <div class="flex items-center justify-between border-b border-border/60 pb-3">
-              <div class="flex items-center gap-2.5">
-                <span class="text-2xl font-black text-text font-mono tracking-tight">
-                  {{ selectedWord.word }}
-                </span>
-                <span :class="[
-                  'px-2.5 py-0.5 rounded-full text-xs font-bold font-sans',
-                  selectedWord.accuracy === 'correct'
-                    ? 'bg-green-500/15 text-green-500 border border-green-500/30'
-                    : selectedWord.accuracy === 'needs_work'
-                      ? 'bg-amber-500/15 text-amber-500 border border-amber-500/30'
-                      : 'bg-red-500/15 text-red-500 border border-red-500/30',
-                ]">
-                  {{ Math.round(selectedWord.score) }}%
-                </span>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 overflow-y-auto max-h-[60vh] pr-1">
+            <button v-for="acc in ACCENTS" :key="acc.id" type="button" @click="handleSelectAccent(acc.id)" :class="[
+              'flex items-center gap-3 p-3 rounded-2xl border text-left transition-all active:scale-95 cursor-pointer',
+              acc.id === selectedAccent
+                ? 'bg-primary/10 border-primary shadow-sm text-primary ring-1 ring-primary/40 font-bold'
+                : 'bg-surface border-border hover:border-primary/40 text-text',
+            ]">
+              <span
+                class="w-8 h-8 rounded-xl bg-primary/10 text-primary border border-primary/20 font-black text-xs flex items-center justify-center shrink-0">{{
+                  acc.shortLabel }}</span>
+              <div class="min-w-0 flex-1">
+                <p class="text-xs font-bold truncate">{{ acc.label }}</p>
+                <p class="text-[0.65rem] text-text-muted truncate">{{ acc.desc }}</p>
               </div>
-              <button type="button" @click="selectedWord = null"
-                class="p-1.5 rounded-full hover:bg-surface-hover text-text-muted hover:text-text transition-colors"
-                aria-label="Fechar">
-                <X :size="18" />
-              </button>
-            </div>
-
-            <!-- Status da Pronúncia -->
-            <div class="flex items-center gap-2 text-xs font-semibold">
-              <span v-if="selectedWord.accuracy === 'correct'" class="flex items-center gap-1.5 text-green-500">
-                <CheckCircle2 :size="16" /> Pronúncia natural e clara
-              </span>
-              <span v-else-if="selectedWord.accuracy === 'needs_work'" class="flex items-center gap-1.5 text-amber-500">
-                <Sparkles :size="16" /> Compreensível, mas com sotaque
-              </span>
-              <span v-else class="flex items-center gap-1.5 text-red-500">
-                <XCircle :size="16" /> Fonema impreciso ou trocado
-              </span>
-            </div>
-
-            <!-- Dica da Teacher Tati para a palavra -->
-            <div v-if="selectedWord.tip"
-              class="p-3.5 bg-primary/10 border border-primary/25 rounded-2xl flex items-start gap-3 text-left">
-              <div
-                class="w-8 h-8 rounded-full overflow-hidden shrink-0 border border-primary/40 mt-0.5 bg-primary text-white font-black flex items-center justify-center">
-                <img v-if="!logoError" src="/images/tati_logo.jpg" alt="Teacher Tati" class="w-full h-full object-cover"
-                  @error="logoError = true" />
-                <span v-else class="text-xs">T</span>
-              </div>
-              <div class="space-y-1">
-                <p class="text-[0.68rem] font-bold text-primary uppercase tracking-wider">
-                  Dica da Teacher Tati
-                </p>
-                <p class="text-xs text-text leading-relaxed font-medium">
-                  {{ selectedWord.tip }}
-                </p>
-              </div>
-            </div>
-
-            <div v-else-if="selectedWord.accuracy === 'correct'"
-              class="p-3 bg-green-500/10 border border-green-500/20 rounded-2xl text-xs text-text-muted leading-relaxed">
-              Perfeito! Você articulou esse termo com precisão e clareza acústica.
-            </div>
-
-            <!-- Botão de Ouvir Palavra -->
-            <button type="button" @click="playWordAudio(selectedWord.word)"
-              :disabled="isPlayingWord === selectedWord.word"
-              class="w-full py-2.5 px-4 bg-primary hover:opacity-95 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-md active:scale-98 disabled:opacity-50">
-              <Volume2 :size="16" :class="isPlayingWord === selectedWord.word ? 'animate-pulse' : ''" />
-              {{
-                isPlayingWord === selectedWord.word
-                  ? 'Tocando pronúncia...'
-                  : `Ouvir pronúncia de "${selectedWord.word}"`
-              }}
             </button>
           </div>
         </div>
-      </Teleport>
-
-      <!-- Accent Picker Modal -->
-      <Teleport to="body">
-        <div v-if="isAccentModalOpen"
-          class="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/75 dark:bg-black/85 animate-fade-in">
-          <div class="fixed inset-0 cursor-pointer" @click="isAccentModalOpen = false" />
-          <div
-            class="relative w-full sm:max-w-md bg-white dark:bg-[#111322] border border-border/80 dark:border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl p-5 sm:p-6 z-10 max-h-[85vh] flex flex-col space-y-4">
-            <div class="flex items-center justify-between border-b border-border/40 pb-3 shrink-0">
-              <div class="space-y-0.5">
-                <h3 class="text-base sm:text-lg font-black text-text flex items-center gap-2">
-                  <span>🌎</span> English Accents (Edge TTS)
-                </h3>
-                <p class="text-xs text-text-muted">Teacher Tati will practice with the selected accent</p>
-              </div>
-              <button type="button" @click="isAccentModalOpen = false"
-                class="p-1.5 rounded-full hover:bg-surface-hover text-text-muted hover:text-text transition-colors cursor-pointer">
-                <X :size="18" />
-              </button>
+      </div>
+    </Teleport>
+    <!-- Modal de Resumo de Prática Anterior do Histórico -->
+    <Teleport to="body">
+      <div v-if="selectedHistoryModalItem"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
+        @click="selectedHistoryModalItem = null">
+        <div @click.stop
+          class="relative w-full max-w-lg bg-surface border border-border rounded-3xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar">
+          <!-- Cabeçalho do modal -->
+          <div class="flex items-center justify-between border-b border-border/60 pb-3">
+            <div>
+              <h3 class="text-base font-bold text-text flex items-center gap-2">
+                <Sparkles :size="18" class="text-primary" />
+                Pronunciation Summary
+              </h3>
+              <p class="text-xs text-text-muted mt-0.5">
+                {{ new Date(selectedHistoryModalItem.created_at).toLocaleDateString() }} {{ new
+                  Date(selectedHistoryModalItem.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                }}
+              </p>
             </div>
+            <button type="button" @click="selectedHistoryModalItem = null"
+              class="p-1.5 rounded-full hover:bg-surface-hover text-text-muted hover:text-text transition-colors cursor-pointer"
+              aria-label="Close">
+              <X :size="18" />
+            </button>
+          </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 overflow-y-auto max-h-[60vh] pr-1">
-              <button v-for="acc in ACCENTS" :key="acc.id" type="button" @click="handleSelectAccent(acc.id)" :class="[
-                'flex items-center gap-3 p-3 rounded-2xl border text-left transition-all active:scale-95 cursor-pointer',
-                acc.id === selectedAccent
-                  ? 'bg-primary/10 border-primary shadow-sm text-primary ring-1 ring-primary/40 font-bold'
-                  : 'bg-surface border-border hover:border-primary/40 text-text',
-              ]">
-                <span class="text-xl shrink-0">{{ acc.flag }}</span>
-                <div class="min-w-0 flex-1">
-                  <p class="text-xs font-bold truncate">{{ acc.label }}</p>
-                  <p class="text-[0.65rem] text-text-muted truncate">{{ acc.desc }}</p>
-                </div>
-              </button>
+          <!-- Nota e Status Geral -->
+          <div class="flex items-center justify-between p-4 rounded-2xl bg-bg-secondary/40 border border-border">
+            <div>
+              <div class="text-[0.68rem] font-bold text-text-muted uppercase tracking-wider">Overall Score</div>
+              <div :class="['text-3xl font-black mt-0.5', scoreColor(selectedHistoryModalItem.score)]">
+                {{ Math.round(selectedHistoryModalItem.score) }}%
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span
+                class="text-[0.65rem] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/20">
+                {{ selectedHistoryModalItem.mode.toUpperCase() }} MODE
+              </span>
+              <span
+                class="text-[0.65rem] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-surface border border-border text-text-muted">
+                {{ selectedHistoryModalItem.accent }}
+              </span>
             </div>
           </div>
+
+          <!-- Comparativo: Frase Correta vs O Que o Aluno Falou -->
+          <div class="space-y-3">
+            <!-- Frase Correta (Target) -->
+            <div class="p-3.5 bg-green-500/10 border border-green-500/25 rounded-2xl space-y-2">
+              <div class="flex items-center justify-between">
+                <span
+                  class="text-[0.68rem] font-bold text-green-500 uppercase tracking-wider flex items-center gap-1.5">
+                  <CheckCircle2 :size="13" />
+                  Target Sentence (Correct)
+                </span>
+                <button type="button"
+                  @click="playTatiHistoryReference(selectedHistoryModalItem.target_phrase, selectedHistoryModalItem.accent)"
+                  :disabled="isPlayingTatiReference"
+                  class="text-xs text-green-600 dark:text-green-400 hover:opacity-80 font-bold flex items-center gap-1 transition-all cursor-pointer disabled:opacity-50">
+                  <Volume2 :size="13" />
+                  {{ isPlayingTatiReference ? 'Playing...' : 'Teacher Tati' }}
+                </button>
+              </div>
+              <p class="text-sm font-semibold text-text leading-relaxed">
+                {{ selectedHistoryModalItem.target_phrase || selectedHistoryModalItem.spoken_phrase }}
+              </p>
+            </div>
+
+            <!-- Frase Falada pelo Aluno (Spoken) -->
+            <div class="p-3.5 bg-primary/10 border border-primary/25 rounded-2xl space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-[0.68rem] font-bold text-primary uppercase tracking-wider flex items-center gap-1.5">
+                  <Mic :size="13" />
+                  What You Said
+                </span>
+                <button v-if="selectedHistoryModalItem.user_audio_b64" type="button"
+                  @click="playHistoryAudio(selectedHistoryModalItem)"
+                  class="text-xs text-primary hover:opacity-80 font-bold flex items-center gap-1 transition-all cursor-pointer">
+                  <Volume2 :size="13" />
+                  {{ playingHistoryAudioId === selectedHistoryModalItem.id ? 'Pause' : 'Listen to Your Audio' }}
+                </button>
+              </div>
+              <p class="text-sm text-text italic leading-relaxed">
+                "{{ selectedHistoryModalItem.spoken_phrase || selectedHistoryModalItem.target_phrase }}"
+              </p>
+            </div>
+          </div>
+
+          <!-- Palavras Avaliadas com Destaque -->
+          <div v-if="selectedHistoryModalItem.words_result?.length" class="space-y-2">
+            <h4 class="text-xs font-bold text-text-subtle uppercase tracking-wider">
+              Word-by-Word Analysis
+            </h4>
+            <div class="flex flex-wrap gap-2">
+              <div v-for="(w, idx) in selectedHistoryModalItem.words_result" :key="idx" :class="[
+                'px-2.5 py-1 rounded-xl text-xs font-mono border flex items-center gap-1.5',
+                w.accuracy === 'correct'
+                  ? 'bg-green-500/10 text-green-500 border-green-500/25'
+                  : w.accuracy === 'needs_work'
+                    ? 'bg-amber-500/10 text-amber-500 border-amber-500/30'
+                    : 'bg-red-500/10 text-red-500 border-red-500/30 line-through'
+              ]">
+                <span class="font-bold">{{ w.word }}</span>
+                <span v-if="w.score != null" class="text-[0.65rem] opacity-75 font-sans">
+                  {{ Math.round(w.score) }}%
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Feedback da Professora Tatiana -->
+          <div v-if="selectedHistoryModalItem.feedback"
+            class="p-3.5 bg-surface-hover/60 border border-border rounded-2xl space-y-1">
+            <p class="text-[0.68rem] font-bold text-text-subtle uppercase tracking-wider">Teacher Tati's Feedback</p>
+            <p class="text-xs text-text leading-relaxed italic">
+              "{{ selectedHistoryModalItem.feedback }}"
+            </p>
+          </div>
+
+          <!-- Botões de Ação do Modal -->
+          <div class="pt-3 border-t border-border/60 flex items-center justify-end gap-3">
+            <button type="button" @click="selectedHistoryModalItem = null"
+              class="px-4 py-2 rounded-xl border border-border text-xs font-bold text-text-muted hover:text-text hover:bg-surface-hover transition-colors cursor-pointer">
+              Close
+            </button>
+            <button type="button" @click="handleRetrySentence(selectedHistoryModalItem)"
+              class="px-5 py-2 rounded-xl bg-primary hover:opacity-95 text-white text-xs font-bold flex items-center gap-2 transition-all shadow-md active:scale-95 cursor-pointer">
+              <RotateCcw :size="14" />
+              <span>Retry This Sentence</span>
+            </button>
+          </div>
         </div>
-      </Teleport>
-    </div>
+      </div>
+    </Teleport>
   </div>
 </template>

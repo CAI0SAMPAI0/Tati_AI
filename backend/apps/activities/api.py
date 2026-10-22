@@ -552,7 +552,28 @@ async def verify_pronunciation(request: HttpRequest, payload: PronunciationVerif
         if streak_info and res.metadata is not None:
             res.metadata["streak"] = streak_info
 
+    
+        if user and hasattr(user, "username"):
+            try:
+                from apps.activities.models import PronunciationHistory
+                await sync_to_async(PronunciationHistory.objects.create)(
+                    username=user.username,
+                    target_phrase=payload.target_phrase or payload.reference_text or "",
+                    spoken_phrase=res.transcription or payload.spoken_phrase or "",
+                    score=res.score,
+                    accuracy_score=res.metadata.get("accuracy_score", res.score) if res.metadata else res.score,
+                    fluency_score=res.metadata.get("fluency_score", 0.0) if res.metadata else 0.0,
+                    words_result=[w.dict() if hasattr(w, "dict") else dict(w) for w in (res.words or [])],
+                    feedback=res.feedback or "",
+                    accent=user_accent,
+                    mode=payload.mode or "preset",
+                    user_audio_b64=payload.audio or "",
+                )
+            except Exception as save_err:
+                logger.warning(f"Erro ao salvar historico de pronuncia: {save_err}")
+
         return res
+                
     except Exception as e:
         logger.error(f"[SpeechAPI] Erro ao verificar pronúncia: {e}", exc_info=True)
         target = payload.target_phrase or payload.reference_text or ""
@@ -592,6 +613,36 @@ async def speech_tts(request: HttpRequest, payload: dict):
     accent = payload.get("accent") or "en-US"
     audio_b64 = await AudioService.text_to_speech_async(text, accent=accent)
     return {"audio": audio_b64, "audio_b64": audio_b64}
+
+
+@speech_router.get("/pronunciation-history", auth=auth_required)
+def get_user_pronunciation_history(request: HttpRequest, limit: int = 50):
+    """
+    Retorna o historico de praticas de pronuncia do estudante logado.
+    """
+    user = getattr(request, "auth", None)
+    if not user or not hasattr(user, "username"):
+        return []
+
+    from apps.activities.models import PronunciationHistory
+    qs = PronunciationHistory.objects.filter(username=user.username).order_by("-created_at")[:limit]
+    return [
+        {
+            "id": str(p.id),
+            "target_phrase": p.target_phrase,
+            "spoken_phrase": p.spoken_phrase,
+            "score": p.score,
+            "accuracy_score": p.accuracy_score,
+            "fluency_score": p.fluency_score,
+            "words_result": p.words_result,
+            "feedback": p.feedback,
+            "accent": p.accent,
+            "mode": p.mode,
+            "user_audio_b64": p.user_audio_b64 or "",
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+        }
+        for p in qs
+    ]
 
 
 #    EXTERNAL CONTENT: TEST ENGLISH & LIVEWORKSHEETS                    
