@@ -78,14 +78,18 @@ MIDDLEWARE = [
 
 
 # Ativa debug_toolbar apenas se explicitamente habilitado via variável de ambiente (desativado por padrão em produção/HF)
-if os.getenv("ENABLE_DEBUG_TOOLBAR", "false").lower() in ("true", "1"):
+# Ativa debug_toolbar em desenvolvimento local (DEBUG=True) ou se ENABLE_DEBUG_TOOLBAR=true (desativado por padrão em produção/HF)
+_is_debug_mode = os.getenv("DEBUG", "False").lower() in ("true", "1")
+_enable_debug_toolbar = os.getenv("ENABLE_DEBUG_TOOLBAR", "true" if _is_debug_mode else "false").lower() in ("true", "1")
+
+if _enable_debug_toolbar:
     INSTALLED_APPS.append("debug_toolbar")
     MIDDLEWARE.insert(2, "debug_toolbar.middleware.DebugToolbarMiddleware")
     DEBUG_TOOLBAR_CONFIG = {
         "SHOW_TOOLBAR_CALLBACK": lambda req: True,
         "RENDER_PANELS": True,
     }
-    INTERNAL_IPS = ["127.0.0.1", "localhost", "172.18.0.1"]
+    INTERNAL_IPS = ["127.0.0.1", "localhost", "172.18.0.1", "172.17.0.1", "172.19.0.1"]
 
 ROOT_URLCONF = "app.urls"
 # Silencia aviso de namespace duplicado pois a api é montada em /api/v1/, /api/ e / para compatibilidade legada
