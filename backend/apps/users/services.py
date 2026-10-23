@@ -597,7 +597,7 @@ class ProgressReportService:
         msgs = list(
             Message.objects.filter(
                 username=user.username, role="user", created_at__gte=week_ago
-            )
+            ).only("id", "session_id", "created_at")
         )
 
         days = [(now - timedelta(days=i)).strftime("%a") for i in range(6, -1, -1)]
@@ -648,7 +648,7 @@ class ProgressReportService:
         msgs = list(
             Message.objects.filter(
                 username=username, role="user", created_at__gte=month_start
-            )
+            ).only("id", "created_at", "content")
         )
 
         # Messages grouped by week of the month (Week 1: days 1-7, Week 2: 8-14, Week 3: 15-21, Week 4: 22-28, Week 5: 29+)

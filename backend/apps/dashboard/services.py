@@ -1049,7 +1049,10 @@ class DashboardService:
 
         # 1. Progresso dos Módulos
         modules = Module.objects.filter(is_published=True).order_by("order")
-        submissions = list(ActivitySubmission.objects.filter(username=username))
+        submissions = list(
+            ActivitySubmission.objects.filter(username=username).only(
+            "id", "module_id", "activity_type", "metadata"
+        ))
 
         completed_mod_keys = set()
         for sub in submissions:
@@ -1198,9 +1201,9 @@ class DashboardService:
         usernames = list(set(usernames))
 
         subs = list(
-            ActivitySubmission.objects.filter(username__in=usernames).order_by(
-                "-created_at"
-            )[:200]
+            ActivitySubmission.objects.filter(username__in=usernames)
+            .defer("student_answer", "teacher_feedback", "ai_feedback")
+            .order_by("-created_at")[:200]
         )
 
         counts = {
@@ -1467,7 +1470,7 @@ class DashboardService:
         
         from apps.activities.models import PronunciationHistory
         
-        pronunciations = PronunciationHistory.objects.filter(username=username).order_by("-created_at")
+        pronunciations = PronunciationHistory.objects.filter(username=username).defer("user_audio_b64").order_by("-created_at")
         pronunciation_list = [
             {
                 "id": str(p.id),

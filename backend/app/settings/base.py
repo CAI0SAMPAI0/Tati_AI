@@ -85,7 +85,7 @@ if os.getenv("ENABLE_DEBUG_TOOLBAR", "false").lower() in ("true", "1"):
         "SHOW_TOOLBAR_CALLBACK": lambda req: True,
         "RENDER_PANELS": True,
     }
-    INTERNAL_IPS = ["127.0.0.1", "localhost"]
+    INTERNAL_IPS = ["127.0.0.1", "localhost", "172.18.0.1"]
 
 ROOT_URLCONF = "app.urls"
 # Silencia aviso de namespace duplicado pois a api é montada em /api/v1/, /api/ e / para compatibilidade legada
@@ -207,6 +207,7 @@ if IS_VALID_REDIS_URL and SHOULD_USE_REDIS_CACHE:
             "LOCATION": REDIS_URL,
             "OPTIONS": {
                 "CLIENT_CLASS": "django_redis.client.DefaultClient",
+                "COMPRESSOR": "django_redis.compressors.zlib.ZlibCompressor",
                 "IGNORE_EXCEPTIONS": True,
             },
             "KEY_PREFIX": "tati_ai",
