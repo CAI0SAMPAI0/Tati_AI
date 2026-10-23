@@ -1398,7 +1398,7 @@ class DashboardService:
 
     @staticmethod
     def get_student_insight(username: str, lang: str = "en-US") -> dict:
-        msgs = Message.objects.filter(username=username, role="user").order_by(
+        msgs = Message.objects.filter(username=username, role="user").only("id", "content").order_by(
             "-created_at"
         )[:15]
         user_texts = [m.content for m in msgs if m.content]

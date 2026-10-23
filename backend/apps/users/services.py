@@ -689,7 +689,7 @@ class ProgressReportService:
         subs = list(
             ActivitySubmission.objects.filter(
                 username=username, created_at__gte=month_start, status="completed"
-            )
+            ).only("id", "created_at")
         )
         for s in subs:
             if s.created_at:
