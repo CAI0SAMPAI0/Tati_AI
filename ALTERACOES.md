@@ -4,6 +4,23 @@ Este documento registra todas as alterações efetuadas no projeto durante a spr
 
 ---
 
+## [Infra / Banco de Dados] Migração 100% Zero-Data-Loss: Railway PostgreSQL -> Supabase
+- **Objetivo**: Migrar de forma segura todos os dados e tabelas hospedados no PostgreSQL da Railway para o Supabase PostgreSQL com integridade transacional e paridade 1:1.
+- **Backups Locais Criados**:
+  - `backend/backups/railway_full_backup_20261025_151319.json` (336.45 MB, 14.819 linhas preservadas em disco).
+  - `backend/backups/supabase_backup_20261025_151446.json` (282.29 MB).
+- **Scripts de Automação Desenvolvidos**:
+  - `backend/scripts/backup_railway_db.py`: Script para extração de snapshots lógicos completos de segurança.
+  - `backend/scripts/migrate_railway_to_supabase.py`: Script de replicação atômica com sincronização de schemas, tipos ENUM, sequências PostgreSQL, ajuste de constraints (`user_trophies.trophy_id` para `VARCHAR(100)`), truncamento prévio em bloco e inserção em lotes via `psycopg2.extras.execute_batch`.
+  - `backend/scripts/compare_tables.py`: Ferramenta de auditoria de paridade 1:1 tabela por tabela.
+- **Resultado da Migração**:
+  - Todas as 62 tabelas migradas com **14.819 de 14.819 registros confirmados (100% de paridade)**.
+  - Sequências realinhadas via `setval()` para prevenir colisões de chave primária.
+  - `.gitignore` atualizado para proteger a pasta de backups.
+  - `.env` atualizado com a `DATABASE_URL` do Supabase e Django validado sem inconsistências.
+
+---
+
 ## [Sprint 0] Inicialização e Alinhamento de Branches
 - **Branch**: Merge realizado com sucesso da branch `main` para a `desenvolvimento`.
 - **Git Push**: Branch `desenvolvimento` sincronizada com o repositório remoto `origin/desenvolvimento`.

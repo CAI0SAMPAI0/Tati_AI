@@ -18,6 +18,8 @@ backend-django/
 db.sqlite3
 backend/staticfiles/
 staticfiles/
+backend/backups/
+backups/
 
 # IDE
 .vscode/
