@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import {
   ArrowLeft,
+  BookOpen,
   GraduationCap,
   CheckCircle2,
   XCircle,
@@ -373,6 +374,29 @@ onUnmounted(() => {
         </div>
       </div>
 
+      <!-- Points to Improve -->
+      <div v-if="examResult.points_to_improve && examResult.points_to_improve.length > 0" class="bg-surface border border-border rounded-3xl p-6 md:p-8 mb-8 shadow-xs">
+        <div class="flex items-center gap-3 mb-5">
+          <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center font-bold">
+            <Lightbulb class="w-5 h-5" />
+          </div>
+          <div>
+            <h2 class="text-lg md:text-xl font-bold text-text">Recommended Improvements</h2>
+            <p class="text-xs text-text-muted">Constructive next steps to strengthen your English</p>
+          </div>
+        </div>
+        <div class="space-y-2.5">
+          <div
+            v-for="(tip, idx) in examResult.points_to_improve"
+            :key="idx"
+            class="flex items-start gap-3 p-3.5 rounded-2xl bg-amber-500/5 border border-amber-500/20 text-xs sm:text-sm text-text"
+          >
+            <Sparkles class="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+            <span>{{ tip }}</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Detailed Corrections Review -->
       <div v-if="examResult.corrections && examResult.corrections.length > 0" class="bg-surface border border-border rounded-3xl p-6 md:p-8 shadow-xs">
         <h2 class="text-lg md:text-xl font-bold text-text mb-2 flex items-center gap-2">
@@ -398,7 +422,7 @@ onUnmounted(() => {
               >
                 <CheckCircle2 v-if="corr.is_correct" class="w-3 h-3" />
                 <XCircle v-else class="w-3 h-3" />
-                <span>{{ corr.is_correct ? `Correct (+${corr.points_earned} pts)` : 'Incorrect (0 pts)' }}</span>
+                <span>{{ corr.is_correct ? `Correct (+${corr.points_earned} pts)` : `Needs Review (+${corr.points_earned || 0} pts)` }}</span>
               </span>
             </div>
 
@@ -408,8 +432,9 @@ onUnmounted(() => {
               <p class="text-text-muted">
                 Your answer: <strong :class="corr.is_correct ? 'text-success' : 'text-danger'">{{ corr.student_answer || '(not answered)' }}</strong>
               </p>
-              <p v-if="!corr.is_correct && corr.correct_answer" class="text-text-muted">
-                Target answer: <strong class="text-success">{{ corr.correct_answer }}</strong>
+              <p v-if="corr.correct_answer && (corr.type === 'writing' || !corr.is_correct)" class="text-text-muted">
+                {{ corr.type === 'writing' ? 'Polished version:' : 'Target answer:' }}
+                <strong class="text-success">{{ corr.correct_answer }}</strong>
               </p>
             </div>
 
@@ -605,14 +630,21 @@ onUnmounted(() => {
             </button>
           </div>
 
-          <!-- Open-ended Text Input -->
+          <!-- Open-ended Writing Textarea -->
           <div v-else class="pt-2">
-            <input
-              type="text"
+            <textarea
+              rows="4"
               v-model="answers[q.id]"
-              placeholder="Type your answer here..."
-              class="w-full px-4 py-3 rounded-xl bg-bg border border-border text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
-            />
+              placeholder="Write your paragraph in English here..."
+              class="w-full px-4 py-3 rounded-xl bg-bg border border-border text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all resize-y"
+            ></textarea>
+            <div class="flex items-center justify-between text-[0.7rem] text-text-muted mt-1.5 px-1">
+              <span>Punctuation errors do not reduce your writing score.</span>
+              <span class="font-bold">
+                Words: {{ (answers[q.id] || '').trim() ? (answers[q.id] || '').trim().split(/\s+/).length : 0 }}
+                <template v-if="q.min_words && q.max_words"> ({{ q.min_words }}–{{ q.max_words }} recommended)</template>
+              </span>
+            </div>
           </div>
         </div>
 

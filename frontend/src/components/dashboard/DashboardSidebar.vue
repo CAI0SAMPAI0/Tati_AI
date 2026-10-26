@@ -10,11 +10,12 @@ import {
   BookOpen,
   Zap,
   MessageSquare,
-  MessageCircle,
   Settings,
   X,
 } from 'lucide-vue-next';
 import TatiLogo from '../ui/TatiLogo.vue';
+import WhatsAppIcon from '../icons/WhatsAppIcon.vue';
+import ExamIcon from '../icons/ExamIcon.vue';
 
 export type DashSection =
   | 'overview'
@@ -25,6 +26,7 @@ export type DashSection =
   | 'games'
   | 'news'
   | 'cefr'
+  | 'exams'
   | 'premium'
   | 'feedbacks'
   | 'whatsapp';
@@ -48,9 +50,10 @@ const navItems: Array<{ id: DashSection; icon: any; label: string }> = [
   { id: 'games', icon: Gamepad2, label: 'Games' },
   { id: 'news', icon: Newspaper, label: 'News' },
   { id: 'cefr', icon: BookOpen, label: 'CEFR Materials' },
+  { id: 'exams', icon: ExamIcon, label: 'Exams' },
   { id: 'premium', icon: Zap, label: "Taty's Materials" },
   { id: 'feedbacks', icon: MessageSquare, label: 'Feedbacks' },
-  { id: 'whatsapp', icon: MessageCircle, label: 'WhatsApp Config' },
+  { id: 'whatsapp', icon: WhatsAppIcon, label: 'WhatsApp Config' },
 ];
 
 function handleSelectSection(id: DashSection) {

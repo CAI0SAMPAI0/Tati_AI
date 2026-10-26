@@ -26,6 +26,7 @@ import NewsSection from '@/components/dashboard/NewsSection.vue';
 import FeedbacksSection from '@/components/dashboard/FeedbacksSection.vue';
 import WhatsappSection from '@/components/dashboard/WhatsappSection.vue';
 import CefrSection from '@/components/dashboard/CefrSection.vue';
+import ExamSection from '@/components/dashboard/ExamSection.vue';
 import PremiumSection from '@/components/dashboard/PremiumSection.vue';
 import { useToast } from '@/composables/useToast';
 
@@ -55,6 +56,7 @@ const validSections: DashSection[] = [
   'games',
   'news',
   'cefr',
+  'exams',
   'premium',
   'feedbacks',
   'whatsapp',
@@ -202,6 +204,7 @@ const sectionTitles: Record<DashSection, { title: string; subtitle: string }> = 
   games: { title: 'Games', subtitle: 'WordWall games for students' },
   news: { title: 'News', subtitle: 'News, reels and links for students' },
   cefr: { title: 'CEFR Materials', subtitle: 'Diagnose and generate from PDFs' },
+  exams: { title: 'Exams', subtitle: 'Review questions, AI improvements & student answers by level' },
   premium: { title: "Taty's Materials", subtitle: 'Premium materials & payments' },
   feedbacks: { title: 'Student Feedback', subtitle: 'Opinions and reviews submitted by students' },
   whatsapp: { title: 'WhatsApp Connection', subtitle: 'Connect and manage WhatsApp WAHA sessions' },
@@ -492,6 +495,9 @@ const sectionTitles: Record<DashSection, { title: string; subtitle: string }> = 
 
         <!-- 8. CEFR MATERIALS SECTION -->
         <CefrSection v-else-if="activeSection === 'cefr'" />
+
+        <!-- 8.5 EXAMS VERIFICATION & STUDENT ANSWERS SECTION -->
+        <ExamSection v-else-if="activeSection === 'exams'" />
 
         <!-- 9. PREMIUM MATERIALS SECTION -->
         <PremiumSection v-else-if="activeSection === 'premium'" />

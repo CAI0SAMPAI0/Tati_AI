@@ -351,6 +351,29 @@ class TrimestralExam(models.Model):
         return f"TrimestralExam {self.username} [{self.level}] - {self.status} ({self.score}%)"
 
 
+class ScrapedActivityContent(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    url = models.CharField(max_length=1000, unique=True, db_index=True)
+    slug = models.CharField(max_length=255, blank=True, default="", db_index=True)
+    title = models.CharField(max_length=500, blank=True, default="")
+    category = models.CharField(max_length=50, db_index=True)  # grammar, vocabulary, listening, reading
+    level = models.CharField(max_length=20, default="A1", db_index=True)
+    reading_text = models.TextField(blank=True, default="")
+    audio_text = models.TextField(blank=True, default="")
+    questions = models.JSONField(default=list, blank=True)
+    raw_content = models.TextField(blank=True, default="")
+    scraped_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)
+
+    class Meta:
+        db_table = "scraped_activity_contents"
+        managed = False
+        ordering = ["-scraped_at"]
+
+    def __str__(self):
+        return f"[{self.level}][{self.category}] {self.title or self.slug or self.url}"
+
+
 class PronunciationHistory(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     username = models.CharField(max_length=150, db_index=True)

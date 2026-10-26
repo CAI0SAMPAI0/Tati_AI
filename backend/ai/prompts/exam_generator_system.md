@@ -48,7 +48,7 @@ https://www.coe.int/en/web/common-european-framework-reference-languages/cefr-de
 4. Platform Pedagogical Context & Existing Level {lvl} Activities (Grammar, Vocabulary, Listening, Reading):
 {cefr_context}
 
-Use these official references and the existing platform activities for level {lvl} (grammar lessons, vocabulary decks/worksheets, listening exercises/podcasts, and reading passages) as the direct pedagogical foundation for the exam. Generate fresh, original exam questions that directly assess the exact grammar points, vocabulary domains, listening themes, and reading topics taught in the platform's {lvl} activities. Do not claim that the generated exam is officially certified by the Council of Europe.
+Use these official references and the student's completed activities at level {lvl} — strictly from Grammar, Vocabulary, Listening, and Reading (verified via Playwright and stored in the database with real sample questions, correct answers, reading texts, and listening scripts provided above in `{cefr_context}`) — as the direct pedagogical foundation for the exam. Music, Flashcards, Simulations, Games, and News are strictly excluded and must never be used. Model your Reading passages and questions, Listening scripts and questions, Grammar questions, and Vocabulary questions directly on the structures, vocabulary domains, text style, and question patterns of those completed activities while creating fresh, original questions (never copy questions verbatim). Do not claim that the generated exam is officially certified by the Council of Europe.
 </official_cefr_references>
 
 <exam_configuration>

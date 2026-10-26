@@ -6,6 +6,7 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     DJANGO_SETTINGS_MODULE=app.settings.production \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
     WORKERS=1
 
 # Instalar dependências de sistema para compilação e conversão de documentos
@@ -31,7 +32,10 @@ RUN if [ -f "/tmp/build/backend/requirements.txt" ]; then \
     fi \
     && rm -rf /tmp/build \
     && pip install --upgrade pip && pip --version \
-    && pip install --no-cache-dir -r requirements.txt
+    && pip install --no-cache-dir -r requirements.txt \
+    && playwright install --with-deps chromium \
+    && chmod -R 755 /ms-playwright \
+    && rm -rf /var/lib/apt/lists/*
 
 # Coleta arquivos estaticos
 RUN python manage.py collectstatic --noinput || true

@@ -612,3 +612,229 @@ def update_student_feedback(
     from apps.activities.services import StudentFeedbackService
     return StudentFeedbackService.update_feedback(feedback_id, payload.dict(exclude_unset=True))
 
+
+#    EXAMES TRIMESTRAIS: VERIFICAÇÃO, IA EM TEMPO REAL & RESPOSTAS      
+
+
+class ExamSyncInput(BaseModel):
+    force_refresh: Optional[bool] = False
+
+
+class ExamGenerateInput(BaseModel):
+    num_questions: Optional[int] = 10
+
+
+class ExamResetInput(BaseModel):
+    mode: Optional[str] = "clear_all"
+    exam_id: Optional[str] = None
+
+
+class QuestionApprovalInput(BaseModel):
+    approval_status: str
+    admin_notes: Optional[str] = None
+
+
+class BulkApprovalInput(BaseModel):
+    approval_status: Optional[str] = "approved"
+
+
+class QuestionAIImproveInput(BaseModel):
+    suggestion: str
+
+
+class QuestionManualUpdateInput(BaseModel):
+    question: Optional[str] = None
+    reading_text: Optional[str] = None
+    audio_text: Optional[str] = None
+    options: Optional[List[str]] = None
+    correct_answer: Optional[str] = None
+    explanation: Optional[str] = None
+    approval_status: Optional[str] = None
+    admin_notes: Optional[str] = None
+
+
+@dashboard_router.get("/exams/overview", auth=auth_required)
+def get_dashboard_exams_overview(
+    request: HttpRequest,
+    level: Optional[str] = None,
+    search: Optional[str] = None,
+):
+    """
+    Lista alunos filtrados por nível CEFR (A1..C2) com contagem de atividades Grammar..Reading
+    verificadas via Playwright, exames pendentes de aprovação e histórico de respostas.
+    """
+    require_staff_user(request)
+    from apps.activities.admin_exam_review import AdminExamReviewService
+    return AdminExamReviewService.list_students_and_exams(level=level, search=search)
+
+
+@dashboard_router.get("/exams/students/{username}", auth=auth_required)
+def get_dashboard_student_exam_detail(request: HttpRequest, username: str):
+    """
+    Retorna detalhes completos de exames, questões para aprovação, atividades extraídas pelo Playwright
+    e respostas completas de um aluno específico.
+    """
+    require_staff_user(request)
+    from apps.activities.admin_exam_review import AdminExamReviewService
+    try:
+        return AdminExamReviewService.get_student_exam_detail(username)
+    except ValueError as e:
+        raise HttpError(404, str(e))
+
+
+@dashboard_router.post("/exams/students/{username}/sync-activities", auth=auth_required)
+def sync_dashboard_student_activities(
+    request: HttpRequest,
+    username: str,
+    payload: Optional[ExamSyncInput] = None,
+):
+    """
+    Aciona o Playwright para verificar e salvar no banco as questões, respostas corretas e textos
+    das atividades concluídas pelo aluno no nível atual (Grammar até Reading).
+    """
+    require_staff_user(request)
+    from apps.activities.admin_exam_review import AdminExamReviewService
+    try:
+        force = bool(payload.force_refresh) if payload else False
+        return AdminExamReviewService.sync_student_activities(username, force_refresh=force)
+    except ValueError as e:
+        raise HttpError(404, str(e))
+
+
+@dashboard_router.post("/exams/students/{username}/generate", auth=auth_required)
+def generate_dashboard_student_exam(
+    request: HttpRequest,
+    username: str,
+    payload: Optional[ExamGenerateInput] = None,
+):
+    """
+    Sincroniza atividades concluídas do aluno via Playwright e gera/regenera o exame personalizado do nível atual.
+    """
+    require_staff_user(request)
+    from apps.activities.admin_exam_review import AdminExamReviewService
+    try:
+        count = int(payload.num_questions or 10) if payload else 10
+        return AdminExamReviewService.generate_student_exam(username, num_questions=count)
+    except ValueError as e:
+        raise HttpError(404, str(e))
+
+
+@dashboard_router.post("/exams/students/{username}/reset", auth=auth_required)
+def reset_dashboard_student_exam(
+    request: HttpRequest,
+    username: str,
+    payload: Optional[ExamResetInput] = None,
+):
+    """
+    Reseta o exame de um aluno caso a professora deseje liberar nova tentativa
+    (mode='reopen' mantém questões aprovadas e libera refazer; mode='clear_all' zera ciclo; mode='delete_one' remove tentativa).
+    """
+    staff = require_staff_user(request)
+    from apps.activities.admin_exam_review import AdminExamReviewService
+    try:
+        mode = (payload.mode or "clear_all") if payload else "clear_all"
+        ex_id = payload.exam_id if payload else None
+        return AdminExamReviewService.reset_student_exams(
+            username=username,
+            mode=mode,
+            exam_id=ex_id,
+            reviewer=staff.username,
+        )
+    except ValueError as e:
+        raise HttpError(400, str(e))
+
+
+@dashboard_router.patch("/exams/{exam_id}/questions/{question_id}/status", auth=auth_required)
+def update_exam_question_status(
+    request: HttpRequest,
+    exam_id: str,
+    question_id: str,
+    payload: QuestionApprovalInput,
+):
+    """
+    Aprova ou reprova uma questão específica de um exame no Dashboard.
+    """
+    staff = require_staff_user(request)
+    from apps.activities.admin_exam_review import AdminExamReviewService
+    try:
+        return AdminExamReviewService.set_question_approval(
+            exam_id=exam_id,
+            question_id=question_id,
+            approval_status=payload.approval_status,
+            admin_notes=payload.admin_notes,
+            reviewer=staff.username,
+        )
+    except ValueError as e:
+        raise HttpError(400, str(e))
+
+
+@dashboard_router.post("/exams/{exam_id}/approve-all", auth=auth_required)
+def approve_all_exam_questions(
+    request: HttpRequest,
+    exam_id: str,
+    payload: Optional[BulkApprovalInput] = None,
+):
+    """
+    Aprova todas as questões de um exame em lote.
+    """
+    staff = require_staff_user(request)
+    from apps.activities.admin_exam_review import AdminExamReviewService
+    try:
+        st = (payload.approval_status or "approved") if payload else "approved"
+        return AdminExamReviewService.approve_all_questions(
+            exam_id=exam_id,
+            approval_status=st,
+            reviewer=staff.username,
+        )
+    except ValueError as e:
+        raise HttpError(400, str(e))
+
+
+@dashboard_router.post("/exams/{exam_id}/questions/{question_id}/ai-improve", auth=auth_required)
+def ai_improve_exam_question(
+    request: HttpRequest,
+    exam_id: str,
+    question_id: str,
+    payload: QuestionAIImproveInput,
+):
+    """
+    Recebe o que alterar/melhorar sugerido pela admin, pede para a IA atualizar a questão na hora,
+    persiste no banco e retorna imediatamente a questão atualizada.
+    """
+    staff = require_staff_user(request)
+    from apps.activities.admin_exam_review import AdminExamReviewService
+    try:
+        return AdminExamReviewService.improve_question_realtime(
+            exam_id=exam_id,
+            question_id=question_id,
+            suggestion=payload.suggestion,
+            reviewer=staff.username,
+        )
+    except ValueError as e:
+        raise HttpError(400, str(e))
+    except RuntimeError as e:
+        raise HttpError(502, str(e))
+
+
+@dashboard_router.patch("/exams/{exam_id}/questions/{question_id}", auth=auth_required)
+def manual_edit_exam_question(
+    request: HttpRequest,
+    exam_id: str,
+    question_id: str,
+    payload: QuestionManualUpdateInput,
+):
+    """
+    Permite edição manual direta da questão pela admin caso deseje ajustar texto/opções manualmente.
+    """
+    staff = require_staff_user(request)
+    from apps.activities.admin_exam_review import AdminExamReviewService
+    try:
+        return AdminExamReviewService.manual_update_question(
+            exam_id=exam_id,
+            question_id=question_id,
+            updates=payload.dict(exclude_unset=True),
+            reviewer=staff.username,
+        )
+    except ValueError as e:
+        raise HttpError(400, str(e))
+

@@ -209,3 +209,5 @@ docker-compose1.yml
 
 test-results/
 playwright-report/
+scripts/
+backend/scripts/

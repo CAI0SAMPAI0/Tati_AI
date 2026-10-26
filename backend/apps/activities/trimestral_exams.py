@@ -224,12 +224,21 @@ def is_user_authorized(user_or_username: Any) -> bool:
         if role in ("programador", "professor", "professora", "teacher", "admin"):
             return True
         uname = str(getattr(user_or_username, "username", "")).strip().lower()
-        return uname in ALLOWED_USERNAMES
+        if uname in ALLOWED_USERNAMES:
+            return True
+        try:
+            if TrimestralExam.objects.filter(username__iexact=uname).exists():
+                return True
+        except Exception:
+            pass
+        return False
 
     uname = str(user_or_username).strip().lower()
     if uname in ALLOWED_USERNAMES:
         return True
     try:
+        if TrimestralExam.objects.filter(username__iexact=uname).exists():
+            return True
         user = User.objects.filter(username__iexact=uname).only("role").first()
         if user and (
             getattr(user, "is_staff", False)
@@ -342,15 +351,27 @@ def evaluate_speaking_with_gemini(
                     )
                     if resp and resp.text:
                         data = json.loads(resp.text.strip())
+                        lvl_upper = (level or "A1").strip().upper()
                         score = int(data.get("score", 75))
-                        passed = bool(data.get("passed", score >= 60))
                         transcription = str(data.get("transcription", "")).strip()
+                        raw_improvements = data.get("improvements") or []
+                        improvements = [str(x).strip() for x in raw_improvements if str(x).strip()] if isinstance(raw_improvements, list) else []
                         feedback = str(data.get("feedback", "Good oral response in English.")).strip()
+
+                        # Avaliação mais acolhedora e menos agressiva para A1, A2 e B1
+                        if lvl_upper in ("A1", "A2", "B1") and len(transcription.split()) >= 4 and 40 <= score < 65:
+                            score = max(score, 68)
+
+                        passed = bool(data.get("passed", score >= 60)) or (score >= 60)
+                        if improvements and "improvement" not in feedback.lower() and "practice" not in feedback.lower():
+                            feedback = f"{feedback} Suggested improvements: {' '.join(f'• {tip}' for tip in improvements[:3])}"
+
                         return {
                             "passed": passed,
                             "score": score,
                             "transcription": transcription,
                             "feedback": feedback,
+                            "improvements": improvements,
                         }
                 except Exception as model_err:
                     logger.warning(f"[SpeakingEval] Tentativa com Gemini {g_model} falhou: {model_err}")
@@ -436,7 +457,12 @@ def evaluate_writing_with_ai(
                         messages=[
                             {
                                 "role": "system",
-                                "content": "You are a fair CEFR English writing examiner. Return valid JSON only. Never deduct points for punctuation or comma errors.",
+                                "content": (
+                                    "You are a supportive, fair CEFR English writing examiner. Return valid JSON only. "
+                                    "Never deduct points for punctuation or comma errors. "
+                                    "For A1, A2, and B1 students, do not be aggressive or overly strict with developmental slips; "
+                                    "score encouragingly when meaning is clear while always showing specific improvements to make."
+                                ),
                             },
                             {"role": "user", "content": eval_prompt},
                         ],
@@ -446,17 +472,26 @@ def evaluate_writing_with_ai(
                     raw = res.choices[0].message.content
                     if raw:
                         data = json.loads(raw.strip())
+                        lvl_upper = (level or "A1").strip().upper()
                         pts10 = int(round(float(data.get("points_out_of_10", round(float(data.get("score", 75)) / 10)))))
                         pts10 = max(0, min(10, pts10))
-                        score = int(data.get("score", pts10 * 10))
-                        passed = bool(data.get("passed", score >= 60))
+                        # Calibração acolhedora (não agressiva) para A1, A2 e B1 quando há esforço compreensível
+                        if lvl_upper in ("A1", "A2", "B1") and word_count >= max(8, int(min_words * 0.5)) and pts10 in (4, 5):
+                            pts10 = 6
+                        score = max(int(data.get("score", pts10 * 10)), pts10 * 10)
+                        passed = bool(data.get("passed", score >= 60)) or (score >= 60)
+                        raw_improvements = data.get("improvements") or []
+                        improvements = [str(x).strip() for x in raw_improvements if str(x).strip()] if isinstance(raw_improvements, list) else []
                         feedback = str(data.get("feedback", "Good written paragraph in English.")).strip()
+                        if improvements and "improvement" not in feedback.lower() and "next" not in feedback.lower():
+                            feedback = f"{feedback} Areas to improve: {' '.join(f'• {tip}' for tip in improvements[:3])}"
                         improved = str(data.get("improved_version", "")).strip()
                         return {
                             "passed": passed,
                             "score": score,
                             "points_out_of_10": pts10,
                             "feedback": feedback,
+                            "improvements": improvements,
                             "improved_version": improved,
                         }
                 except Exception as groq_err:
@@ -483,17 +518,25 @@ def evaluate_writing_with_ai(
                     )
                     if resp and resp.text:
                         data = json.loads(resp.text.strip())
+                        lvl_upper = (level or "A1").strip().upper()
                         pts10 = int(round(float(data.get("points_out_of_10", round(float(data.get("score", 75)) / 10)))))
                         pts10 = max(0, min(10, pts10))
-                        score = int(data.get("score", pts10 * 10))
-                        passed = bool(data.get("passed", score >= 60))
+                        if lvl_upper in ("A1", "A2", "B1") and word_count >= max(8, int(min_words * 0.5)) and pts10 in (4, 5):
+                            pts10 = 6
+                        score = max(int(data.get("score", pts10 * 10)), pts10 * 10)
+                        passed = bool(data.get("passed", score >= 60)) or (score >= 60)
+                        raw_improvements = data.get("improvements") or []
+                        improvements = [str(x).strip() for x in raw_improvements if str(x).strip()] if isinstance(raw_improvements, list) else []
                         feedback = str(data.get("feedback", "Good written paragraph in English.")).strip()
+                        if improvements and "improvement" not in feedback.lower() and "next" not in feedback.lower():
+                            feedback = f"{feedback} Areas to improve: {' '.join(f'• {tip}' for tip in improvements[:3])}"
                         improved = str(data.get("improved_version", "")).strip()
                         return {
                             "passed": passed,
                             "score": score,
                             "points_out_of_10": pts10,
                             "feedback": feedback,
+                            "improvements": improvements,
                             "improved_version": improved,
                         }
                 except Exception as gem_err:
@@ -1132,13 +1175,8 @@ class ExamGeneratorService:
     def _fetch_level_activities(cls, level: str) -> Dict[str, List[str]]:
         """
         Coleta as atividades reais existentes na plataforma para o nível solicitado
-        nas 4 áreas: grammar, vocabulary, listening e reading.
-        Combina:
-        - Catálogo Test-English (te_english_data.json)
-        - Catálogo LiveWorksheets (liveworksheets_data.json)
-        - Catálogo GrammarService (grammar_data.py)
-        - Decks de Flashcards CEFR (cefr_flashcards)
-        - Podcasts e News publicados do nível
+        ESTRITAMENTE nas 4 áreas: grammar, vocabulary, listening e reading.
+        Music, Flashcards, Simulations, Games e News NÃO entram.
         """
         lvl = (level or "A1").strip().upper()
         result: Dict[str, List[str]] = {
@@ -1151,9 +1189,8 @@ class ExamGeneratorService:
         try:
             from .services import ExternalContentService
             from .grammar_data import GrammarService
-            from .models import Flashcard, Podcast, NewsItem
 
-            # 1. Grammar: GrammarService + Test-English + LiveWorksheets
+            # 1. Grammar: GrammarService + Test-English + LiveWorksheets (estritamente Grammar..Reading)
             g_data = GrammarService.get_grammar(level=lvl)
             for t in g_data.get("topics", []):
                 title = t.get("title", "")
@@ -1176,56 +1213,31 @@ class ExamGeneratorService:
                     if title and title not in result[cat]:
                         result[cat].append(title)
 
-            # 2. Vocabulary extra: tópicos e palavras dos Flashcards CEFR do nível
-            try:
-                fc_rows = list(Flashcard.objects.filter(level__iexact=lvl, is_published=True)[:40])
-                fc_topics = sorted({(c.topic or "").strip() for c in fc_rows if (c.topic or "").strip()})
-                fc_words = [c.front.strip() for c in fc_rows if c.front and len(c.front.strip()) <= 35][:15]
-                for ft in fc_topics:
-                    label = f"Flashcard Topic: {ft}"
-                    if label not in result["vocabulary"]:
-                        result["vocabulary"].append(label)
-                if fc_words:
-                    result["vocabulary"].append(f"Platform Vocabulary Words ({lvl}): {', '.join(fc_words)}")
-            except Exception:
-                pass
-
-            # 3. Listening extra: Podcasts do nível
-            try:
-                podcasts = list(Podcast.objects.filter(level__icontains=lvl)[:8])
-                for p in podcasts:
-                    if p.title and p.title not in result["listening"]:
-                        result["listening"].append(f"Podcast: {p.title}")
-            except Exception:
-                pass
-
-            # 4. Reading extra: News do nível
-            try:
-                news_qs = list(NewsItem.objects.filter(is_published=True)[:15])
-                for n in news_qs:
-                    lvls = [str(x).upper() for x in (n.levels or [])]
-                    if not lvls or lvl in lvls or "ALL" in lvls:
-                        if n.title and n.title not in result["reading"]:
-                            result["reading"].append(f"Article: {n.title}")
-            except Exception:
-                pass
-
         except Exception as e:
             logger.warning(f"[ExamGeneratorService] Erro ao carregar atividades do nível {lvl}: {e}")
 
         return result
 
     @classmethod
-    def _fetch_cefr_context(cls, level: str, sampled_activities: Optional[Dict[str, List[str]]] = None) -> str:
+    def _fetch_cefr_context(
+        cls,
+        level: str,
+        sampled_activities: Optional[Dict[str, List[str]]] = None,
+        student_foundation_text: str = "",
+    ) -> str:
         """
-        Recupera trechos de conteúdo real dos documentos CEFR cadastrados no banco
-        e combina com as atividades existentes de Grammar, Vocabulary, Listening e Reading do nível.
+        Combina as atividades concluídas pelo aluno no nível atual (extraídas via Playwright e salvas no banco,
+        com exemplos reais de questões, respostas corretas, textos de Reading e Listening)
+        com os documentos de referência CEFR do nível.
         """
         context_snippets = []
         lvl = (level or "A1").strip().upper()
 
+        if student_foundation_text:
+            context_snippets.append(student_foundation_text)
+
         if sampled_activities:
-            context_snippets.append(f"Existing Platform Activities for Level {lvl} (use these topics, structures, and themes to generate the exam questions):")
+            context_snippets.append(f"Syllabus Activity Titles for Level {lvl} (strictly Grammar through Reading):")
             if sampled_activities.get("grammar"):
                 context_snippets.append(f"- Level {lvl} Grammar Activities: {'; '.join(sampled_activities['grammar'])}")
             if sampled_activities.get("vocabulary"):
@@ -1267,11 +1279,13 @@ class ExamGeneratorService:
         cls,
         level: str = "A1",
         num_questions: int = 10,
+        username: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
         Gera entre 8 e 15 questões balanceadas (Reading, Grammar, Vocabulary, Listening, Writing, Speaking)
-        totalmente dinâmicas, não repetitivas e calibradas de acordo com as diretrizes oficiais CEFR
-        e com as atividades reais de Grammar, Vocabulary, Listening e Reading do nível na plataforma.
+        calibradas para o nível atual do aluno e baseadas nas atividades que o aluno JÁ FEZ
+        (estritamente Grammar até Reading, extraídas via Playwright e salvas no banco).
+        Music, Flashcards, Simulations, Games e News não entram.
         """
         num_questions = max(8, min(15, num_questions))
         lvl = (level or "A1").strip().upper()
@@ -1279,13 +1293,43 @@ class ExamGeneratorService:
             lvl = "A1"
         specs = CEFR_LEVEL_SPECS[lvl]
 
-        # Coleta e sorteia uma amostra das atividades reais da plataforma para o nível
-        all_activities = cls._fetch_level_activities(lvl)
-        sampled_activities = {
-            cat: (random.sample(items, k=min(4, len(items))) if items else [])
-            for cat, items in all_activities.items()
+        # 1. Verifica e extrai via Playwright as atividades concluídas pelo aluno no nível atual (Grammar..Reading)
+        student_foundation_text = ""
+        student_titles_by_cat: Dict[str, List[str]] = {
+            "grammar": [],
+            "vocabulary": [],
+            "listening": [],
+            "reading": [],
         }
-        cefr_context = cls._fetch_cefr_context(lvl, sampled_activities=sampled_activities)
+        try:
+            from .activity_scraper import ActivityPlaywrightScraper
+            foundation = ActivityPlaywrightScraper.build_exam_prompt_foundation(
+                username=username,
+                level=lvl,
+                scrape_missing=True,
+            )
+            student_foundation_text = foundation.get("prompt_context", "")
+            for c_key, t_list in (foundation.get("titles_by_category") or {}).items():
+                if c_key in student_titles_by_cat and t_list:
+                    student_titles_by_cat[c_key] = [cls._clean_activity_title(t) or t for t in t_list]
+        except Exception as scrape_err:
+            logger.warning(f"[ExamGeneratorService] Aviso ao construir base Playwright para {username} ({lvl}): {scrape_err}")
+
+        # 2. Complementa apenas com catálogo Grammar..Reading do nível se faltar alguma área
+        all_activities = cls._fetch_level_activities(lvl)
+        sampled_activities: Dict[str, List[str]] = {}
+        for cat in ("grammar", "vocabulary", "listening", "reading"):
+            if student_titles_by_cat[cat]:
+                sampled_activities[cat] = student_titles_by_cat[cat][:5]
+            else:
+                items = all_activities.get(cat, [])
+                sampled_activities[cat] = random.sample(items, k=min(4, len(items))) if items else []
+
+        cefr_context = cls._fetch_cefr_context(
+            lvl,
+            sampled_activities=sampled_activities,
+            student_foundation_text=student_foundation_text,
+        )
 
         # Combina as especificações CEFR com as atividades reais de cada modalidade do nível
         grammar_topics = specs["grammar_topics"]
@@ -1364,7 +1408,7 @@ class ExamGeneratorService:
                     client = genai.Client(api_key=gemini_key.strip())
 
             if client:
-                for g_model in ["gemini-flash-latest", "gemini-3.8-flash", "gemini-3.1-flash-lite"]:
+                for g_model in ["gemini-3.1-flash-lite", "gemini-3.8-flash", "gemini-flash-latest"]:
                     try:
                         response = client.models.generate_content(
                             model=g_model,
@@ -1372,6 +1416,7 @@ class ExamGeneratorService:
                             config=types.GenerateContentConfig(
                                 response_mime_type="application/json",
                                 temperature=0.7,
+                                http_options=types.HttpOptions(timeout=15000),
                             ),
                         )
                         if response and response.text:
@@ -1385,14 +1430,21 @@ class ExamGeneratorService:
         except Exception as e:
             logger.warning(f"[ExamGeneratorService] Falha geral no Gemini: {e}")
 
-        # 2. Tenta via Groq (com modelos estáveis Llama de alto throughput e sem erro de 8k TPM)
+        # 2. Tenta via Groq (com controle estrito de TPM para nunca estourar limite de 8k tokens)
         groq_client = cls._get_groq_client()
-        candidate_models = [
+        groq_prompt_kwargs = dict(prompt_kwargs)
+        if len(str(groq_prompt_kwargs.get("cefr_context") or "")) > 5500:
+            groq_prompt_kwargs["cefr_context"] = str(groq_prompt_kwargs["cefr_context"])[:5500]
+        groq_system_prompt = PromptManager.get_prompt(
+            "exam_generator_system",
+            section="System Prompt",
+            **groq_prompt_kwargs,
+        )
+        candidate_models = list(dict.fromkeys([
             getattr(settings, "GROQ_MODEL", "openai/gpt-oss-120b"),
             "openai/gpt-oss-120b",
             "openai/gpt-oss-20b",
-            "qwen/qwen3.8-27b",
-        ]
+        ]))
 
         if groq_client:
             for model_name in candidate_models:
@@ -1400,10 +1452,11 @@ class ExamGeneratorService:
                     res = groq_client.chat.completions.create(
                         model=model_name,
                         messages=[
-                            {"role": "system", "content": system_prompt},
+                            {"role": "system", "content": groq_system_prompt},
                             {"role": "user", "content": user_prompt},
                         ],
                         response_format={"type": "json_object"},
+                        max_tokens=2800,
                         temperature=0.7,
                     )
                     raw_content = res.choices[0].message.content
@@ -1496,6 +1549,9 @@ class ExamGeneratorService:
                 "max_seconds": max_sec,
                 "min_words": min_w,
                 "max_words": max_w,
+                "approval_status": q.get("approval_status") or "pending",
+                "admin_notes": q.get("admin_notes") or "",
+                "ai_updated": bool(q.get("ai_updated", False)),
             })
 
         # Se vieram menos do que o total solicitado, complementa com fallback
@@ -1622,6 +1678,186 @@ class ExamGeneratorService:
             items.append(t)
         return items
 
+    @classmethod
+    def improve_single_question_with_ai(
+        cls,
+        level: str,
+        question_obj: Dict[str, Any],
+        suggestion: str,
+        username: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Reescreve ou aprimora em tempo real uma única questão do exame conforme
+        as instruções/sugestões enviadas pelo administrador no Dashboard,
+        respeitando o nível CEFR do aluno, as atividades concluídas por ele (Grammar..Reading)
+        e mantendo todos os campos voltados ao aluno 100% em inglês.
+        """
+        lvl = (level or "A1").strip().upper()
+        if lvl not in CEFR_LEVEL_SPECS:
+            lvl = "A1"
+        specs = CEFR_LEVEL_SPECS[lvl]
+        q_id = str(question_obj.get("id") or "q1")
+        q_type = str(question_obj.get("type") or "grammar").lower().strip()
+
+        student_context = ""
+        try:
+            from .activity_scraper import ActivityPlaywrightScraper
+            foundation = ActivityPlaywrightScraper.build_exam_prompt_foundation(
+                username=username,
+                level=lvl,
+                scrape_missing=False,
+            )
+            student_context = foundation.get("prompt_context", "")[:2500]
+        except Exception:
+            pass
+
+        system_msg = (
+            "You are a senior CEFR English exam editor. Modify ONLY the provided exam question according to the "
+            "administrator's improvement request (which may be written in Portuguese or English). "
+            "EVERY STUDENT-FACING FIELD IN YOUR JSON OUTPUT MUST BE WRITTEN 100% IN NATURAL ENGLISH "
+            "(never include Portuguese in question, reading_text, audio_text, options, correct_answer, or explanation). "
+            "Return valid JSON only with a single updated question object."
+        )
+
+        user_msg = f"""Target CEFR Level: {lvl} ({specs['name']})
+Question Modality (`type`): {q_type} (keep this exact type unless the admin explicitly asks to change it)
+Reading limits (if type=reading): {specs['reading_min_words']} to {specs['reading_max_words']} words in `reading_text`
+Listening limits (if type=listening): {specs['listening_min_words']} to {specs['listening_max_words']} words in `audio_text`
+Writing limits (if type=writing): {specs['writing_min_words']} to {specs['writing_max_words']} words (`options` must be [], `correct_answer` must be "")
+Speaking limits (if type=speaking): {specs['speaking_min_seconds']} to {specs['speaking_limit_seconds']} seconds (`options` must be ["Record your voice response in English"])
+
+Student's Completed Level {lvl} Activities Context (Grammar through Reading ONLY):
+{student_context or f"Standard CEFR {lvl} Grammar: {specs['grammar_topics']} | Vocabulary: {specs['vocabulary_topics']}"}
+
+Current Question JSON:
+{json.dumps(question_obj, ensure_ascii=False, indent=2)}
+
+Administrator's Improvement / Change Request:
+"{suggestion}"
+
+Instructions:
+1. Apply the administrator's requested changes accurately and immediately.
+2. Keep difficulty strictly calibrated to CEFR {lvl}.
+3. If multiple-choice (`reading`, `grammar`, `vocabulary`, `listening`), provide exactly 4 clear options in `options`, ensure `correct_answer` matches one option character-for-character, and include a concise English `explanation`.
+4. Return ONLY a JSON object with keys: `id`, `type`, `points`, `question`, `options`, `correct_answer`, `explanation`, `reading_text`, `audio_text`, `min_words`, `max_words`, `min_seconds`, `max_seconds`."""
+
+        updated_raw: Optional[Dict[str, Any]] = None
+
+        # 1. Groq ultra-rápido (~1s) primeiro para edição em tempo real no Dashboard
+        groq_client = cls._get_groq_client()
+        if groq_client:
+            for model_name in list(dict.fromkeys([
+                getattr(settings, "GROQ_MODEL", "openai/gpt-oss-120b"),
+                "openai/gpt-oss-120b",
+                "openai/gpt-oss-20b",
+            ])):
+                try:
+                    res = groq_client.chat.completions.create(
+                        model=model_name,
+                        messages=[
+                            {"role": "system", "content": system_msg},
+                            {"role": "user", "content": user_msg},
+                        ],
+                        response_format={"type": "json_object"},
+                        max_tokens=1200,
+                        temperature=0.5,
+                    )
+                    raw_txt = res.choices[0].message.content
+                    if raw_txt:
+                        parsed = json.loads(raw_txt.strip())
+                        if isinstance(parsed, dict) and "question" in parsed:
+                            updated_raw = parsed
+                            break
+                        if isinstance(parsed, dict) and isinstance(parsed.get("questions"), list) and parsed["questions"]:
+                            updated_raw = parsed["questions"][0]
+                            break
+                except Exception as gr_err:
+                    logger.warning(f"[ExamGeneratorService] Groq improve_single_question ({model_name}) falhou: {gr_err}")
+
+        # 2. Fallback Gemini real-time
+        if not updated_raw:
+            try:
+                from apps.chat.audio_service import get_gemini_client
+                from google import genai
+                from google.genai import types
+
+                client = get_gemini_client()
+                if not client:
+                    gemini_key = getattr(settings, "GEMINI_API_KEY", None) or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+                    if gemini_key:
+                        client = genai.Client(api_key=gemini_key.strip())
+
+                if client:
+                    for g_model in ["gemini-3.8-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"]:
+                        try:
+                            resp = client.models.generate_content(
+                                model=g_model,
+                                contents=f"{system_msg}\n\n{user_msg}",
+                                config=types.GenerateContentConfig(
+                                    response_mime_type="application/json",
+                                    temperature=0.5,
+                                    http_options=types.HttpOptions(timeout=12000),
+                                ),
+                            )
+                            if resp and resp.text:
+                                parsed = json.loads(resp.text.strip())
+                                if isinstance(parsed, dict) and "question" in parsed:
+                                    updated_raw = parsed
+                                    break
+                                if isinstance(parsed, dict) and isinstance(parsed.get("questions"), list) and parsed["questions"]:
+                                    updated_raw = parsed["questions"][0]
+                                    break
+                        except Exception as g_err:
+                            logger.warning(f"[ExamGeneratorService] Gemini improve_single_question ({g_model}) falhou: {g_err}")
+            except Exception as e:
+                logger.warning(f"[ExamGeneratorService] Erro Gemini improve_single_question: {e}")
+
+        if not updated_raw:
+            raise RuntimeError("Não foi possível atualizar a questão com a IA no momento. Tente novamente em instantes.")
+
+        new_type = str(updated_raw.get("type") or q_type).lower().strip()
+        new_opts = updated_raw.get("options") if isinstance(updated_raw.get("options"), list) else []
+        new_correct = str(updated_raw.get("correct_answer") or "").strip()
+
+        if new_type == "writing":
+            new_opts = []
+            new_correct = ""
+        elif new_type == "speaking":
+            new_opts = []
+            new_correct = None
+        else:
+            if len(new_opts) < 4:
+                base_opts = question_obj.get("options") or ["Option A", "Option B", "Option C", "Option D"]
+                while len(new_opts) < 4:
+                    cand = base_opts[len(new_opts) % len(base_opts)]
+                    new_opts.append(f"{cand}" if cand not in new_opts else f"Alternative {len(new_opts) + 1}")
+            new_opts = [str(o).strip() for o in new_opts[:4]]
+            if not new_correct:
+                new_correct = new_opts[0]
+            elif new_correct not in new_opts:
+                new_opts[0] = new_correct
+            random.shuffle(new_opts)
+
+        return {
+            "id": q_id,
+            "type": new_type,
+            "points": int(updated_raw.get("points") or question_obj.get("points") or 10),
+            "question": str(updated_raw.get("question") or question_obj.get("question") or "").strip(),
+            "options": new_opts,
+            "correct_answer": new_correct,
+            "explanation": str(updated_raw.get("explanation") or question_obj.get("explanation") or "").strip(),
+            "reading_text": updated_raw.get("reading_text") if new_type == "reading" else None,
+            "audio_text": updated_raw.get("audio_text") if new_type == "listening" else None,
+            "audio_url": None,
+            "min_seconds": int(updated_raw.get("min_seconds") or specs["speaking_min_seconds"]) if new_type == "speaking" else None,
+            "max_seconds": int(updated_raw.get("max_seconds") or specs["speaking_limit_seconds"]) if new_type == "speaking" else None,
+            "min_words": int(updated_raw.get("min_words") or specs["writing_min_words"]) if new_type == "writing" else None,
+            "max_words": int(updated_raw.get("max_words") or specs["writing_max_words"]) if new_type == "writing" else None,
+            "approval_status": "pending",
+            "admin_notes": suggestion,
+            "ai_updated": True,
+        }
+
 
 
 class TrimestralExamService:
@@ -1648,7 +1884,11 @@ class TrimestralExamService:
                 if TrimestralExam.objects.filter(username=username, status__in=["ready", "in_progress"]).exists():
                     return
                 logger.info(f"[TrimestralExamService] Iniciando pré-geração em segundo plano para {username} ({level})...")
-                questions = ExamGeneratorService.generate_trimestral_questions(level=level, num_questions=count)
+                questions = ExamGeneratorService.generate_trimestral_questions(
+                    level=level,
+                    num_questions=count,
+                    username=username,
+                )
                 new_exam = TrimestralExam.objects.create(
                     id=uuid.uuid4(),
                     username=username,
@@ -1844,6 +2084,26 @@ class TrimestralExamService:
             ready_exam = None
 
         if ready_exam and not force:
+            # Se houver alguma questão reprovada pelo admin ainda não corrigida, substitui via IA antes de ativar
+            r_qs = list(ready_exam.questions or [])
+            replaced_any = False
+            for idx_q, rq in enumerate(r_qs):
+                if rq.get("approval_status") == "rejected":
+                    try:
+                        note = rq.get("admin_notes") or "Create a clearer, well-calibrated alternative question for this level."
+                        r_qs[idx_q] = ExamGeneratorService.improve_single_question_with_ai(
+                            level=ready_exam.level or level,
+                            question_obj=rq,
+                            suggestion=note,
+                            username=username,
+                        )
+                        replaced_any = True
+                    except Exception as rep_err:
+                        logger.warning(f"[TrimestralExamService] Falha ao substituir questão rejeitada {rq.get('id')}: {rep_err}")
+            if replaced_any:
+                ready_exam.questions = r_qs
+                ready_exam.save(update_fields=["questions"])
+
             ready_exam = cls._ensure_exam_has_writing(ready_exam)
             ready_exam.status = "in_progress"
             ready_exam.started_at = django_timezone.now()
@@ -1880,11 +2140,12 @@ class TrimestralExamService:
             active_exam.status = "expired"
             active_exam.save(update_fields=["status"])
 
-        # Gera novo exame com a IA
+        # Gera novo exame com a IA baseado no nível atual e atividades concluídas pelo aluno
         num_questions = max(8, min(15, num_questions))
         questions = ExamGeneratorService.generate_trimestral_questions(
             level=level,
             num_questions=num_questions,
+            username=username,
         )
 
         new_exam = TrimestralExam.objects.create(
@@ -2028,6 +2289,7 @@ class TrimestralExamService:
                     "is_correct": is_correct,
                     "points_earned": item_points,
                     "explanation": explanation_display,
+                    "improvements": speaking_eval.get("improvements", []),
                 })
             elif is_writing:
                 specs_lvl = get_cefr_level_specs(exam.level or "A1")
@@ -2063,6 +2325,7 @@ class TrimestralExamService:
                     "is_correct": is_correct,
                     "points_earned": item_points,
                     "explanation": explanation_display,
+                    "improvements": writing_eval.get("improvements", []),
                 })
             else:
                 is_correct = (student_val.lower() == correct_val.lower()) and bool(student_val)
@@ -2085,13 +2348,14 @@ class TrimestralExamService:
                     "explanation": explanation,
                 })
 
-        # Score geral de 0 a 100
+        # Score geral de 0 a 100 (avaliação menos agressiva para A1, A2 e B1)
+        current_level = exam.level.upper() if exam.level else "A1"
+        pass_threshold = 60 if current_level in ("A1", "A2", "B1") else 70
         score = int(round((earned_points / total_points) * 100)) if total_points > 0 else 0
-        passed = score >= 70
+        passed = score >= pass_threshold
 
         # Progressão de Nível CEFR
         recommended_level = None
-        current_level = exam.level.upper() if exam.level else "A1"
         if score >= 85 and current_level in LEVEL_ORDER:
             curr_idx = LEVEL_ORDER.index(current_level)
             if curr_idx < len(LEVEL_ORDER) - 1:
@@ -2104,15 +2368,17 @@ class TrimestralExamService:
                 f"You scored {score}% with excellent comprehension and accuracy across all skills. "
                 f"You are well prepared to advance to new challenges!"
             )
-        elif score >= 70:
+        elif passed:
             summary_feedback = (
-                f"Great job! You passed the {current_level} quarterly exam with a score of {score}%. "
-                f"Your reading, vocabulary, and grammar are on track. Continue practicing regular speaking and listening."
+                f"Great job! You passed the {current_level} quarterly exam with an encouraging score of {score}%. "
+                f"Your foundation in reading, vocabulary, and grammar is progressing well. "
+                f"Check the suggested improvements below to keep strengthening your writing and speaking!"
             )
         else:
             summary_feedback = (
-                f"Good effort! The exam identified key areas to reinforce together at the {current_level} level. "
-                f"We recommend focusing on vocabulary flashcards, reading comprehension, and pronunciation over the coming weeks."
+                f"Great effort completing your {current_level} quarterly exam ({score}%)! "
+                f"Every step builds your confidence in English. Review the constructive tips below on grammar, "
+                f"vocabulary, reading comprehension, and listening so we can strengthen these areas together."
             )
 
         now = django_timezone.now()
@@ -2130,6 +2396,12 @@ class TrimestralExamService:
         # Computa métricas de evolução (Can-Do statements do CEFR e habilidades dominadas)
         corrections_map = {c["question_id"]: c["is_correct"] for c in corrections}
         evolution = cls._compute_evolution_skills(questions, corrections_map, current_level)
+        for c in corrections:
+            for tip in (c.get("improvements") or []):
+                if tip and tip not in evolution["points_to_improve"]:
+                    evolution["points_to_improve"].append(tip)
+
+        prev_fb = exam.feedback if isinstance(exam.feedback, dict) else {}
 
         # Salva o Exame como Concluído
         exam.status = "completed"
@@ -2147,6 +2419,8 @@ class TrimestralExamService:
             "skills_breakdown": evolution["skills_breakdown"],
             "points_to_improve": evolution["points_to_improve"],
             "corrections": corrections,
+            "speaking_audio_map": {k: v for k, v in audio_map.items() if v and len(v) < 2_500_000},
+            "review_meta": prev_fb.get("review_meta", {}),
         }
         exam.completed_at = now
         exam.save()
@@ -2244,12 +2518,12 @@ class TrimestralExamService:
                     if pct >= 70:
                         can_do_statements.append("Demonstrates practical command of high-frequency words and level-appropriate collocations.")
                     else:
-                        points_to_improve.append("Vocabulary expansion and collocation practice with flashcards.")
+                        points_to_improve.append("Vocabulary expansion and collocation practice in Vocabulary exercises.")
                 elif s_key == "listening":
                     if pct >= 70:
                         can_do_statements.append("Comprehends spoken dialogues, announcements, and everyday oral instructions.")
                     else:
-                        points_to_improve.append("Active listening practice with podcasts and spoken dialogues.")
+                        points_to_improve.append("Active listening practice with spoken dialogues and Listening exercises.")
                 elif s_key == "writing":
                     if pct >= 70:
                         can_do_statements.append("Produces coherent, well-structured written paragraphs with level-appropriate grammar and vocabulary.")
