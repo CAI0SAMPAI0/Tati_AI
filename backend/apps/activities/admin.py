@@ -12,9 +12,9 @@ from .models import (
 
 @admin.register(Flashcard)
 class FlashcardAdmin(admin.ModelAdmin):
-    list_display = ("front", "back", "level", "topic", "is_published", "created_at")
+    list_display = ("front", "image_url", "level", "topic", "is_published", "created_at")
     list_filter = ("level", "is_published", "topic")
-    search_fields = ("front", "back", "explanation", "topic")
+    search_fields = ("front", "topic")
     show_full_result_count = False
 
 

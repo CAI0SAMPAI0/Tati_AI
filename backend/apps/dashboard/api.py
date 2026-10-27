@@ -1,7 +1,7 @@
 import json
 import os
 from typing import List, Optional, Any, Dict
-from ninja import Router
+from ninja import Router, File, UploadedFile
 from django.http import HttpRequest as DjangoHttpRequest
 from ninja.errors import HttpError
 from pydantic import BaseModel
@@ -248,6 +248,103 @@ def create_flashcard_deck(request: HttpRequest, payload: FlashcardDeckInput):
     """
     require_staff_user(request)
     return DashboardService.create_flashcard_deck(payload.dict())
+
+
+class FlashcardAIGenerateInput(BaseModel):
+    theme: str
+    level: Optional[str] = "B1"
+    levels: Optional[List[str]] = []
+    count: Optional[int] = 10
+    with_images: Optional[bool] = True
+
+
+@dashboard_router.post("/flashcards/upload-image", auth=auth_required)
+def upload_dashboard_flashcard_image(request: HttpRequest, file: UploadedFile = File(...)):
+    """
+    Faz upload de imagem de flashcard para o Cloudinary a partir do painel administrativo.
+    """
+    require_staff_user(request)
+    from apps.activities.assets_service import CloudinaryService
+
+    content = file.read()
+    url = CloudinaryService.upload_file(content, file.name)
+    return {"url": url}
+
+
+@dashboard_router.post("/flashcards/generate-ai", auth=auth_required)
+def generate_dashboard_flashcards_ai(request: HttpRequest, payload: FlashcardAIGenerateInput):
+    """
+    Gera prévia de flashcards visuais (frente = palavra/frase; verso = imagem real) para o editor do Dashboard.
+    """
+    require_staff_user(request)
+    from django.conf import settings
+    from shared.prompt_manager import PromptManager
+    from apps.activities.generator import CEFRGeneratorService, validate_flashcard_data
+    from apps.activities.image_service import ImageResolverService
+
+    theme = (payload.theme or "").strip()
+    if not theme:
+        raise HttpError(400, "Theme is required.")
+
+    lvl = ((payload.levels[0] if payload.levels else payload.level) or "B1").strip().upper()
+    count = max(1, min(int(payload.count or 10), 50))
+
+    client = CEFRGeneratorService._get_groq_client()
+    raw_items: List[Dict[str, Any]] = []
+    if client:
+        prompt = PromptManager.get_prompt(
+            "cefr_activity_generator",
+            section="Flashcards Generator",
+            count=count,
+            lvl=lvl,
+            topic=theme,
+            ref_context="",
+        )
+        configured_model = getattr(settings, "GROQ_MODEL", "openai/gpt-oss-120b")
+        for m_candidate in [configured_model, "openai/gpt-oss-120b", "openai/gpt-oss-20b"]:
+            try:
+                res = client.chat.completions.create(
+                    model=m_candidate,
+                    messages=[{"role": "user", "content": prompt}],
+                    response_format={"type": "json_object"},
+                    temperature=0.3,
+                )
+                parsed = json.loads(res.choices[0].message.content)
+                items = parsed.get("flashcards", [])
+                if items:
+                    raw_items = items
+                    break
+            except Exception:
+                continue
+
+    results = []
+    seen = set()
+    for item in raw_items:
+        if not isinstance(item, dict):
+            continue
+        clean_candidate = {
+            "front": item.get("front"),
+            "image_search_query": item.get("image_search_query"),
+            "image_prompt": item.get("image_prompt"),
+        }
+        ok, _ = validate_flashcard_data(clean_candidate)
+        if not ok:
+            continue
+        front = str(clean_candidate["front"]).strip()
+        if front.lower() in seen:
+            continue
+        seen.add(front.lower())
+        img_url = ImageResolverService.resolve_image(
+            term=front,
+            topic=theme,
+            search_query=(clean_candidate.get("image_search_query") or "").strip() or None,
+            visual_prompt=(clean_candidate.get("image_prompt") or "").strip() or None,
+        )
+        results.append({"front": front, "image_url": img_url})
+        if len(results) >= count:
+            break
+
+    return {"success": True, "flashcards": results}
 
 
 @dashboard_router.put("/flashcards/{deck_id}", auth=auth_required)

@@ -7,7 +7,8 @@ class Flashcard(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     level = models.CharField(max_length=20, default="A1")
     front = models.TextField()
-    back = models.TextField()
+    # Coluna legada mantida apenas para transição segura de banco; novos cards usam verso exclusivamente em image_url
+    back = models.TextField(blank=True, default="")
     explanation = models.TextField(blank=True, null=True)
     image_url = models.URLField(max_length=1000, blank=True, null=True)
     topic = models.CharField(max_length=100, blank=True, null=True)
@@ -22,7 +23,7 @@ class Flashcard(models.Model):
         ordering = ["level", "front"]
 
     def __str__(self):
-        return f"[{self.level}] {self.front} -> {self.back}"
+        return f"[{self.level}] {self.front}"
 
 
 class Module(models.Model):

@@ -1385,14 +1385,13 @@ onMounted(() => {
             <div
               v-for="card in group.cards.slice(0, 6)"
               :key="card.id"
-              class="p-2.5 rounded-xl bg-bg/50 border border-border/80 flex items-start gap-2.5"
+              class="p-2.5 rounded-xl bg-bg/50 border border-border/80 flex items-center gap-2.5"
             >
               <div v-if="card.image_url" class="w-10 h-10 rounded-lg overflow-hidden shrink-0 border border-border bg-surface">
                 <img :src="card.image_url" alt="" class="w-full h-full object-cover" />
               </div>
               <div class="min-w-0 flex-1">
                 <div class="font-bold text-xs text-text truncate">{{ card.front }}</div>
-                <div class="text-[0.7rem] text-text-muted truncate leading-relaxed">{{ card.back }}</div>
               </div>
             </div>
           </div>

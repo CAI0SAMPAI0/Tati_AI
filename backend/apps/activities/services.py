@@ -164,26 +164,14 @@ class FlashcardService:
                             matched_topic = t
 
                 if matched:
-                    all_matched_fronts = [c.front for c in matched]
-                    cards_list = []
-                    for c in matched:
-                        raw_opts = c.options if hasattr(c, "options") and isinstance(c.options, list) else []
-                        opts = [str(o).strip() for o in raw_opts if str(o).strip()]
-                        if c.front and c.front not in opts:
-                            opts.insert(0, c.front)
-                        for sib in all_matched_fronts:
-                            if sib != c.front and sib not in opts:
-                                opts.append(sib)
-                            if len(opts) >= 4:
-                                break
-                        cards_list.append({
+                    cards_list = [
+                        {
                             "id": str(c.id),
                             "front": c.front,
-                            "back": c.back,
-                            "explanation": c.explanation or "No explanation provided.",
-                            "image_url": c.image_url,
-                            "options": opts[:4],
-                        })
+                            "image_url": c.image_url or "",
+                        }
+                        for c in matched
+                    ]
                     return {
                         "id": deck_id,
                         "title": f"CEFR {lvl}: {matched_topic}",
@@ -203,25 +191,22 @@ class FlashcardService:
         m = Module.objects.filter(id=module_id).first()
         if m:
             fc = m.flashcards if isinstance(m.flashcards, list) else []
-            all_m_fronts = [item.get("front", "") for item in fc if isinstance(item, dict)]
             enhanced_fc = []
             for item in fc:
                 if isinstance(item, dict):
-                    card_copy = dict(item)
-                    raw_opts = card_copy.get("options") or []
-                    opts = [str(o).strip() for o in raw_opts if str(o).strip()]
-                    front = card_copy.get("front", "")
-                    if front and front not in opts:
-                        opts.insert(0, front)
-                    for sib in all_m_fronts:
-                        if sib != front and sib not in opts:
-                            opts.append(sib)
-                        if len(opts) >= 4:
-                            break
-                    card_copy["options"] = opts[:4]
-                    enhanced_fc.append(card_copy)
-                else:
-                    enhanced_fc.append(item)
+                    front = str(item.get("front") or "").strip()
+                    if not front:
+                        continue
+                    image_url = str(
+                        item.get("image_url") or item.get("imageUrl") or item.get("image") or ""
+                    ).strip()
+                    card_payload = {
+                        "front": front,
+                        "image_url": image_url,
+                    }
+                    if item.get("id"):
+                        card_payload["id"] = str(item["id"])
+                    enhanced_fc.append(card_payload)
             return {
                 "id": str(m.id),
                 "title": m.title,
@@ -2934,6 +2919,8 @@ class SubmissionService:
                 )
             ).delete()
 
+            cache.delete(f"user_goals_{username}")
+
             total_xp = user.total_xp if user and isinstance(user, User) else 0
             streak_count = user.streak_count if user and isinstance(user, User) else 0
 
@@ -2950,16 +2937,24 @@ class SubmissionService:
         from django.db.models import Q
 
         # Verifica se esta atividade já havia sido marcada como concluída anteriormente
-        already_completed = ActivitySubmission.objects.filter(
-            Q(username=username)
-            & (
-                Q(metadata__activity_id=str(activity_id))
-                | Q(metadata__id=str(target_id))
-                | Q(metadata__url=target_url)
-                | Q(metadata__slug=target_slug)
+        existing_completed = list(
+            ActivitySubmission.objects.filter(
+                Q(username=username)
+                & (
+                    Q(metadata__activity_id=str(activity_id))
+                    | Q(metadata__id=str(target_id))
+                    | Q(metadata__url=target_url)
+                    | Q(metadata__slug=target_slug)
+                )
+                & Q(status="completed")
             )
-            & Q(status="completed")
-        ).exists()
+        )
+        already_completed = len(existing_completed) > 0
+        previous_points = None
+        if already_completed:
+            prev_meta = existing_completed[0].metadata if isinstance(existing_completed[0].metadata, dict) else {}
+            if prev_meta.get("points_awarded") is not None:
+                previous_points = int(prev_meta["points_awarded"])
 
         ActivitySubmission.objects.filter(
             Q(username=username)
@@ -2978,14 +2973,16 @@ class SubmissionService:
         multiplier = 2 if is_weekly_completed else 1
 
         base_xp = 25 if score >= 70 else 5
-        xp_earned = base_xp * multiplier
-        metadata["points_awarded"] = xp_earned
+        calculated_xp = base_xp * multiplier
+        metadata["points_awarded"] = previous_points if (already_completed and previous_points is not None) else calculated_xp
         metadata["multiplier_applied"] = multiplier
 
+        actual_xp_earned = 0
         if user and isinstance(user, User):
-            # Apenas concede novos XP se o aluno ainda não havia concluído esta atividade antes
+            # Apenas concede novos XP se o aluno ainda não havia concluído esta atividade antes (ou após reverter para pendente)
             if not already_completed:
-                XPService.award_xp(user, xp_earned, f"Atividade {activity_type}")
+                XPService.award_xp(user, calculated_xp, f"Atividade {activity_type}")
+                actual_xp_earned = calculated_xp
             StreakService.record_activity(user)
 
         submission = ActivitySubmission.objects.create(
@@ -3028,7 +3025,7 @@ class SubmissionService:
         return {
             "success": True,
             "id": str(submission.id),
-            "xp_earned": xp_earned,
+            "xp_earned": actual_xp_earned,
             "multiplier": multiplier,
             "weekly_bonus_awarded": weekly_bonus_awarded,
             "new_total_xp": total_xp,

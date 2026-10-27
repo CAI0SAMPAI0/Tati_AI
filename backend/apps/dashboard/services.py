@@ -391,8 +391,6 @@ class DashboardService:
                 card_list = [
                     {
                         "front": c.front,
-                        "back": c.back,
-                        "explanation": c.explanation or "",
                         "image_url": c.image_url or "",
                     }
                     for c in cards

@@ -1317,11 +1317,8 @@ def get_cefr_all(request: HttpRequest):
                 "id": str(f.id),
                 "level": f.level,
                 "front": f.front,
-                "back": f.back,
-                "explanation": f.explanation or "",
                 "image_url": f.image_url or "",
                 "topic": f.topic or "General",
-                "options": f.options or [],
                 "is_published": f.is_published,
             }
             for f in fc
@@ -1813,21 +1810,19 @@ def save_flashcard_group(request: HttpRequest, body: CEFRFlashcardGroupSaveSchem
         is_pub = card.get("is_published", True)
         if is_pub:
             has_published = True
-        raw_opts = card.get("options") or []
-        cleaned_opts = [str(o).strip() for o in raw_opts if str(o).strip()]
         card_front = card.get("front", "").strip()
-        if card_front and card_front not in cleaned_opts:
-            cleaned_opts.insert(0, card_front)
+        if not card_front:
+            continue
 
         fc = Flashcard.objects.create(
             id=uuid.uuid4(),
             level=body.new_level.upper(),
             topic=body.new_topic,
             front=card_front,
-            back=card.get("back", ""),
-            explanation=card.get("explanation", ""),
-            image_url=card.get("image_url", ""),
-            options=cleaned_opts[:4],
+            back="",
+            explanation="",
+            image_url=card.get("image_url", "").strip(),
+            options=[],
             is_published=is_pub,
         )
         inserted.append(str(fc.id))

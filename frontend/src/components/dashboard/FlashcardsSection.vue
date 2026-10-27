@@ -34,8 +34,8 @@ import { useBodyScrollLock } from '@/composables/useBodyScrollLock';
 
 export interface Flashcard {
   front: string;
-  back: string;
   image_url?: string;
+  back?: string;
 }
 
 export interface FlashcardDeck {
@@ -91,7 +91,7 @@ const formData = ref<{
   level: 'all',
   levels: [],
   ai_theme: '',
-  ai_with_images: false,
+  ai_with_images: true,
   flashcards: [],
 });
 
@@ -127,10 +127,10 @@ function handleOpenNew() {
     level: 'all',
     levels: ['B1'],
     ai_theme: '',
-    ai_with_images: false,
+    ai_with_images: true,
     flashcards: [
-      { front: '', back: '' },
-      { front: '', back: '' },
+      { front: '', image_url: '' },
+      { front: '', image_url: '' },
     ],
   };
   isModalOpen.value = true;
@@ -148,11 +148,11 @@ function handleOpenEdit(deck: FlashcardDeck) {
     level: deck.level || 'all',
     levels: deck.levels || (deck.level ? [deck.level] : ['B1']),
     ai_theme: '',
-    ai_with_images: false,
+    ai_with_images: true,
     flashcards: rawCards.map((c: any) => ({
       front: c.front || '',
-      back: c.back || '',
       image_url: c.image_url || '',
+      ...(c.back ? { back: c.back } : {}),
     })),
   };
   isModalOpen.value = true;
@@ -169,7 +169,7 @@ function handleToggleLevel(code: string) {
 }
 
 function handleAddCard() {
-  formData.value.flashcards.push({ front: '', back: '' });
+  formData.value.flashcards.push({ front: '', image_url: '' });
 }
 
 function handleRemoveCard(index: number) {
@@ -194,7 +194,6 @@ async function handleGenerateAI() {
     if (cards.length > 0) {
       formData.value.flashcards = cards.map((c: any) => ({
         front: c.front || '',
-        back: c.back || '',
         image_url: c.image_url || '',
       }));
       if (!formData.value.title) {
@@ -236,9 +235,15 @@ async function handleSaveDeck() {
     return;
   }
 
-  const validCards = formData.value.flashcards.filter((c) => c.front.trim() && c.back.trim());
+  const validCards = formData.value.flashcards
+    .filter((c) => c.front.trim() && c.image_url?.trim())
+    .map((c) => ({
+      front: c.front.trim(),
+      image_url: c.image_url!.trim(),
+      ...(c.back ? { back: c.back } : {}),
+    }));
   if (validCards.length === 0) {
-    toast.error('Deck must have at least one valid card (front & back).');
+    toast.error('Deck must have at least one valid card (front word/phrase & back image).');
     activeStep.value = 2;
     return;
   }
@@ -700,10 +705,9 @@ onMounted(() => {
                     />
                   </div>
 
-                  <label class="flex items-center gap-2 text-xs font-semibold text-text cursor-pointer">
-                    <input v-model="formData.ai_with_images" type="checkbox" class="rounded accent-primary" />
-                    <span>Include contextual images</span>
-                  </label>
+                  <span class="text-xs font-medium text-text-muted">
+                    Word/phrase front + contextual image back
+                  </span>
 
                   <button
                     type="button"
@@ -752,10 +756,10 @@ onMounted(() => {
                   </button>
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div class="space-y-3">
                   <div>
                     <label class="block text-[0.65rem] font-bold text-text-muted uppercase mb-1">
-                      Front (English Word / Phrase)
+                      Front (English Word / Phrase) *
                     </label>
                     <input
                       v-model="card.front"
@@ -767,31 +771,23 @@ onMounted(() => {
 
                   <div>
                     <label class="block text-[0.65rem] font-bold text-text-muted uppercase mb-1">
-                      Back (Portuguese Translation / Meaning)
+                      Back (Image URL or Upload) *
                     </label>
-                    <input
-                      v-model="card.back"
-                      type="text"
-                      placeholder="e.g. Portão de embarque"
-                      class="w-full px-3 py-2 rounded-xl bg-surface border border-border text-xs text-text outline-none focus:border-primary"
-                    />
+                    <div class="flex items-center gap-3">
+                      <ImageIcon class="w-4 h-4 text-text-subtle shrink-0" />
+                      <input
+                        v-model="card.image_url"
+                        type="text"
+                        placeholder="Image URL (https://...)"
+                        class="flex-1 px-3 py-2 rounded-xl bg-surface border border-border text-xs text-text outline-none focus:border-primary"
+                      />
+                      <label class="px-3 py-2 rounded-xl border border-border bg-surface hover:bg-surface-hover text-text text-xs font-bold flex items-center gap-1.5 cursor-pointer shrink-0">
+                        <Upload class="w-3.5 h-3.5" />
+                        <span>Upload</span>
+                        <input type="file" accept="image/*" class="hidden" @change="handleUploadCardImage(idx, $event)" />
+                      </label>
+                    </div>
                   </div>
-                </div>
-
-                <!-- Optional Image URL / Upload -->
-                <div class="flex items-center gap-3 pt-1">
-                  <ImageIcon class="w-4 h-4 text-text-subtle shrink-0" />
-                  <input
-                    v-model="card.image_url"
-                    type="text"
-                    placeholder="Optional image URL (https://...)"
-                    class="flex-1 px-3 py-1.5 rounded-lg bg-surface border border-border text-[0.7rem] text-text outline-none focus:border-primary"
-                  />
-                  <label class="px-2.5 py-1.5 rounded-lg border border-border bg-surface hover:bg-surface-hover text-text text-[0.7rem] font-bold flex items-center gap-1 cursor-pointer">
-                    <Upload class="w-3 h-3" />
-                    <span>Upload</span>
-                    <input type="file" accept="image/*" class="hidden" @change="handleUploadCardImage(idx, $event)" />
-                  </label>
                 </div>
 
                 <!-- Image Preview Thumbnail -->

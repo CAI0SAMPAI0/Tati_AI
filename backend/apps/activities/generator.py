@@ -37,20 +37,15 @@ EVERYDAY_TOPICS = [
 
 def validate_flashcard_data(card: dict) -> tuple[bool, list[str]]:
     """
-    Função pura de validação de dados de flashcards pedagógicos CEFR.
+    Função pura de validação de flashcards visuais (frente = palavra/frase; verso = apenas imagem).
     Regras:
-    1. options deve conter exatamente 4 alternativas.
-    2. As 4 alternativas devem ser únicas (case-insensitive).
-    3. O valor de front deve estar presente em options exatamente uma vez (case-insensitive).
-    4. Nenhuma opção pode ser placeholder/filler:
-       - 'Alternative N', 'Option A', 'None of the above', 'All of the above', etc.
-       - Strings vazias ou apenas espaços.
-    5. front, back, explanation devem ser strings não-vazias e ter tamanhos mínimos:
-       - len(front.strip()) >= 2
-       - len(back.strip()) >= 5
-       - len(explanation.strip()) >= 5
+    1. front deve ser string não-vazia (>= 2 caracteres), sem URLs nem placeholders.
+    2. Campos obsoletos de texto/múltipla escolha ('back' preenchido ou 'options' não-vazio) são rejeitados.
+    3. Deve conter referência/entrada visual válida ('image_url' HTTP(S) real sem domínios fake/placeholder
+       OU 'image_search_query' >= 3 caracteres e/ou 'image_prompt' >= 10 caracteres para resolução real).
     """
     import re
+    from urllib.parse import urlparse
 
     errors: list[str] = []
     if not isinstance(card, dict):
@@ -58,24 +53,10 @@ def validate_flashcard_data(card: dict) -> tuple[bool, list[str]]:
 
     front = card.get("front")
     back = card.get("back")
-    explanation = card.get("explanation")
     raw_options = card.get("options")
-
-    if not isinstance(front, str) or len(front.strip()) < 2:
-        errors.append("Field 'front' must be a non-empty string with at least 2 characters.")
-    if not isinstance(back, str) or len(back.strip()) < 5:
-        errors.append("Field 'back' must be a non-empty string with at least 5 characters.")
-    if not isinstance(explanation, str) or len(explanation.strip()) < 5:
-        errors.append("Field 'explanation' must be a non-empty string with at least 5 characters.")
-
-    if not isinstance(raw_options, list):
-        errors.append("Field 'options' must be a list of 4 strings.")
-        return False, errors
-
-    cleaned_options = [str(o).strip() for o in raw_options]
-
-    if len(cleaned_options) != 4:
-        errors.append(f"Options must contain exactly 4 items, found {len(cleaned_options)}.")
+    image_url = card.get("image_url")
+    search_query = card.get("image_search_query")
+    image_prompt = card.get("image_prompt")
 
     filler_patterns = [
         re.compile(r"^alternative\s*\d*$", re.IGNORECASE),
@@ -88,26 +69,54 @@ def validate_flashcard_data(card: dict) -> tuple[bool, list[str]]:
         re.compile(r"^-$"),
     ]
 
-    for idx, opt in enumerate(cleaned_options):
-        if not opt:
-            errors.append(f"Option {idx + 1} is empty.")
-            continue
+    if not isinstance(front, str) or len(front.strip()) < 2:
+        errors.append("Field 'front' must be a non-empty string with at least 2 characters.")
+    else:
+        clean_front = front.strip()
+        if re.match(r"^https?://", clean_front, re.IGNORECASE):
+            errors.append("Field 'front' must be a word or phrase, not a URL.")
         for pat in filler_patterns:
-            if pat.match(opt):
-                errors.append(f"Option '{opt}' is a placeholder/filler.")
+            if pat.match(clean_front):
+                errors.append(f"Field 'front' ('{clean_front}') cannot be a placeholder.")
                 break
 
-    lower_options = [o.lower() for o in cleaned_options if o]
-    if len(set(lower_options)) != len(cleaned_options):
-        errors.append("Options must be unique (case-insensitive duplicate detected).")
+    if isinstance(back, str) and back.strip():
+        errors.append("Field 'back' text definition/translation is not allowed; back must be image-only.")
 
-    if isinstance(front, str) and front.strip():
-        front_lower = front.strip().lower()
-        matches = [o for o in lower_options if o == front_lower]
-        if len(matches) == 0:
-            errors.append(f"Target word/phrase ('{front.strip()}') must be present in options.")
-        elif len(matches) > 1:
-            errors.append(f"Target word/phrase ('{front.strip()}') appears multiple times in options.")
+    if raw_options is not None and (not isinstance(raw_options, list) or len(raw_options) > 0):
+        errors.append("Field 'options' is not allowed; flashcards are word/phrase-to-image only.")
+
+    fake_host_tokens = ("example.com", "example.org", "placeholder", "dummyimage", "fake", "localhost", "loremflickr")
+    has_valid_url = False
+    if image_url is not None and str(image_url).strip() != "":
+        if not isinstance(image_url, str):
+            errors.append("Field 'image_url' must be a valid HTTP(S) URL string.")
+        else:
+            raw_url = image_url.strip()
+            parsed = urlparse(raw_url)
+            host = (parsed.netloc or "").lower()
+            if parsed.scheme not in ("http", "https") or not host or "." not in host:
+                errors.append("Field 'image_url' must be a real HTTP(S) URL, not plain text.")
+            elif any(tok in host for tok in fake_host_tokens):
+                errors.append(f"Field 'image_url' host '{host}' is a placeholder/fake domain.")
+            else:
+                has_valid_url = True
+
+    has_search_query = isinstance(search_query, str) and len(search_query.strip()) >= 3
+    has_image_prompt = isinstance(image_prompt, str) and len(image_prompt.strip()) >= 10
+
+    if has_search_query and re.match(r"^https?://", search_query.strip(), re.IGNORECASE):
+        errors.append("Field 'image_search_query' must be descriptive keywords, not a URL.")
+        has_search_query = False
+
+    if has_image_prompt and re.match(r"^https?://", image_prompt.strip(), re.IGNORECASE):
+        errors.append("Field 'image_prompt' must be a visual description, not a URL.")
+        has_image_prompt = False
+
+    if not has_valid_url and not has_search_query and not has_image_prompt:
+        errors.append(
+            "Flashcard must provide a valid 'image_url' or visual generation inputs ('image_search_query' / 'image_prompt')."
+        )
 
     return (len(errors) == 0, errors)
 
@@ -209,41 +218,50 @@ class CEFRGeneratorService:
                 except Exception as e:
                     logger.warning(f"[CEFR Generator] Erro ao chamar Groq com modelo {m_candidate}: {e}")
 
-        # Fallback se a IA não retornar o total solicitado
+        # Sanitiza eventuais campos legados caso o LLM os inclua por engano antes da validação
+        sanitized_raw_cards = []
+        for raw_item in cards_data:
+            if isinstance(raw_item, dict):
+                sanitized_raw_cards.append(
+                    {
+                        "front": raw_item.get("front"),
+                        "image_search_query": raw_item.get("image_search_query"),
+                        "image_prompt": raw_item.get("image_prompt"),
+                    }
+                )
+        cards_data = sanitized_raw_cards
+
+        # Fallback caso a chave de IA não esteja configurada ou retorne menos itens que o solicitado
         if not cards_data or len(cards_data) < count:
             existing_fronts = {str(c.get("front", "")).strip().lower() for c in cards_data}
-            base_templates = [
-                ("Essential vocabulary for {topic}", "A core word or phrase frequently used in real-world discussions about {topic}.", "Understanding this concept is fundamental for daily conversations."),
-                ("To practice {topic}", "To perform activities or speaking drills regularly to enhance your fluency in {topic}.", "I practice talking about {topic} every week to gain confidence."),
-                ("Key expression for {topic}", "A highly useful idiomatic or communicative phrase when discussing {topic}.", "Native speakers use this expression frequently when engaging in {topic}."),
-                ("Ask about {topic}", "To request information, guidance or clarification regarding {topic}.", "Excuse me, could you give me more details about {topic}?"),
-                ("Describing {topic}", "To explain the main characteristics, details or opinions about {topic}.", "She gave a vivid description of {topic} during the group discussion."),
-                ("Action plan for {topic}", "A practical strategy or organized steps taken to handle {topic}.", "We created a practical action plan to master {topic} step by step."),
-                ("Common situation in {topic}", "A typical everyday scenario that learners encounter regarding {topic}.", "This is a very common situation when you deal with {topic} abroad."),
-                ("Solving issues with {topic}", "How to communicate solutions, overcome challenges and handle doubts in {topic}.", "Good communication helps in solving most issues related to {topic}."),
-                ("Useful phrases for {topic}", "Practical phrases that help you speak more naturally about {topic}.", "Reviewing these useful phrases makes talking about {topic} effortless."),
-                ("Review and mastery of {topic}", "Consolidating your vocabulary and communicative skills in {topic}.", "Consistent review leads to complete mastery of {topic}.")
+            if topic_context and isinstance(topic_context.get("items"), list):
+                seed_terms = [str(it).strip() for it in topic_context["items"] if str(it).strip()]
+            else:
+                seed_terms = []
+            default_visual_terms = seed_terms + [
+                f"{topic.strip()}",
+                f"Asking for help in {topic.lower()}",
+                f"Checking details in {topic.lower()}",
+                f"Everyday conversation about {topic.lower()}",
+                f"Planning ahead for {topic.lower()}",
             ]
-            for f_tmpl, b_tmpl, exp_tmpl in base_templates:
+            for candidate_front in default_visual_terms:
                 if len(cards_data) >= count:
                     break
-                front_val = f_tmpl.format(topic=topic.lower()).strip()
-                if front_val.lower() in existing_fronts:
+                front_val = candidate_front.strip()
+                if len(front_val) < 2 or front_val.lower() in existing_fronts:
                     continue
                 existing_fronts.add(front_val.lower())
-                cards_data.append({
-                    "front": front_val,
-                    "back": b_tmpl.format(topic=topic.lower()).strip(),
-                    "options": [
-                        front_val,
-                        f"Unrelated phrase for {topic.lower()}",
-                        f"Grammar mistake in {topic.lower()}",
-                        f"Opposite meaning in {topic.lower()}"
-                    ],
-                    "explanation": exp_tmpl.format(topic=topic.lower()).strip(),
-                    "image_search_query": f"{topic.lower()} discussion communication",
-                    "image_prompt": f"Realistic educational photo representing {topic.lower()} with natural lighting and no text",
-                })
+                cards_data.append(
+                    {
+                        "front": front_val,
+                        "image_search_query": f"{topic.lower()} {front_val.lower()} real scene",
+                        "image_prompt": (
+                            f"Realistic documentary photograph illustrating {front_val} in the context of {topic.lower()}, "
+                            f"natural lighting, no text, no letters, no watermark"
+                        ),
+                    }
+                )
 
         # Validação estrita e retry com LLM para cada card
         validated_cards = []
@@ -258,26 +276,21 @@ class CEFRGeneratorService:
                     f"[CEFR Generator] Card inválido (tentativa {retry_count}/2). Erros: {errors}. Executando retry..."
                 )
                 retry_prompt = f"""You are Teacher Tatiana Duarte, expert ESL teacher.
-A flashcard generated for CEFR level {lvl} on topic "{topic}" failed validation with the following errors:
+A word-to-image flashcard generated for CEFR level {lvl} on topic "{topic}" failed validation with the following errors:
 {json.dumps(errors)}
 
 Here is the invalid card data:
 {json.dumps(c)}
 
 Fix this flashcard according to these STRICT RULES:
-1. "front": English target word/expression (>= 2 characters).
-2. "back": Clear English definition suited for CEFR Level {lvl} (>= 5 characters).
-3. "options": EXACTLY 4 distinct English options. "front" MUST appear in "options" exactly once. The other 3 options MUST be plausible, realistic English words/expressions in the same lexical field. NEVER use "Alternative N", "Option A", "None of the above", or placeholders.
-4. "explanation": Example sentence in English demonstrating natural context (>= 5 characters).
-5. "image_search_query": 2-4 concrete, physical English words representing the everyday situation in the "explanation" sentence (e.g. for "most popular" with "This song is the most popular on the radio" -> "vintage radio playing music", NEVER trophies, shelves, or abstract symbols; for diet -> "fresh healthy salad food", NEVER stethoscope/doctor).
-6. "image_prompt": Photographic visual prompt depicting the concrete card situation from the explanation with natural lighting, strictly no text, no letters, no logos, no watermark, no trophies/shrines, and no unrelated medical equipment.
+1. "front": English target word or short phrase (1-4 words, >= 2 characters). Never a URL or placeholder.
+2. DO NOT include "back", "options", or "explanation". Flashcards are strictly front (word/phrase) -> back (image only).
+3. "image_search_query": 2-5 concrete, physical English words depicting the visual subject of "front" (never a URL, never trophies/shrines/puzzles).
+4. "image_prompt": Realistic photographic description depicting "front" with natural lighting, strictly no text, no letters, no signage, no watermark (never a URL).
 
 Return ONLY a JSON object:
 {{
   "front": "...",
-  "back": "...",
-  "options": ["...", "...", "...", "..."],
-  "explanation": "...",
   "image_search_query": "...",
   "image_prompt": "..."
 }}"""
@@ -322,29 +335,24 @@ Return ONLY a JSON object:
         with transaction.atomic():
             for c in unique_cards[:count]:
                 front = (c.get("front") or "").strip()
-                back = (c.get("back") or "").strip()
-                explanation = (c.get("explanation") or "").strip()
                 search_query = (c.get("image_search_query") or "").strip() or None
                 visual_prompt = (c.get("image_prompt") or "").strip() or None
-                raw_options = c.get("options") or []
-                cleaned_opts = [str(o).strip() for o in raw_options if str(o).strip()]
 
                 img_url = ImageResolverService.resolve_image(
                     term=front,
                     topic=deck_title,
                     search_query=search_query,
                     visual_prompt=visual_prompt,
-                    explanation=explanation,
                 )
                 fc, created_flag = Flashcard.objects.update_or_create(
                     level=lvl,
                     topic=deck_title,
                     front=front,
                     defaults={
-                        "back": back,
-                        "explanation": explanation,
+                        "back": "",
+                        "explanation": "",
                         "image_url": img_url,
-                        "options": cleaned_opts[:4],
+                        "options": [],
                         "is_published": False,
                     },
                 )
