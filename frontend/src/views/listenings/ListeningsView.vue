@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import { Headphones, Tag, Play, Sparkles, Waves, Video } from 'lucide-vue-next';
 import { apiGet } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
+import { peekActivityCache, cachedActivityFetch, TTL_1_DAY_MS } from '@/utils/activityCache';
 
 interface Podcast {
   id: string;
@@ -17,14 +18,21 @@ interface Podcast {
 }
 
 const router = useRouter();
-const listenings = ref<Podcast[]>([]);
-const isLoading = ref(true);
+const initialCached = peekActivityCache<Podcast[]>('podcasts:all');
+const listenings = ref<Podcast[]>(initialCached || []);
+const isLoading = ref(!initialCached);
 const visibleCount = ref(12);
 
 async function loadListenings() {
-  isLoading.value = true;
+  if (!peekActivityCache<Podcast[]>('podcasts:all')) {
+    isLoading.value = true;
+  }
   try {
-    const data = await apiGet<Podcast[]>(`${ENDPOINTS.ACTIVITIES_PODCASTS_RECOMMENDATIONS}?lang=en-US`);
+    const data = await cachedActivityFetch<Podcast[]>(
+      'podcasts:all',
+      () => apiGet<Podcast[]>(`${ENDPOINTS.ACTIVITIES_PODCASTS_RECOMMENDATIONS}?level=all`),
+      TTL_1_DAY_MS
+    );
     listenings.value = data || [];
   } catch (err) {
     console.error('Error fetching listenings:', err);

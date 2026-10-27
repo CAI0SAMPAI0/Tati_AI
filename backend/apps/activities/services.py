@@ -381,17 +381,37 @@ class VocabularyService:
 
 
 class PodcastService:
-    @staticmethod
-    def get_podcasts(level: str = None, category: str = None) -> list[PodcastOut]:
-        qs = Podcast.objects.all()
-        if level and level.lower() not in ("all", "any"):
-            qs = qs.filter(level__iexact=level)
-        if category:
-            qs = qs.filter(category__iexact=category)
+    # Cache em RAM do processo Python (TTL 24h) para evitar queries ao banco sem gastar a cota mensal do Redis
+    _MEM_CACHE: dict[tuple[str, str], tuple[float, list[PodcastOut]]] = {}
+    _TTL_SECONDS = 86400
+
+    @classmethod
+    def invalidate_cache(cls) -> None:
+        cls._MEM_CACHE.clear()
+
+    @classmethod
+    def get_podcasts(cls, level: str = None, category: str = None) -> list[PodcastOut]:
+        import time as _time
+        from django.db.models import Q
+
+        norm_level = (level or "all").strip().lower()
+        norm_cat = (category or "").strip().lower()
+        cache_key = (norm_level, norm_cat)
+        now_ts = _time.monotonic()
+
+        cached = cls._MEM_CACHE.get(cache_key)
+        if cached and cached[0] > now_ts:
+            return cached[1]
+
+        qs = Podcast.objects.defer("transcript_segments")
+        if norm_level not in ("all", "any", ""):
+            qs = qs.filter(Q(level__iexact=norm_level) | Q(level__iexact="all"))
+        if norm_cat:
+            qs = qs.filter(category__iexact=norm_cat)
 
         items = list(qs[:30])
         if not items:
-            return [
+            fallback = [
                 PodcastOut(
                     id="tati_pod_1",
                     title="Real English Conversation with Teacher Tati",
@@ -419,8 +439,10 @@ class PodcastService:
                     easy_words=["meeting", "schedule", "deadline"],
                 ),
             ]
+            cls._MEM_CACHE[cache_key] = (now_ts + cls._TTL_SECONDS, fallback)
+            return fallback
 
-        return [
+        result = [
             PodcastOut(
                 id=p.id,
                 title=p.title,
@@ -436,6 +458,8 @@ class PodcastService:
             )
             for p in items
         ]
+        cls._MEM_CACHE[cache_key] = (now_ts + cls._TTL_SECONDS, result)
+        return result
 
     @staticmethod
     def get_podcast(podcast_id: str) -> PodcastOut:
@@ -3046,19 +3070,42 @@ class ExternalContentService:
         "listening": "listening",
         "reading": "reading",
     }
+    # Cache em RAM do processo Python (TTL 7 dias + validação de mtime do arquivo) sem consumir Redis
+    _JSON_FILE_CACHE: dict[str, tuple[float, Any]] = {}
+    _RESULT_CACHE: dict[tuple, tuple[float, float, Any]] = {}
+    _TTL_SECONDS = 7 * 86400
+
+    @classmethod
+    def _load_json_cached(cls, data_file: str) -> tuple[float, Any]:
+        import json
+
+        mtime = os.path.getmtime(data_file)
+        cached = cls._JSON_FILE_CACHE.get(data_file)
+        if cached and cached[0] == mtime:
+            return mtime, cached[1]
+        with open(data_file, "r", encoding="utf-8") as f:
+            parsed = json.load(f)
+        cls._JSON_FILE_CACHE[data_file] = (mtime, parsed)
+        return mtime, parsed
 
     @classmethod
     def get_test_english_content(
         cls, level: str = "A1", category: str = "grammar"
     ) -> dict:
+        import time as _time
+
         data_file = os.path.join(cls.DATA_DIR, "te_english_data.json")
         if not os.path.exists(data_file):
             return {"success": True, "level": level, "category": category, "items": []}
 
-        import json
+        mtime = os.path.getmtime(data_file)
+        cache_key = ("te", (level or "a1").strip().lower(), (category or "grammar").strip().lower())
+        now_ts = _time.monotonic()
+        hit = cls._RESULT_CACHE.get(cache_key)
+        if hit and hit[0] == mtime and hit[1] > now_ts:
+            return hit[2]
 
-        with open(data_file, "r", encoding="utf-8") as f:
-            data = json.load(f)
+        _, data = cls._load_json_cached(data_file)
 
         cat = category.lower()
         cat_slug = cls.TE_CATEGORIES.get(cat, cat)
@@ -3097,18 +3144,22 @@ class ExternalContentService:
                 url = it.get("url") or f"https://test-english.com/{cat_slug}/{lvl_path}/{slug}/"
                 enriched.append({**it, "url": url, "level": level_code})
 
-        return {
+        res = {
             "success": True,
             "level": level,
             "category": category,
             "items": enriched,
             "source": "test-english.com",
         }
+        cls._RESULT_CACHE[cache_key] = (mtime, now_ts + cls._TTL_SECONDS, res)
+        return res
 
     @classmethod
     def get_liveworksheets_content(
         cls, level: str = "A1", category: str = "general"
     ) -> dict:
+        import time as _time
+
         data_file = os.path.join(cls.DATA_DIR, "liveworksheets_data.json")
         if not os.path.exists(data_file):
             return {
@@ -3119,10 +3170,14 @@ class ExternalContentService:
                 "worksheets": [],
             }
 
-        import json
+        mtime = os.path.getmtime(data_file)
+        cache_key = ("lw", (level or "a1").strip().lower(), (category or "general").strip().lower())
+        now_ts = _time.monotonic()
+        hit = cls._RESULT_CACHE.get(cache_key)
+        if hit and hit[0] == mtime and hit[1] > now_ts:
+            return hit[2]
 
-        with open(data_file, "r", encoding="utf-8") as f:
-            data = json.load(f)
+        _, data = cls._load_json_cached(data_file)
 
         cat = category.lower() if category.lower() in data else "grammar"
         cat_data = data.get(cat, {})
@@ -3158,7 +3213,7 @@ class ExternalContentService:
                     "source": "liveworksheets.com",
                 })
 
-        return {
+        res = {
             "success": True,
             "level": level,
             "category": category,
@@ -3166,15 +3221,16 @@ class ExternalContentService:
             "worksheets": enriched,
             "source": "liveworksheets.com",
         }
+        cls._RESULT_CACHE[cache_key] = (mtime, now_ts + cls._TTL_SECONDS, res)
+        return res
 
     @classmethod
     def get_musics_content(cls) -> list[dict]:
         data_file = os.path.join(cls.DATA_DIR, "lingoclip_musics.json")
         if not os.path.exists(data_file):
             return []
-        import json
-        with open(data_file, "r", encoding="utf-8") as f:
-            return json.load(f)
+        _, data = cls._load_json_cached(data_file)
+        return data
 
 
 class StudentFeedbackService:

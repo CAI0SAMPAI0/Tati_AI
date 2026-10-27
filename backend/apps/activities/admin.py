@@ -33,6 +33,16 @@ class PodcastAdmin(admin.ModelAdmin):
     search_fields = ("title", "description")
     show_full_result_count = False
 
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        from .services import PodcastService
+        PodcastService.invalidate_cache()
+
+    def delete_model(self, request, obj):
+        super().delete_model(request, obj)
+        from .services import PodcastService
+        PodcastService.invalidate_cache()
+
 
 @admin.register(Game)
 class GameAdmin(admin.ModelAdmin):

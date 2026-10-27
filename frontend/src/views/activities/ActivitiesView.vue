@@ -26,6 +26,12 @@ import {
 } from 'lucide-vue-next';
 import { apiGet, apiPost } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
+import {
+  peekActivityCache,
+  cachedActivityFetch,
+  TTL_1_DAY_MS,
+  TTL_7_DAYS_MS,
+} from '@/utils/activityCache';
 import { useAuth } from '@/composables/useAuth';
 import { useToast } from '@/composables/useToast';
 import { normalizeLevel } from '@/constants/levels';
@@ -68,17 +74,18 @@ const musicGenre = ref<string>('All');
 const visibleCount = ref(12);
 
 // Data States
-const grammarItems = ref<any[]>([]);
-const vocabularyItems = ref<any[]>([]);
-const readingItems = ref<any[]>([]);
-const listeningItems = ref<any[]>([]);
-const musicsRaw = ref<any[]>([]);
+const grammarItems = ref<any[]>(peekActivityCache<any[]>('te:grammar:all') || []);
+const vocabularyItems = ref<any[]>(peekActivityCache<any[]>('te:vocabulary:all') || []);
+const readingItems = ref<any[]>(peekActivityCache<any[]>('te:reading:all') || []);
+const listeningTeItems = ref<any[]>(peekActivityCache<any[]>('te:listening:all') || []);
+const listeningPodcastItems = ref<any[]>(peekActivityCache<any[]>('podcasts:all') || []);
+const musicsRaw = ref<any[]>(peekActivityCache<any[]>('musics:all') || []);
 const flashcardsRaw = ref<any[]>([]);
 const simulationsRaw = ref<any[]>([]);
 const gamesRaw = ref<any[]>([]);
 const newsRaw = ref<any[]>([]);
 const mySubmissions = ref<any[]>([]);
-const isLoading = ref(true);
+const isLoading = ref(grammarItems.value.length === 0);
 
 const selectedActivity = ref<any | null>(null);
 
@@ -87,12 +94,28 @@ const effectiveLevel = computed(() => {
   return 'All';
 });
 
-const testEnglishLevel = computed(() => {
-  if (filterLevel.value === 'All') return 'all';
-  const lvl = filterLevel.value.toLowerCase().trim();
-  if (lvl.startsWith('b1+')) return 'b1';
-  return lvl || 'a1';
-});
+// Filtra localmente itens do Test-English mantendo fallback C2 -> C1 idêntico ao backend
+function filterTestEnglishByLevel(items: any[], targetLvl: string): any[] {
+  if (!targetLvl || targetLvl === 'All') return items;
+  const target = targetLvl.toUpperCase().trim();
+  const exact = items.filter((it) => (it.level || '').toUpperCase().trim() === target);
+  if (exact.length > 0) return exact;
+  if (target === 'C2') {
+    return items
+      .filter((it) => (it.level || '').toUpperCase().trim() === 'C1')
+      .map((it) => ({ ...it, level: 'C2' }));
+  }
+  return exact;
+}
+
+function filterPodcastsByLevel(items: any[], targetLvl: string): any[] {
+  if (!targetLvl || targetLvl === 'All') return items;
+  const target = targetLvl.toUpperCase().trim();
+  return items.filter((p) => {
+    const pLvl = (p.level || 'all').toUpperCase().trim();
+    return pLvl === 'ALL' || pLvl === target;
+  });
+}
 
 function getCleanLevels(levels?: string[]): string[] {
   if (!Array.isArray(levels)) return [];
@@ -126,39 +149,107 @@ async function fetchSubmissions() {
   } catch (_) {}
 }
 
+async function loadTestEnglishCategory(category: 'grammar' | 'vocabulary' | 'reading' | 'listening'): Promise<any[]> {
+  return cachedActivityFetch<any[]>(
+    `te:${category}:all`,
+    async () => {
+      const res = await apiGet<any>(ENDPOINTS.TEST_ENGLISH_CONTENT('all', category));
+      return Array.isArray(res?.items) ? res.items : Array.isArray(res) ? res : [];
+    },
+    TTL_7_DAYS_MS
+  );
+}
+
+async function loadPodcastsCatalog(): Promise<any[]> {
+  return cachedActivityFetch<any[]>(
+    'podcasts:all',
+    async () => {
+      const res = await apiGet<any[]>(`${ENDPOINTS.ACTIVITIES_PODCASTS_RECOMMENDATIONS}?level=all`);
+      return Array.isArray(res) ? res : [];
+    },
+    TTL_1_DAY_MS
+  );
+}
+
+async function loadMusicsCatalog(): Promise<any[]> {
+  return cachedActivityFetch<any[]>(
+    'musics:all',
+    async () => {
+      const res = await apiGet<any[]>(ENDPOINTS.ACTIVITIES_MUSICS);
+      return Array.isArray(res) ? res : [];
+    },
+    TTL_7_DAYS_MS
+  );
+}
+
 async function fetchCurrentTabContent() {
-  isLoading.value = true;
   try {
     if (activeTab.value === 'grammar') {
-      const res = await apiGet<any>(ENDPOINTS.TEST_ENGLISH_CONTENT(testEnglishLevel.value, 'grammar'));
-      grammarItems.value = res?.items || res || [];
+      const cached = peekActivityCache<any[]>('te:grammar:all');
+      if (cached) {
+        grammarItems.value = cached;
+        isLoading.value = false;
+        return;
+      }
+      isLoading.value = true;
+      grammarItems.value = await loadTestEnglishCategory('grammar');
     } else if (activeTab.value === 'vocabulary') {
-      const res = await apiGet<any>(ENDPOINTS.TEST_ENGLISH_CONTENT(testEnglishLevel.value, 'vocabulary'));
-      vocabularyItems.value = res?.items || res || [];
+      const cached = peekActivityCache<any[]>('te:vocabulary:all');
+      if (cached) {
+        vocabularyItems.value = cached;
+        isLoading.value = false;
+        return;
+      }
+      isLoading.value = true;
+      vocabularyItems.value = await loadTestEnglishCategory('vocabulary');
     } else if (activeTab.value === 'reading') {
-      const res = await apiGet<any>(ENDPOINTS.TEST_ENGLISH_CONTENT(testEnglishLevel.value, 'reading'));
-      readingItems.value = res?.items || res || [];
+      const cached = peekActivityCache<any[]>('te:reading:all');
+      if (cached) {
+        readingItems.value = cached;
+        isLoading.value = false;
+        return;
+      }
+      isLoading.value = true;
+      readingItems.value = await loadTestEnglishCategory('reading');
     } else if (activeTab.value === 'listenings') {
+      const cachedTe = peekActivityCache<any[]>('te:listening:all');
+      const cachedPods = peekActivityCache<any[]>('podcasts:all');
+      if (cachedTe && cachedPods) {
+        listeningTeItems.value = cachedTe;
+        listeningPodcastItems.value = cachedPods;
+        isLoading.value = false;
+        return;
+      }
+      isLoading.value = true;
       const [teRes, podsRes] = await Promise.allSettled([
-        apiGet<any>(ENDPOINTS.TEST_ENGLISH_CONTENT(testEnglishLevel.value, 'listening')),
-        apiGet<any[]>(ENDPOINTS.ACTIVITIES_PODCASTS_RECOMMENDATIONS),
+        loadTestEnglishCategory('listening'),
+        loadPodcastsCatalog(),
       ]);
-      const list1 = teRes.status === 'fulfilled' ? teRes.value?.items || teRes.value || [] : [];
-      const list2 = podsRes.status === 'fulfilled' ? podsRes.value || [] : [];
-      listeningItems.value = [...list1, ...list2];
+      listeningTeItems.value = teRes.status === 'fulfilled' ? teRes.value : [];
+      listeningPodcastItems.value = podsRes.status === 'fulfilled' ? podsRes.value : [];
     } else if (activeTab.value === 'musics') {
-      const res = await apiGet<any[]>(ENDPOINTS.ACTIVITIES_MUSICS);
-      musicsRaw.value = Array.isArray(res) ? res : [];
+      const cached = peekActivityCache<any[]>('musics:all');
+      if (cached) {
+        musicsRaw.value = cached;
+        isLoading.value = false;
+        return;
+      }
+      isLoading.value = true;
+      musicsRaw.value = await loadMusicsCatalog();
     } else if (activeTab.value === 'flashcards') {
+      if (flashcardsRaw.value.length === 0) isLoading.value = true;
       const res = await apiGet<any[]>(ENDPOINTS.ACTIVITIES_MODULES);
       flashcardsRaw.value = Array.isArray(res) ? res : [];
     } else if (activeTab.value === 'simulations') {
+      if (simulationsRaw.value.length === 0) isLoading.value = true;
       const res = await apiGet<any[]>('/simulation/scenarios');
       simulationsRaw.value = Array.isArray(res) ? res : [];
     } else if (activeTab.value === 'games') {
+      if (gamesRaw.value.length === 0) isLoading.value = true;
       const res = await apiGet<any[]>(ENDPOINTS.ACTIVITIES_GAMES);
       gamesRaw.value = Array.isArray(res) ? res : [];
     } else if (activeTab.value === 'news') {
+      if (newsRaw.value.length === 0) isLoading.value = true;
       const res = await apiGet<any[]>(ENDPOINTS.ACTIVITIES_NEWS);
       newsRaw.value = Array.isArray(res) ? res : [];
     }
@@ -169,17 +260,45 @@ async function fetchCurrentTabContent() {
   }
 }
 
-watch([activeTab, filterLevel], () => {
+// Pré-aquece silenciosamente os 5 catálogos estáticos em segundo plano caso ainda não estejam no localStorage
+function prewarmStaticActivityCatalogs() {
+  if (!peekActivityCache('te:vocabulary:all')) {
+    loadTestEnglishCategory('vocabulary').then((d) => { vocabularyItems.value = d; }).catch(() => {});
+  }
+  if (!peekActivityCache('te:reading:all')) {
+    loadTestEnglishCategory('reading').then((d) => { readingItems.value = d; }).catch(() => {});
+  }
+  if (!peekActivityCache('te:listening:all')) {
+    loadTestEnglishCategory('listening').then((d) => { listeningTeItems.value = d; }).catch(() => {});
+  }
+  if (!peekActivityCache('podcasts:all')) {
+    loadPodcastsCatalog().then((d) => { listeningPodcastItems.value = d; }).catch(() => {});
+  }
+  if (!peekActivityCache('musics:all')) {
+    loadMusicsCatalog().then((d) => { musicsRaw.value = d; }).catch(() => {});
+  }
+}
+
+watch(activeTab, () => {
   visibleCount.value = 12;
   fetchCurrentTabContent();
 });
 
+watch(filterLevel, () => {
+  visibleCount.value = 12;
+});
+
 const filteredList = computed(() => {
   let list: any[] = [];
-  if (activeTab.value === 'grammar') list = grammarItems.value;
-  else if (activeTab.value === 'vocabulary') list = vocabularyItems.value;
-  else if (activeTab.value === 'reading') list = readingItems.value;
-  else if (activeTab.value === 'listenings') list = listeningItems.value;
+  if (activeTab.value === 'grammar') list = filterTestEnglishByLevel(grammarItems.value, filterLevel.value);
+  else if (activeTab.value === 'vocabulary') list = filterTestEnglishByLevel(vocabularyItems.value, filterLevel.value);
+  else if (activeTab.value === 'reading') list = filterTestEnglishByLevel(readingItems.value, filterLevel.value);
+  else if (activeTab.value === 'listenings') {
+    list = [
+      ...filterTestEnglishByLevel(listeningTeItems.value, filterLevel.value),
+      ...filterPodcastsByLevel(listeningPodcastItems.value, filterLevel.value),
+    ];
+  }
   else if (activeTab.value === 'musics') {
     list = musicsRaw.value;
     if (musicGenre.value !== 'All') {
@@ -384,7 +503,9 @@ const tabs = [
 
 onMounted(() => {
   fetchSubmissions();
-  fetchCurrentTabContent();
+  fetchCurrentTabContent().then(() => {
+    setTimeout(prewarmStaticActivityCatalogs, 400);
+  });
 });
 </script>
 

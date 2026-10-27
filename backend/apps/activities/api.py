@@ -126,18 +126,30 @@ def review_flashcard(request: HttpRequest, payload: FlashcardReviewInput):
 #    PODCASTS & TREINAMENTO AUDITIVO                                    
 
 
-@activities_router.get("/podcasts", response=List[PodcastOut], auth=auth_optional)
+@activities_router.get("/podcasts", response=List[PodcastOut], auth=None)
 @activities_router.get(
-    "/podcasts/recommendations", response=List[PodcastOut], auth=auth_optional
+    "/podcasts/recommendations", response=List[PodcastOut], auth=None
 )
 def get_podcasts(
-    request: HttpRequest, level: Optional[str] = None, category: Optional[str] = None
+    request: HttpRequest,
+    response: HttpResponse,
+    level: Optional[str] = None,
+    category: Optional[str] = None,
 ):
     """
-    Lista podcasts recomendados e episódios com transcrições.
+    Lista podcasts recomendados e episódios (cacheados em RAM por 24h).
+    Só consulta o usuário no banco se o parâmetro 'level' não for informado.
     """
-    user = request.auth if isinstance(getattr(request, "auth", None), User) else None
-    user_level = level or (user.level if user and getattr(user, "level", None) else "Beginner")
+    user_level = level
+    if not user_level:
+        resolved = auth_optional(request)
+        if isinstance(resolved, User) and getattr(resolved, "level", None):
+            user_level = resolved.level
+        else:
+            user_level = "all"
+    else:
+        response["Cache-Control"] = "public, max-age=86400, stale-while-revalidate=86400"
+
     return PodcastService.get_podcasts(user_level, category)
 
 
@@ -487,23 +499,25 @@ def clear_grammar_cache(request: HttpRequest):
 #    READING & LISTENING                                                
 
 
-@activities_router.get("/reading", auth=auth_optional)
-def get_reading_materials(request: HttpRequest, level: str = "A1"):
+@activities_router.get("/reading", auth=None)
+def get_reading_materials(request: HttpRequest, response: HttpResponse, level: str = "A1"):
     """
-    Retorna materiais de leitura graduados (News + Test English Reading).
+    Retorna materiais de leitura graduados (Test English Reading).
     """
     from .services import ExternalContentService
 
+    response["Cache-Control"] = "public, max-age=86400, stale-while-revalidate=604800"
     return ExternalContentService.get_test_english_content(level, "reading")
 
 
-@activities_router.get("/listening", auth=auth_optional)
-def get_listening_materials(request: HttpRequest, level: str = "A1"):
+@activities_router.get("/listening", auth=None)
+def get_listening_materials(request: HttpRequest, response: HttpResponse, level: str = "A1"):
     """
-    Retorna materiais de compreensão auditiva (Podcasts + Test English Listening).
+    Retorna materiais de compreensão auditiva (Test English Listening).
     """
     from .services import ExternalContentService
 
+    response["Cache-Control"] = "public, max-age=86400, stale-while-revalidate=604800"
     return ExternalContentService.get_test_english_content(level, "listening")
 
 
@@ -648,38 +662,47 @@ def get_user_pronunciation_history(request: HttpRequest, limit: int = 50):
 #    EXTERNAL CONTENT: TEST ENGLISH & LIVEWORKSHEETS                    
 
 
-@activities_router.get("/test-english/content", auth=auth_optional)
+@activities_router.get("/test-english/content", auth=None)
 def test_english_content(
-    request: HttpRequest, level: str = "A1", category: str = "grammar"
+    request: HttpRequest,
+    response: HttpResponse,
+    level: str = "A1",
+    category: str = "grammar",
 ):
     """
-    Retorna o catálogo indexado de exercícios do Test English.
+    Retorna o catálogo indexado de exercícios do Test English (cacheado em RAM e navegador).
     """
     from .services import ExternalContentService
 
+    response["Cache-Control"] = "public, max-age=86400, stale-while-revalidate=604800"
     return ExternalContentService.get_test_english_content(level, category)
 
 
-@activities_router.get("/liveworksheets/content", auth=auth_optional)
+@activities_router.get("/liveworksheets/content", auth=None)
 def liveworksheets_content(
-    request: HttpRequest, level: str = "A1", category: str = "general"
+    request: HttpRequest,
+    response: HttpResponse,
+    level: str = "A1",
+    category: str = "general",
 ):
     """
-    Retorna o catálogo indexado de exercícios do LiveWorksheets.
+    Retorna o catálogo indexado de exercícios do LiveWorksheets (cacheado em RAM e navegador).
     """
     from .services import ExternalContentService
 
+    response["Cache-Control"] = "public, max-age=86400, stale-while-revalidate=604800"
     return ExternalContentService.get_liveworksheets_content(level, category)
 
 
-@activities_router.get("/musics", auth=auth_optional)
-def list_musics(request: HttpRequest):
+@activities_router.get("/musics", auth=None)
+def list_musics(request: HttpRequest, response: HttpResponse):
     """
     Retorna o catálogo de músicas e letras do LingoClip com os 3 modos de jogo
     (Múltipla Escolha, Digitação e Karaokê).
     """
     from .services import ExternalContentService
 
+    response["Cache-Control"] = "public, max-age=86400, stale-while-revalidate=604800"
     return ExternalContentService.get_musics_content()
 
 
