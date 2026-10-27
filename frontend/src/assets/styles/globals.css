@@ -108,6 +108,12 @@
     max-width: 100%;
     height: auto;
   }
+
+  /* Remove o botao nativo de revelar senha do Edge/Windows para evitar olhos duplicados */
+  input::-ms-reveal,
+  input::-ms-clear {
+    display: none;
+  }
 }
 
 /* Scrollbar */

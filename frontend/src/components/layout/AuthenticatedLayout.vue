@@ -1,14 +1,26 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import { useRoute } from 'vue-router';
+import { ref, computed, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { useAuth } from '@/composables/useAuth';
 import MainHeader from './MainHeader.vue';
 import SidebarActivities from './SidebarActivities.vue';
 import ToastContainer from '../ui/ToastContainer.vue';
 
 const route = useRoute();
-const { isLoaded } = useAuth();
+const router = useRouter();
+const { isLoaded, isAuthenticated } = useAuth();
 const isSidebarOpen = ref(true);
+
+watch(
+  [isLoaded, isAuthenticated],
+  ([loaded, authed]) => {
+    const isPublic = route.matched.some((record) => record.meta.public);
+    if (loaded && !authed && !isPublic) {
+      router.replace('/login');
+    }
+  },
+  { immediate: true }
+);
 
 const isStandaloneLayout = computed(() => {
   return (
@@ -73,4 +85,3 @@ const isStandaloneLayout = computed(() => {
     </div>
   </div>
 </template>
-

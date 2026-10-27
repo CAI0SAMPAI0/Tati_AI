@@ -18,8 +18,6 @@ import {
   Clock,
   RefreshCw,
   Star,
-  Eye,
-  EyeOff,
   Trash2,
   LogOut,
   AlertTriangle,
@@ -81,8 +79,6 @@ const pwData = ref({
   new_pw: '',
   confirm_pw: '',
 });
-const showPw = ref(false);
-const showConfirm = ref(false);
 
 // Delete Account Modal
 const isDeleteModalOpen = ref(false);
@@ -356,13 +352,18 @@ async function handleChangePassword() {
   }
 }
 
+function handleSignOut() {
+  logout();
+  router.replace('/login');
+}
+
 async function handleDeleteAccount() {
   isDeleting.value = true;
   try {
     await apiDelete('/profile/');
     toast.success('Your account has been deleted.');
     isDeleteModalOpen.value = false;
-    logout();
+    handleSignOut();
   } catch (e) {
     toast.error('Could not delete account. Please try again.');
   } finally {
@@ -878,38 +879,20 @@ async function handleDeleteAccount() {
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="space-y-1.5">
               <label class="text-[0.7rem] font-bold text-text-muted uppercase tracking-wider">New Password</label>
-              <div class="relative">
-                <Input
-                  :type="showPw ? 'text' : 'password'"
-                  v-model="pwData.new_pw"
-                />
-                <button
-                  type="button"
-                  @click="showPw = !showPw"
-                  class="absolute right-3 top-1/2 -translate-y-1/2 text-text-subtle hover:text-text cursor-pointer"
-                >
-                  <EyeOff v-if="showPw" class="w-4 h-4" />
-                  <Eye v-else class="w-4 h-4" />
-                </button>
-              </div>
+              <Input
+                type="password"
+                auto-complete="new-password"
+                v-model="pwData.new_pw"
+              />
             </div>
 
             <div class="space-y-1.5">
               <label class="text-[0.7rem] font-bold text-text-muted uppercase tracking-wider">Confirm New Password</label>
-              <div class="relative">
-                <Input
-                  :type="showConfirm ? 'text' : 'password'"
-                  v-model="pwData.confirm_pw"
-                />
-                <button
-                  type="button"
-                  @click="showConfirm = !showConfirm"
-                  class="absolute right-3 top-1/2 -translate-y-1/2 text-text-subtle hover:text-text cursor-pointer"
-                >
-                  <EyeOff v-if="showConfirm" class="w-4 h-4" />
-                  <Eye v-else class="w-4 h-4" />
-                </button>
-              </div>
+              <Input
+                type="password"
+                auto-complete="new-password"
+                v-model="pwData.confirm_pw"
+              />
             </div>
           </div>
 
@@ -928,7 +911,7 @@ async function handleDeleteAccount() {
             These actions are irreversible. Proceed with care.
           </p>
           <div class="flex flex-col sm:flex-row gap-3 pt-2">
-            <Button variant="secondary" class="flex-1 font-bold gap-2" @click="logout">
+            <Button variant="secondary" class="flex-1 font-bold gap-2" @click="handleSignOut">
               <LogOut class="w-4 h-4" />
               Sign out
             </Button>
