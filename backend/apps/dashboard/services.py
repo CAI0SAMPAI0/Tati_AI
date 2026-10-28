@@ -365,6 +365,7 @@ class DashboardService:
                     "title": m.title,
                     "description": m.description or "No description provided.",
                     "level": m.level,
+                    "levels": m.levels or ([m.level] if m.level else []),
                     "card_count": len(fc),
                     "cards": fc,
                     "flashcards": fc,
@@ -391,6 +392,8 @@ class DashboardService:
                 card_list = [
                     {
                         "front": c.front,
+                        "back": c.back or "",
+                        "options": c.options or [],
                         "image_url": c.image_url or "",
                     }
                     for c in cards
@@ -405,6 +408,7 @@ class DashboardService:
                         "cards": card_list,
                         "flashcards": card_list,
                         "level": lvl,
+                        "levels": [lvl],
                         "is_published": is_pub,
                         "is_cefr": True,
                         "created_at": cards[0].created_at.isoformat()
@@ -431,9 +435,11 @@ class DashboardService:
         description = data.get("description", "")
         is_published = data.get("is_published", True)
 
+        levels_val = data.get("levels") or ([level] if level else ["all"])
         m = Module.objects.create(
             title=title,
             level=level,
+            levels=levels_val,
             description=description,
             flashcards=cards,
             is_published=is_published,
@@ -530,6 +536,8 @@ class DashboardService:
             m.title = data["title"]
         if "level" in data:
             m.level = data["level"].upper()
+        if "levels" in data:
+            m.levels = data["levels"]
         if "description" in data:
             m.description = data["description"]
         if "flashcards" in data or "cards" in data:

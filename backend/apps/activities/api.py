@@ -57,11 +57,12 @@ exams_router = Router(tags=["Exams"])
 
 
 @activities_router.get("/flashcards/my", auth=auth_required)
-def get_my_flashcards(request: HttpRequest, level: Optional[str] = None):
+def get_my_flashcards(request: HttpRequest, level: Optional[str] = "all"):
     """
     Retorna os baralhos completos de flashcards (Módulos e Decks CEFR por tópico).
+    Por padrão retorna todos os níveis ('all') para permitir filtragem fluida por tabs no frontend.
     """
-    user_level = level or request.auth.level or "A1"
+    user_level = level or "all"
     return FlashcardService.get_my_decks(user_level)
 
 
@@ -100,13 +101,11 @@ def get_module_deck(request: HttpRequest, module_id: str):
 
 
 @activities_router.get("/modules", auth=auth_optional)
-def get_all_modules(request: HttpRequest, level: Optional[str] = None):
+def get_all_modules(request: HttpRequest, level: Optional[str] = "all"):
     """
     Retorna todos os módulos pedagógicos disponíveis.
     """
-    user_level = level or (
-        request.auth.level if isinstance(getattr(request, "auth", None), User) else "A1"
-    )
+    user_level = level or "all"
     return FlashcardService.get_my_decks(user_level)
 
 

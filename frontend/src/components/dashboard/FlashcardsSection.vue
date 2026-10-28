@@ -98,8 +98,10 @@ const formData = ref<{
 const filteredDecks = computed(() => {
   return decks.value.filter((d) => {
     if (filterLevel.value === 'all') return true;
-    const dLevels = (d.levels || (d.level ? [d.level] : [])).map((l) => normalizeLevel(l));
-    return dLevels.includes(normalizeLevel(filterLevel.value));
+    const target = filterLevel.value.trim().toUpperCase();
+    const rawList = d.levels && d.levels.length > 0 ? d.levels : (d.level ? [d.level] : []);
+    const upperList = rawList.map((l) => (l || '').trim().toUpperCase());
+    return upperList.includes(target) || upperList.includes('ALL');
   });
 });
 
@@ -239,7 +241,7 @@ async function handleSaveDeck() {
     .filter((c) => c.front.trim())
     .map((c) => ({
       front: c.front.trim(),
-      image_url: c.image_url!.trim() || '',
+      image_url: c.image_url?.trim() || '',
       ...(c.back ? { back: c.back } : {}),
     }));
   if (validCards.length === 0) {

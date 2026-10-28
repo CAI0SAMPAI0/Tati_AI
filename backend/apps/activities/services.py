@@ -79,7 +79,7 @@ def matches_level(user_lvl: str, target_lvl: str, target_levels: list = None) ->
 
 class FlashcardService:
     @staticmethod
-    def get_my_decks(user_level: str = "A1") -> list[dict]:
+    def get_my_decks(user_level: str = "all") -> list[dict]:
         filtered = []
 
         # 1. Busca módulos que possuem flashcards
@@ -98,6 +98,7 @@ class FlashcardService:
                             or f"Deck com {len(fc)} flashcards",
                             "card_count": len(fc),
                             "level": m.level,
+                            "levels": m.levels or ([m.level] if m.level else []),
                             "is_published": True,
                             "image_url": m.image_url,
                             "created_at": m.created_at.isoformat()
@@ -125,6 +126,7 @@ class FlashcardService:
                     "description": f"Vocabulário essencial sobre {topic}.",
                     "card_count": len(cards),
                     "level": lvl,
+                    "levels": [lvl],
                     "is_published": True,
                     "created_at": cards[0].created_at.isoformat()
                     if cards[0].created_at

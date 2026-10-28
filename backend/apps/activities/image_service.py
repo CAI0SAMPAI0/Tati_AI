@@ -45,11 +45,33 @@ CURATED_THEME_FALLBACKS: Dict[str, str] = {
     "popular": "https://images.unsplash.com/photo-1483478550801-ceba5fe50e8e?auto=format&fit=crop&w=800&q=80",
     "communication": "https://images.unsplash.com/photo-1577563908411-5077b6dc7624?auto=format&fit=crop&w=800&q=80",
     "car": "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=800&q=80",
-    "default": "https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&w=800&q=80",
+    "like": "https://images.unsplash.com/photo-1530047139082-5435ca3c4614?auto=format&fit=crop&w=800&q=80",
+    "preference": "https://images.unsplash.com/photo-1724120932030-d8210a77deed?auto=format&fit=crop&w=800&q=80",
 }
 
 
 class ImageResolverService:
+    COMMON_EXPRESSION_MAP = {
+        "i don't like": "thumbs down gesture dislike",
+        "don't like": "thumbs down gesture dislike",
+        "i hate": "disgusted face expression dislike",
+        "hate": "disgusted face expression dislike",
+        "i would rather": "person choosing dilemma decision",
+        "would rather": "person choosing dilemma decision",
+        "i'm fond of": "happy smiling affectionate hug",
+        "fond of": "happy smiling affectionate",
+        "i'm interested in": "curious person exploring reading",
+        "interested in": "curious person exploring reading",
+        "my favorite": "happy person smiling holding coffee",
+        "favorite": "happy person smiling",
+        "brush teeth": "person brushing teeth bathroom",
+        "take a shower": "person taking shower",
+        "wake up": "person waking up bed morning",
+        "go to bed": "person sleeping in cozy bed",
+        "have breakfast": "healthy breakfast morning table",
+        "read the news": "person reading newspaper tablet",
+        "drink coffee": "cup of coffee on table morning",
+    }
     METAPHORICAL_TOKENS = {
         "trophy", "medal", "award", "shelf", "puzzle", "symbol", "concept", "icon",
         "altar", "shrine", "oratory", "podium", "graphic", "diagram", "statue"
@@ -75,6 +97,10 @@ class ImageResolverService:
         """
         clean_term = term.strip()
         lower_term = clean_term.lower()
+
+        for expr, mapped_q in cls.COMMON_EXPRESSION_MAP.items():
+            if expr in lower_term or lower_term in expr:
+                return mapped_q
 
         # Verifica se search_query contém termos metafóricos irrelevantes (troféu, estátua, oratório)
         has_metaphor = bool(search_query and any(tok in search_query.lower() for tok in cls.METAPHORICAL_TOKENS))
@@ -141,7 +167,8 @@ class ImageResolverService:
             extra_keywords = exp_tokens[:2]
 
         parts = []
-        if topic and not any(w in topic.lower() for w in ["general", "all", "deck", "vocabulary"]):
+        abstract_topics = ["general", "all", "deck", "vocabulary", "preferences", "likes", "information", "routine", "verbs", "actions"]
+        if topic and not any(w in topic.lower() for w in abstract_topics):
             parts.append(topic.strip())
         parts.append(term_keywords)
         if extra_keywords:
@@ -239,12 +266,14 @@ class ImageResolverService:
 
             if best_sim >= threshold:
                 return best_url
+            if candidates:
+                return candidates[0]["url"]
         except Exception as e:
             logger.warning(f"[ImageResolver] Erro no cálculo de embeddings: {e}")
             if candidates:
                 return candidates[0]["url"]
 
-        return None
+        return candidates[0]["url"] if candidates else None
 
     @classmethod
     def generate_flux_image(
@@ -361,9 +390,9 @@ class ImageResolverService:
             return CURATED_THEME_FALLBACKS["trend"]
 
         for key, url in CURATED_THEME_FALLBACKS.items():
-            if key != "default" and key in search_str:
+            if key in search_str:
                 return url
-        return CURATED_THEME_FALLBACKS["default"]
+        return ""
 
     @classmethod
     def resolve_image(

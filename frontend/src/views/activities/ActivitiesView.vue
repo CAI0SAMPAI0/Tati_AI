@@ -238,7 +238,7 @@ async function fetchCurrentTabContent() {
       musicsRaw.value = await loadMusicsCatalog();
     } else if (activeTab.value === 'flashcards') {
       if (flashcardsRaw.value.length === 0) isLoading.value = true;
-      const res = await apiGet<any[]>(ENDPOINTS.ACTIVITIES_MODULES);
+      const res = await apiGet<any[]>(`${ENDPOINTS.ACTIVITIES_MODULES}?level=all`);
       flashcardsRaw.value = Array.isArray(res) ? res : [];
     } else if (activeTab.value === 'simulations') {
       if (simulationsRaw.value.length === 0) isLoading.value = true;

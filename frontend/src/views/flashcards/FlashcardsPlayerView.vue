@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   ArrowLeft,
@@ -13,6 +13,9 @@ import {
   ImageOff,
   ChevronDown,
   Check,
+  X,
+  HelpCircle,
+  AlertTriangle,
 } from 'lucide-vue-next';
 import { apiGet, apiPost } from '@/api/client';
 import { ACCENTS, getStoredAccent } from '@/constants/accents';
@@ -23,7 +26,10 @@ import Button from '@/components/ui/Button.vue';
 interface Flashcard {
   id?: string;
   front: string;
+  back?: string;
+  options?: string[];
   image_url?: string;
+  explanation?: string;
 }
 
 interface Deck {
@@ -34,6 +40,10 @@ interface Deck {
   flashcards: any[];
 }
 
+type CardStatus = 'correct' | 'wrong' | 'unknown' | null;
+
+const OPTION_LETTERS = ['A', 'B', 'C', 'D'];
+
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
@@ -43,12 +53,19 @@ const deckId = computed(() => route.params.id as string);
 
 const deck = ref<Deck | null>(null);
 const isLoading = ref(true);
-const cards = ref<Flashcard[]>([]);
+const queue = ref<Flashcard[]>([]);
+const initialCards = ref<Flashcard[]>([]);
 const currentIndex = ref(0);
-const isFlipped = ref(false);
-const skipFlipTransition = ref(false);
-const imageError = ref(false);
+const selectedOption = ref<string | null>(null);
+const revealed = ref(false);
+const cardStatus = ref<CardStatus>(null);
+const shuffledOptions = ref<string[]>([]);
 const finished = ref(false);
+const imageError = ref(false);
+
+const firstTryCorrect = ref<Set<string>>(new Set());
+const retriedCards = ref<Set<string>>(new Set());
+const retrySessionCount = ref(0);
 
 const isCompleted = ref(false);
 const isReverting = ref(false);
@@ -86,16 +103,66 @@ function capitalize(str: string): string {
   return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
 }
 
-// Normaliza apenas a palavra/frase da frente e a URL real da imagem do verso
-function normalizeCard(raw: any): Flashcard {
-  const frontRaw = String(raw?.front ?? raw?.word ?? raw?.term ?? '').trim();
+function normalizeCard(raw: any, allRawCards: any[] = []): Flashcard {
+  const frontRaw = String(raw?.front ?? raw?.word ?? raw?.term ?? raw?.question ?? '').trim();
+  const front = capitalize(frontRaw);
+  let back = String(raw?.back ?? raw?.definition ?? raw?.meaning ?? raw?.answer ?? '').trim();
+
+  // If back is identical to front or contains the target word, NEVER use it as a clue (prevents spoiling the answer!)
+  if (
+    !back ||
+    back.toLowerCase() === front.toLowerCase() ||
+    (front.length >= 3 && back.toLowerCase().includes(front.toLowerCase()))
+  ) {
+    back = '';
+  }
+
+  let options: string[] = [];
+  if (Array.isArray(raw?.options) && raw.options.length > 0) {
+    options = raw.options.map((o: any) => capitalize(String(o).trim())).filter(Boolean);
+  }
+
+  if (front && !options.some((o) => o.toLowerCase() === front.toLowerCase())) {
+    options.unshift(front);
+  }
+
+  if (options.length < 4 && allRawCards.length > 0) {
+    for (const other of allRawCards) {
+      const otherFrontRaw = String(other?.front ?? other?.word ?? other?.term ?? '').trim();
+      const otherFront = capitalize(otherFrontRaw);
+      if (
+        otherFront &&
+        otherFront.toLowerCase() !== front.toLowerCase() &&
+        !options.some((o) => o.toLowerCase() === otherFront.toLowerCase())
+      ) {
+        options.push(otherFront);
+      }
+      if (options.length >= 4) break;
+    }
+  }
+
+  const fallbackWords = ['Vocabulary', 'Expression', 'Grammar', 'Meaning', 'Concept', 'Practice'];
+  for (const w of fallbackWords) {
+    if (options.length >= 4) break;
+    if (
+      !options.some((o) => o.toLowerCase() === w.toLowerCase()) &&
+      w.toLowerCase() !== front.toLowerCase()
+    ) {
+      options.push(w);
+    }
+  }
+
+  const finalOptions = Array.from(new Set(options.map((o) => capitalize(o)))).slice(0, 4);
   const rawImage = raw?.image_url ?? raw?.imageUrl ?? raw?.image;
   const imageUrl = typeof rawImage === 'string' && rawImage.trim() ? rawImage.trim() : undefined;
 
   return {
     id: raw?.id ? String(raw.id) : undefined,
-    front: capitalize(frontRaw),
+    front,
+    back: back || undefined,
+    options: finalOptions,
     image_url: imageUrl,
+    explanation: raw?.explanation ?? raw?.description ?? undefined,
   };
 }
 
@@ -119,18 +186,24 @@ async function loadDeck() {
   if (!deckId.value) return;
   isLoading.value = true;
   try {
-    const [data, subs] = await Promise.all([
+    const [deckData, subs] = await Promise.all([
       apiGet<Deck>(`/activities/modules/${deckId.value}`),
-      apiGet<any[]>('/activities/submissions/my').catch(() => []),
+      apiGet<any[]>('/activities/submissions').catch(() => []),
     ]);
-    deck.value = data;
-    const raw = Array.isArray(data?.flashcards) ? data.flashcards : [];
-    cards.value = raw.map((c) => normalizeCard(c)).filter((c) => c.front);
+
+    deck.value = deckData;
+    const raw = Array.isArray(deckData?.flashcards) ? deckData.flashcards : [];
+    const normalized = raw.map((c, _, arr) => normalizeCard(c, arr)).filter((c) => c.front);
+
+    initialCards.value = normalized;
+    queue.value = [...normalized];
     currentIndex.value = 0;
-    isFlipped.value = false;
-    imageError.value = false;
-    finished.value = false;
-    checkCompletionFromSubmissions(Array.isArray(subs) ? subs : []);
+
+    if (Array.isArray(subs)) {
+      checkCompletionFromSubmissions(subs);
+    }
+
+    setupCurrentCard();
   } catch (err) {
     console.error('Error loading deck:', err);
     toast.error('Deck not found or failed to load.');
@@ -139,49 +212,122 @@ async function loadDeck() {
   }
 }
 
-const currentCard = computed(() => cards.value[currentIndex.value]);
-const totalCards = computed(() => cards.value.length);
-const progressPct = computed(() =>
-  totalCards.value > 0 ? ((currentIndex.value + 1) / totalCards.value) * 100 : 0
-);
-
-function toggleFlip() {
-  skipFlipTransition.value = false;
-  isFlipped.value = !isFlipped.value;
-}
-
-// Alterna o índice sem exibir a imagem do próximo card durante o retorno da rotação 3D
-function goToCardIndex(nextIdx: number) {
-  skipFlipTransition.value = true;
-  isFlipped.value = false;
+function setupCurrentCard() {
+  if (!currentCard.value) return;
   imageError.value = false;
-  currentIndex.value = nextIdx;
-  if (typeof window !== 'undefined') {
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        skipFlipTransition.value = false;
-      });
-    });
+  const opts = [...(currentCard.value.options || [currentCard.value.front])].map((o) => capitalize(o));
+  for (let i = opts.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [opts[i], opts[j]] = [opts[j], opts[i]];
+  }
+  shuffledOptions.value = opts;
+  selectedOption.value = null;
+  revealed.value = false;
+  cardStatus.value = null;
+}
+
+const currentCard = computed(() => queue.value[currentIndex.value]);
+const isReviewCard = computed(() => currentIndex.value >= initialCards.value.length);
+const totalInQueue = computed(() => queue.value.length);
+const remainingInQueue = computed(() => Math.max(0, queue.value.length - currentIndex.value - 1));
+const progressPct = computed(() => {
+  if (totalInQueue.value === 0) return 0;
+  return Math.min(100, Math.round(((currentIndex.value + 1) / totalInQueue.value) * 100));
+});
+
+const correctPercentage = computed(() => {
+  if (!initialCards.value.length) return 0;
+  return Math.round((firstTryCorrect.value.size / initialCards.value.length) * 100);
+});
+
+function playFeedbackSound(isCorrect: boolean) {
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    if (isCorrect) {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(523.25, ctx.currentTime);
+      osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.12, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.3);
+    } else {
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(220, ctx.currentTime);
+      osc.frequency.setValueAtTime(196, ctx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.35);
+    }
+  } catch {
+    // Ignore audio context autoplay restrictions
   }
 }
 
-function handlePrev() {
-  if (currentIndex.value > 0) {
-    goToCardIndex(currentIndex.value - 1);
-  }
-}
+function handleSelectOption(chosen: string) {
+  if (revealed.value || !currentCard.value) return;
 
-function handleNext() {
-  if (currentCard.value) {
+  selectedOption.value = chosen;
+  revealed.value = true;
+
+  const isMatch = chosen.trim().toLowerCase() === currentCard.value.front.trim().toLowerCase();
+
+  if (isMatch) {
+    cardStatus.value = 'correct';
+    playFeedbackSound(true);
+    if (!retriedCards.value.has(currentCard.value.front)) {
+      firstTryCorrect.value.add(currentCard.value.front);
+    }
     apiPost('/activities/flashcards/progress', {
       deck_id: deckId.value,
       card_front: currentCard.value.front,
       status: 'correct',
     }).catch(() => {});
+  } else {
+    cardStatus.value = 'wrong';
+    playFeedbackSound(false);
+    retriedCards.value.add(currentCard.value.front);
+    retrySessionCount.value++;
+    queue.value.push(currentCard.value);
+    apiPost('/activities/flashcards/progress', {
+      deck_id: deckId.value,
+      card_front: currentCard.value.front,
+      status: 'wrong',
+    }).catch(() => {});
   }
+}
 
-  if (currentIndex.value + 1 < totalCards.value) {
-    goToCardIndex(currentIndex.value + 1);
+function handleSkip() {
+  if (revealed.value || !currentCard.value) return;
+
+  selectedOption.value = null;
+  cardStatus.value = 'unknown';
+  revealed.value = true;
+  playFeedbackSound(false);
+
+  retriedCards.value.add(currentCard.value.front);
+  retrySessionCount.value++;
+  queue.value.push(currentCard.value);
+
+  apiPost('/activities/flashcards/progress', {
+    deck_id: deckId.value,
+    card_front: currentCard.value.front,
+    status: 'skipped',
+  }).catch(() => {});
+}
+
+function handleNext() {
+  if (currentIndex.value + 1 < queue.value.length) {
+    currentIndex.value++;
+    setupCurrentCard();
   } else {
     finishDeck();
   }
@@ -189,8 +335,9 @@ function handleNext() {
 
 async function finishDeck() {
   finished.value = true;
-  const total = totalCards.value;
+  const total = initialCards.value.length;
   const wasAlreadyCompleted = isCompleted.value;
+  const finalScore = total > 0 ? Math.round((firstTryCorrect.value.size / total) * 100) : 100;
 
   try {
     const res = await apiPost<{
@@ -200,13 +347,14 @@ async function finishDeck() {
     }>('/activities/submissions', {
       activity_id: deckId.value,
       activity_type: 'flashcards',
-      score: 100,
+      score: finalScore > 0 ? finalScore : 100,
       status: 'completed',
       metadata: {
         id: deckId.value,
         title: deck.value?.title || 'Flashcards Deck',
         deck_id: deckId.value,
         total_cards: total,
+        score: finalScore,
         status: 'done',
         category: 'flashcards',
         url: `/flashcards/${deckId.value}`,
@@ -265,13 +413,23 @@ async function handleRevertToPending() {
       });
     }
 
-    toast.success('Activity reverted to pending and score removed.');
+    toast.info('Activity reverted to pending. Score reset.');
   } catch (err) {
-    console.error('Error reverting deck to pending:', err);
-    toast.error('Error reverting activity.');
+    console.error('Error reverting flashcard deck to pending:', err);
+    toast.error('Failed to revert status.');
   } finally {
     isReverting.value = false;
   }
+}
+
+function handleRestart() {
+  queue.value = [...initialCards.value];
+  firstTryCorrect.value.clear();
+  retriedCards.value.clear();
+  retrySessionCount.value = 0;
+  currentIndex.value = 0;
+  finished.value = false;
+  setupCurrentCard();
 }
 
 async function handlePlayAudio(text: string) {
@@ -321,27 +479,45 @@ async function handlePlayAudio(text: string) {
   isPlayingAudio.value = false;
 }
 
-function handleRestart() {
-  skipFlipTransition.value = true;
-  currentIndex.value = 0;
-  isFlipped.value = false;
-  imageError.value = false;
-  finished.value = false;
-  lastXpEarned.value = 0;
-  if (typeof window !== 'undefined') {
-    window.requestAnimationFrame(() => {
-      skipFlipTransition.value = false;
-    });
+function handleKeydown(e: KeyboardEvent) {
+  if (finished.value || isLoading.value) return;
+
+  const activeTag = (document.activeElement?.tagName || '').toLowerCase();
+  if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') return;
+
+  // Options 1, 2, 3, 4
+  if (!revealed.value) {
+    if (['1', '2', '3', '4'].includes(e.key)) {
+      const idx = parseInt(e.key, 10) - 1;
+      if (shuffledOptions.value[idx]) {
+        e.preventDefault();
+        handleSelectOption(shuffledOptions.value[idx]);
+      }
+    } else if (e.key.toLowerCase() === 's') {
+      e.preventDefault();
+      handleSkip();
+    }
+  } else {
+    // Proceed on Enter or Space
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleNext();
+    } else if (e.key.toLowerCase() === 'l' && currentCard.value) {
+      e.preventDefault();
+      handlePlayAudio(currentCard.value.front);
+    }
   }
 }
 
 onMounted(() => {
-  document.addEventListener('click', handleDocumentClick);
   loadDeck();
+  document.addEventListener('click', handleDocumentClick);
+  window.addEventListener('keydown', handleKeydown);
 });
 
 onUnmounted(() => {
   document.removeEventListener('click', handleDocumentClick);
+  window.removeEventListener('keydown', handleKeydown);
   if (activeAudio.value) {
     activeAudio.value.pause();
     activeAudio.value = null;
@@ -353,20 +529,23 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-bg text-text flex flex-col">
+  <div class="min-h-screen bg-bg flex flex-col">
     <!-- Loading State -->
-    <div v-if="isLoading" class="min-h-screen flex items-center justify-center">
-      <div class="w-10 h-10 rounded-full border-4 border-primary/20 border-t-primary animate-spin"></div>
+    <div v-if="isLoading" class="flex-1 flex flex-col items-center justify-center p-6 gap-3">
+      <div class="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+      <p class="text-sm font-semibold text-text-muted">Loading deck...</p>
     </div>
 
-    <!-- Empty / Not Found -->
+    <!-- Empty Deck State -->
     <div
-      v-else-if="!deck || cards.length === 0"
-      class="min-h-screen flex flex-col items-center justify-center space-y-4 p-8 text-center"
+      v-else-if="!deck || initialCards.length === 0"
+      class="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-4"
     >
-      <Sparkles class="w-12 h-12 text-primary/40 animate-pulse" />
-      <h2 class="text-xl font-bold">Deck not found or empty</h2>
-      <p class="text-xs text-text-muted max-w-sm">
+      <div class="w-16 h-16 rounded-2xl bg-surface border border-border flex items-center justify-center text-text-muted">
+        <Sparkles class="w-8 h-8 opacity-40" />
+      </div>
+      <h2 class="text-xl font-bold text-text">No Flashcards Available</h2>
+      <p class="text-sm text-text-muted max-w-sm">
         This deck does not have any active cards configured yet.
       </p>
       <Button @click="router.push('/activities')">Back to Activities</Button>
@@ -388,14 +567,23 @@ onUnmounted(() => {
 
         <div>
           <h2 class="text-2xl font-bold text-text mb-1">All Flashcards Mastered!</h2>
-          <p class="text-text-muted text-sm">{{ deck.title }} · {{ totalCards }} cards completed</p>
-          <p v-if="lastXpEarned > 0" class="text-xs font-semibold text-emerald-500 mt-1">
+          <p class="text-text-muted text-sm">{{ deck.title }} · {{ initialCards.length }} cards completed</p>
+          <div class="flex items-center justify-center gap-4 mt-3">
+            <span class="px-3 py-1 rounded-xl bg-primary/10 text-primary font-bold text-xs">
+              Score: {{ correctPercentage }}% First Try
+            </span>
+            <span v-if="retrySessionCount > 0" class="px-3 py-1 rounded-xl bg-amber-500/10 text-amber-500 font-bold text-xs">
+              {{ retrySessionCount }} Review Attempts
+            </span>
+          </div>
+
+          <p v-if="lastXpEarned > 0" class="text-xs font-semibold text-emerald-500 mt-3">
             Activity completed! +{{ lastXpEarned }} XP earned 🎉
           </p>
-          <p v-else-if="isCompleted" class="text-xs font-semibold text-emerald-500 mt-1">
-            You reviewed all cards in this deck! 🎉
+          <p v-else-if="isCompleted" class="text-xs font-semibold text-emerald-500 mt-3">
+            You completed all cards in this deck! 🎉
           </p>
-          <p v-else class="text-xs font-semibold text-warning mt-1">
+          <p v-else class="text-xs font-semibold text-warning mt-3">
             Status: Pending (score removed — complete the deck again to earn XP)
           </p>
         </div>
@@ -464,13 +652,16 @@ onUnmounted(() => {
               :style="{ width: `${progressPct}%` }"
             ></div>
           </div>
-          <span class="text-xs text-text-muted font-bold shrink-0">
-            {{ currentIndex + 1 }} / {{ totalCards }}
+          <span class="text-xs text-text-muted font-bold shrink-0 flex items-center gap-1.5">
+            <span v-if="isReviewCard" class="text-amber-500 font-extrabold flex items-center gap-0.5">
+              🔁 Review
+            </span>
+            <span>Card {{ currentIndex + 1 }} of {{ totalInQueue }}</span>
           </span>
         </div>
       </div>
 
-      <!-- Flashcard Surface & Controls -->
+      <!-- Flashcard Surface & 4 Options -->
       <div class="w-full max-w-2xl space-y-5">
         <div class="text-center">
           <span
@@ -478,138 +669,219 @@ onUnmounted(() => {
           >
             Level {{ deck.level || 'All' }}
           </span>
-          <h1 class="text-2xl font-bold text-text mt-2">{{ deck.title }}</h1>
+          <h1 class="text-xl md:text-2xl font-black text-text mt-2">{{ deck.title }}</h1>
         </div>
 
-        <!-- 3D Flip Card (Bottom-to-Top on Click) -->
-        <div class="flashcard-perspective w-full">
-          <button
-            type="button"
-            @click="toggleFlip"
-            :aria-label="isFlipped ? 'Flip card back to word' : 'Flip card to image'"
-            class="flashcard-inner w-full min-h-[340px] md:min-h-[380px] relative cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-3xl block text-left"
-            :class="{
-              'is-flipped': isFlipped,
-              'no-flip-transition': skipFlipTransition,
-            }"
-          >
-            <!-- FRONT: Word or Phrase Only -->
-            <div
-              class="flashcard-face bg-surface border-2 border-border hover:border-primary/40 rounded-3xl shadow-xl p-8 md:p-12 flex items-center justify-center text-center transition-colors"
-            >
-              <h2
-                class="text-2xl md:text-4xl font-extrabold text-text leading-tight max-w-xl mx-auto select-none"
-              >
-                {{ currentCard?.front }}
+        <!-- Question Prompt / Context Container -->
+        <div class="bg-surface border-2 border-border rounded-3xl shadow-xl overflow-hidden">
+          <!-- Illustration / Question Header (Never spoils the answer) -->
+          <div class="p-6 md:p-8 text-center space-y-4 bg-gradient-to-b from-primary/5 to-transparent border-b border-border/50">
+            <!-- If card has an image, the image is the visual clue -->
+            <div v-if="currentCard?.image_url && !imageError" class="space-y-3">
+              <span class="text-xs uppercase font-black text-primary tracking-widest block">
+                Look at the image
+              </span>
+              <p class="text-xs text-text-muted font-medium">
+                Choose the word or phrase that matches this image:
+              </p>
+              <div class="flex justify-center pt-1">
+                <img
+                  :src="currentCard.image_url"
+                  alt="Context illustration"
+                  @error="imageError = true"
+                  class="max-h-56 md:max-h-64 max-w-full rounded-2xl object-contain border border-border/80 shadow-md bg-bg/50 select-none"
+                />
+              </div>
+            </div>
+
+            <!-- If card has NO image, but has a definition/translation (that does not reveal the answer) -->
+            <div v-else-if="currentCard?.back" class="space-y-2 py-4">
+              <span class="text-xs uppercase font-black text-primary tracking-widest block">
+                Definition / Meaning
+              </span>
+              <h2 class="text-xl md:text-2xl font-bold text-text leading-tight max-w-xl mx-auto">
+                {{ currentCard.back }}
               </h2>
+              <p class="text-xs text-text-muted font-medium">
+                Choose the correct English term:
+              </p>
             </div>
 
-            <!-- BACK: Corresponding Image Only -->
-            <div
-              class="flashcard-face flashcard-face-back bg-surface border-2 border-border hover:border-primary/40 rounded-3xl shadow-xl p-6 md:p-8 flex items-center justify-center transition-colors overflow-hidden"
-            >
-              <img
-                v-if="currentCard?.image_url && !imageError"
-                :src="currentCard.image_url"
-                alt=""
-                @error="imageError = true"
-                class="w-full h-full max-h-72 md:max-h-80 rounded-2xl object-contain mx-auto select-none pointer-events-none"
-              />
-              <div
-                v-else
-                class="flex flex-col items-center justify-center py-12 text-text-muted gap-2"
-              >
-                <ImageOff class="w-10 h-10 opacity-40" />
-                <span class="text-xs font-semibold">Image unavailable</span>
-              </div>
-            </div>
-          </button>
-        </div>
-
-        <!-- Audio Controls Bar: 10 Accents Dropdown + Listen Button -->
-        <div
-          class="bg-surface border border-border rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-sm"
-        >
-          <div class="relative" ref="accentMenuRef">
-            <button
-              type="button"
-              @click.stop="isAccentMenuOpen = !isAccentMenuOpen"
-              class="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-bg hover:bg-surface-hover border border-border hover:border-primary/50 text-xs font-bold text-text transition-all cursor-pointer shadow-xs"
-            >
-              <span class="text-base leading-none">{{ currentAccentObj.flag }}</span>
-              <span>{{ currentAccentObj.label.replace(/^.*?\s/, '') }}</span>
-              <ChevronDown
-                class="w-3.5 h-3.5 text-text-muted transition-transform duration-200"
-                :class="{ 'rotate-180': isAccentMenuOpen }"
-              />
-            </button>
-
-            <div
-              v-if="isAccentMenuOpen"
-              class="absolute left-0 bottom-full mb-2 w-60 bg-surface border border-border rounded-2xl shadow-2xl p-1.5 z-50 animate-fade-in"
-            >
-              <div
-                class="px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-text-muted border-b border-border mb-1"
-              >
-                Pronunciation Accent ({{ ACCENTS.length }})
-              </div>
-              <div class="max-h-60 overflow-y-auto space-y-0.5 custom-scrollbar">
-                <button
-                  v-for="acc in ACCENTS"
-                  :key="acc.id"
-                  type="button"
-                  @click.stop="selectAccentOption(acc.id)"
-                  class="w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-medium transition-all text-left cursor-pointer"
-                  :class="
-                    acc.id === selectedAccent
-                      ? 'bg-primary/15 text-primary font-bold'
-                      : 'hover:bg-bg text-text'
-                  "
-                >
-                  <div class="flex items-center gap-2 truncate">
-                    <span class="text-sm">{{ acc.flag }}</span>
-                    <div class="min-w-0">
-                      <span class="block truncate">{{ acc.label.replace(/^.*?\s/, '') }}</span>
-                      <span class="block text-[10px] text-text-muted truncate">{{ acc.desc }}</span>
-                    </div>
-                  </div>
-                  <Check v-if="acc.id === selectedAccent" class="w-3.5 h-3.5 text-primary shrink-0" />
-                </button>
-              </div>
+            <!-- Fallback if no image and no distinct definition -->
+            <div v-else class="flex flex-col items-center justify-center py-6 text-text-muted gap-2">
+              <span class="text-xs uppercase font-black text-primary tracking-widest block">
+                Challenge
+              </span>
+              <p class="text-sm font-semibold text-text">Choose the correct English term</p>
             </div>
           </div>
 
-          <button
-            type="button"
-            @click="currentCard && handlePlayAudio(currentCard.front)"
-            :disabled="isPlayingAudio || !currentCard"
-            class="px-5 py-2.5 rounded-xl bg-primary text-white hover:bg-primary-hover active:scale-95 transition-all shadow-glow flex items-center justify-center gap-2 text-xs font-bold shrink-0 cursor-pointer disabled:opacity-50"
-          >
-            <Volume2 class="w-4 h-4" :class="{ 'animate-pulse': isPlayingAudio }" />
-            <span>{{ isPlayingAudio ? 'Playing...' : 'Listen' }}</span>
-          </button>
-        </div>
+          <!-- 4 Multiple Choice Options (A, B, C, D) -->
+          <div class="p-5 md:p-6 space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                v-for="(opt, idx) in shuffledOptions"
+                :key="`${opt}-${idx}`"
+                type="button"
+                @click="handleSelectOption(opt)"
+                :disabled="revealed"
+                class="p-4 rounded-2xl font-bold text-sm md:text-base border-2 text-left transition-all flex items-center justify-between gap-3 cursor-pointer disabled:cursor-default"
+                :class="
+                  revealed
+                    ? opt.trim().toLowerCase() === currentCard?.front.trim().toLowerCase()
+                      ? 'bg-emerald-500/15 border-emerald-500 text-emerald-400 shadow-sm'
+                      : selectedOption === opt
+                      ? 'bg-rose-500/15 border-rose-500 text-rose-400'
+                      : 'bg-bg/40 border-border/40 text-text-muted opacity-40'
+                    : 'bg-bg hover:bg-surface-hover border-border text-text hover:border-primary/50'
+                "
+              >
+                <div class="flex items-center gap-3 min-w-0">
+                  <span
+                    class="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black shrink-0 border transition-colors"
+                    :class="
+                      revealed && opt.trim().toLowerCase() === currentCard?.front.trim().toLowerCase()
+                        ? 'bg-emerald-500 text-white border-emerald-400'
+                        : revealed && selectedOption === opt
+                        ? 'bg-rose-500 text-white border-rose-400'
+                        : 'bg-surface text-text-muted border-border'
+                    "
+                  >
+                    {{ OPTION_LETTERS[idx] || idx + 1 }}
+                  </span>
+                  <span class="truncate">{{ opt }}</span>
+                </div>
 
-        <!-- Navigation Buttons: Previous & Next / Finish -->
-        <div class="grid grid-cols-2 gap-3">
-          <button
-            type="button"
-            @click="handlePrev"
-            :disabled="currentIndex === 0"
-            class="w-full py-4 rounded-2xl font-bold text-sm md:text-base bg-surface hover:bg-surface-hover border border-border text-text transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
-          >
-            <ArrowLeft class="w-4 h-4" />
-            <span>Previous</span>
-          </button>
+                <Check
+                  v-if="revealed && opt.trim().toLowerCase() === currentCard?.front.trim().toLowerCase()"
+                  class="w-4 h-4 text-emerald-400 shrink-0"
+                />
+                <X
+                  v-else-if="revealed && selectedOption === opt"
+                  class="w-4 h-4 text-rose-400 shrink-0"
+                />
+              </button>
+            </div>
 
-          <button
-            type="button"
-            @click="handleNext"
-            class="w-full py-4 rounded-2xl font-bold text-sm md:text-base bg-primary text-white hover:bg-primary-hover transition-all shadow-glow flex items-center justify-center gap-2 cursor-pointer"
-          >
-            <span>{{ currentIndex === totalCards - 1 ? 'Finish Deck' : 'Next Card' }}</span>
-            <ArrowRight class="w-4 h-4" />
-          </button>
+            <!-- Bottom Actions: Skip (Before Reveal) -->
+            <div v-if="!revealed" class="flex items-center justify-between pt-2">
+              <button
+                type="button"
+                @click="handleSkip"
+                class="px-4 py-2.5 rounded-xl text-xs font-bold bg-surface hover:bg-surface-hover border border-border text-text-muted transition-all flex items-center gap-2 cursor-pointer"
+              >
+                <HelpCircle class="w-3.5 h-3.5" /> Skip this card
+              </button>
+              <span class="text-xs text-text-muted font-medium">
+                {{ remainingInQueue }} card{{ remainingInQueue === 1 ? '' : 's' }} remaining
+              </span>
+            </div>
+
+            <!-- Revealed Feedback Banner & Proceed Controls -->
+            <div v-else class="space-y-4 pt-2">
+              <!-- Re-queue Alert for Mistakes -->
+              <div
+                v-if="cardStatus !== 'correct'"
+                class="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-3.5 flex items-center gap-3"
+              >
+                <AlertTriangle class="w-4 h-4 text-amber-400 shrink-0" />
+                <p class="text-xs text-amber-300 font-semibold leading-relaxed">
+                  {{
+                    cardStatus === 'wrong'
+                      ? "Incorrect answer! This card will return for you to review before finishing."
+                      : "Card skipped! It will return before the end of the activity for you to try again."
+                  }}
+                </p>
+              </div>
+
+              <!-- Correct English Term Banner with TTS & 10 Accents -->
+              <div
+                class="bg-primary/10 border border-primary/25 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4"
+              >
+                <div class="min-w-0 flex-1">
+                  <span class="text-[0.68rem] text-primary font-black uppercase tracking-wider block">
+                    Correct English Term
+                  </span>
+                  <span class="text-xl md:text-2xl font-extrabold text-text mt-0.5 block truncate">
+                    {{ currentCard?.front }}
+                  </span>
+                  <p v-if="currentCard?.explanation" class="text-xs text-text-muted mt-1.5 italic">
+                    "{{ currentCard.explanation }}"
+                  </p>
+                </div>
+
+                <div class="flex items-center gap-2 shrink-0">
+                  <!-- 10 Accents Dropdown -->
+                  <div class="relative" ref="accentMenuRef">
+                    <button
+                      type="button"
+                      @click.stop="isAccentMenuOpen = !isAccentMenuOpen"
+                      class="flex items-center gap-2 px-3 py-2 rounded-xl bg-surface hover:bg-surface-hover border border-border hover:border-primary/50 text-xs font-bold text-text transition-all cursor-pointer shadow-xs"
+                    >
+                      <span class="text-sm leading-none">{{ currentAccentObj.flag }}</span>
+                      <span class="hidden sm:inline">{{ currentAccentObj.label }}</span>
+                      <span class="sm:hidden">{{ currentAccentObj.shortLabel }}</span>
+                      <ChevronDown
+                        class="w-3.5 h-3.5 text-text-muted transition-transform duration-200"
+                        :class="{ 'rotate-180': isAccentMenuOpen }"
+                      />
+                    </button>
+
+                    <!-- Accents Dropdown Popover -->
+                    <div
+                      v-if="isAccentMenuOpen"
+                      class="absolute right-0 bottom-full mb-2 w-64 bg-surface border border-border rounded-2xl shadow-2xl p-2 z-50 animate-in fade-in slide-in-from-bottom-2 duration-150"
+                    >
+                      <div class="px-2.5 py-1.5 text-[0.68rem] font-bold uppercase tracking-wider text-text-muted border-b border-border/50 mb-1">
+                        Pronunciation Accent ({{ ACCENTS.length }})
+                      </div>
+                      <div class="max-h-60 overflow-y-auto space-y-0.5 custom-scrollbar">
+                        <button
+                          v-for="acc in ACCENTS"
+                          :key="acc.id"
+                          type="button"
+                          @click.stop="selectAccentOption(acc.id)"
+                          class="w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-medium transition-all text-left cursor-pointer"
+                          :class="
+                            acc.id === selectedAccent
+                              ? 'bg-primary/15 text-primary font-bold'
+                              : 'hover:bg-bg text-text'
+                          "
+                        >
+                          <span class="flex items-center gap-2.5">
+                            <span class="text-sm leading-none">{{ acc.flag }}</span>
+                            <span>{{ acc.label }}</span>
+                          </span>
+                          <Check v-if="acc.id === selectedAccent" class="w-3.5 h-3.5 text-primary shrink-0" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Listen Button -->
+                  <button
+                    type="button"
+                    @click="currentCard && handlePlayAudio(currentCard.front)"
+                    :disabled="isPlayingAudio || !currentCard"
+                    class="px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary-hover active:scale-95 transition-all shadow-glow flex items-center justify-center gap-1.5 text-xs font-bold shrink-0 cursor-pointer disabled:opacity-50"
+                  >
+                    <Volume2 class="w-3.5 h-3.5" :class="{ 'animate-pulse': isPlayingAudio }" />
+                    <span>{{ isPlayingAudio ? 'Playing...' : 'Listen' }}</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Proceed Next Button -->
+              <button
+                type="button"
+                @click="handleNext"
+                class="w-full py-4 rounded-2xl font-bold text-base bg-primary text-white hover:bg-primary-hover transition-all shadow-glow flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>{{ currentIndex === queue.length - 1 ? 'Finish Deck' : 'Next Card' }}</span>
+                <ArrowRight class="w-4 h-4" />
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </main>
@@ -617,68 +889,14 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.flashcard-perspective {
-  perspective: 1200px;
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
 }
-
-.flashcard-inner {
-  transform-style: preserve-3d;
-  transition: transform 0.55s cubic-bezier(0.4, 0.2, 0.2, 1);
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
 }
-
-.flashcard-inner.no-flip-transition {
-  transition: none !important;
-}
-
-/* Rotação no eixo X positivo move a borda inferior para cima em direção ao usuário */
-.flashcard-inner.is-flipped {
-  transform: rotateX(180deg);
-}
-
-.flashcard-face {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-}
-
-.flashcard-face-back {
-  transform: rotateX(180deg);
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--color-border);
+  border-radius: 9999px;
 }
 </style>
-
-<style scoped>
-.flashcard-perspective {
-  perspective: 1200px;
-}
-
-.flashcard-inner {
-  transform-style: preserve-3d;
-  transition: transform 0.55s cubic-bezier(0.4, 0.2, 0.2, 1);
-}
-
-.flashcard-inner.no-flip-transition {
-  transition: none !important;
-}
-
-/* Rotação no eixo X positivo move a borda inferior para cima em direção ao usuário */
-.flashcard-inner.is-flipped {
-  transform: rotateX(180deg);
-}
-
-.flashcard-face {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-}
-
-.flashcard-face-back {
-  transform: rotateX(180deg);
-}
-</style>
-
