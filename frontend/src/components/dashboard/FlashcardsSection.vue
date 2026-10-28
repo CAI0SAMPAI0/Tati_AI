@@ -236,14 +236,14 @@ async function handleSaveDeck() {
   }
 
   const validCards = formData.value.flashcards
-    .filter((c) => c.front.trim() && c.image_url?.trim())
+    .filter((c) => c.front.trim())
     .map((c) => ({
       front: c.front.trim(),
-      image_url: c.image_url!.trim(),
+      image_url: c.image_url!.trim() || '',
       ...(c.back ? { back: c.back } : {}),
     }));
   if (validCards.length === 0) {
-    toast.error('Deck must have at least one valid card (front word/phrase & back image).');
+    toast.error('Deck must have at least one valid card (front word/phrase).');
     activeStep.value = 2;
     return;
   }
@@ -771,7 +771,7 @@ onMounted(() => {
 
                   <div>
                     <label class="block text-[0.65rem] font-bold text-text-muted uppercase mb-1">
-                      Back (Image URL or Upload) *
+                      Back (Image URL or Upload) (Optional)
                     </label>
                     <div class="flex items-center gap-3">
                       <ImageIcon class="w-4 h-4 text-text-subtle shrink-0" />
