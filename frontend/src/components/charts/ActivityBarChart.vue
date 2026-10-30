@@ -23,18 +23,18 @@ export interface BarDataPoint extends ModalityItem {
 }
 
 export const MODALITY_CONFIG = [
-  { key: 'grammar', label: 'Grammar', color: '#6366f1' },
-  { key: 'reading', label: 'Reading', color: '#3b82f6' },
-  { key: 'listening', label: 'Listening', color: '#06b6d4' },
-  { key: 'pronunciation', label: 'Pronunciation Practice', color: '#10b981' },
-  { key: 'speaking', label: 'Speaking', color: '#f59e0b' },
-  { key: 'vocabulary', label: 'Vocabulary', color: '#ec4899' },
-  { key: 'flashcards', label: 'Flashcards', color: '#8b5cf6' },
-  { key: 'games', label: 'Games (WordWall)', color: '#f97316' },
-  { key: 'musics', label: 'Musics (LingoClip)', color: '#14b8a6' },
-  { key: 'news', label: 'News / Reels', color: '#84cc16' },
-  { key: 'exam', label: 'Exams', color: '#ef4444' },
-  { key: 'other', label: 'Other', color: '#64748b' },
+  { key: 'grammar', label: 'Grammar', color: '#312e81' }, // Deep Indigo / Dark Navy
+  { key: 'reading', label: 'Reading', color: '#38bdf8' }, // Bright Sky Blue (Claro)
+  { key: 'listening', label: 'Listening', color: '#eab308' }, // Warm Gold / Yellow (Ouvir)
+  { key: 'pronunciation', label: 'Pronunciation Practice', color: '#10b981' }, // Emerald Green
+  { key: 'speaking', label: 'Speaking', color: '#ea580c' }, // Vivid Tangerine Orange
+  { key: 'vocabulary', label: 'Vocabulary', color: '#ec4899' }, // Hot Pink
+  { key: 'flashcards', label: 'Flashcards', color: '#8b5cf6' }, // Violet / Purple
+  { key: 'games', label: 'Games (WordWall)', color: '#06b6d4' }, // Cyan / Teal
+  { key: 'musics', label: 'Musics (LingoClip)', color: '#d946ef' }, // Magenta / Fuchsia
+  { key: 'news', label: 'News / Reels', color: '#65a30d' }, // Olive Lime
+  { key: 'exam', label: 'Exams', color: '#ef4444' }, // Crimson Red
+  { key: 'other', label: 'Other', color: '#64748b' }, // Neutral Slate
 ] as const;
 </script>
 
