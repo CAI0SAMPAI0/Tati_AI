@@ -1,18 +1,55 @@
+<script lang="ts">
+export interface ModalityItem {
+  grammar?: number;
+  reading?: number;
+  listening?: number;
+  pronunciation?: number;
+  speaking?: number;
+  vocabulary?: number;
+  flashcards?: number;
+  games?: number;
+  musics?: number;
+  news?: number;
+  exam?: number;
+  other?: number;
+  [key: string]: any;
+}
+
+export interface BarDataPoint extends ModalityItem {
+  name?: string;
+  day?: string;
+  messages?: number;
+  total?: number;
+}
+
+export const MODALITY_CONFIG = [
+  { key: 'grammar', label: 'Grammar', color: '#6366f1' },
+  { key: 'reading', label: 'Reading', color: '#3b82f6' },
+  { key: 'listening', label: 'Listening', color: '#06b6d4' },
+  { key: 'pronunciation', label: 'Pronunciation Practice', color: '#10b981' },
+  { key: 'speaking', label: 'Speaking', color: '#f59e0b' },
+  { key: 'vocabulary', label: 'Vocabulary', color: '#ec4899' },
+  { key: 'flashcards', label: 'Flashcards', color: '#8b5cf6' },
+  { key: 'games', label: 'Games (WordWall)', color: '#f97316' },
+  { key: 'musics', label: 'Musics (LingoClip)', color: '#14b8a6' },
+  { key: 'news', label: 'News / Reels', color: '#84cc16' },
+  { key: 'exam', label: 'Exams', color: '#ef4444' },
+  { key: 'other', label: 'Other', color: '#64748b' },
+] as const;
+</script>
+
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-
-interface BarDataPoint {
-  name: string;
-  messages: number;
-}
 
 const props = withDefaults(
   defineProps<{
     data: BarDataPoint[];
     barSize?: number;
+    tooltipPosition?: 'top' | 'bottom';
   }>(),
   {
     barSize: 28,
+    tooltipPosition: 'bottom',
   }
 );
 
@@ -26,9 +63,23 @@ const padding = { top: 20, right: 16, bottom: 32, left: 32 };
 const chartWidth = computed(() => width - padding.left - padding.right);
 const chartHeight = computed(() => height - padding.top - padding.bottom);
 
+const isStacked = computed(() => {
+  if (!props.data || props.data.length === 0) return false;
+  return props.data.some((d) =>
+    MODALITY_CONFIG.some((m) => typeof d[m.key] === 'number')
+  );
+});
+
+function calculateTotal(d: BarDataPoint): number {
+  if (isStacked.value) {
+    return MODALITY_CONFIG.reduce((acc, m) => acc + (Number(d[m.key]) || 0), 0);
+  }
+  return Math.max(0, Number(d.messages ?? d.total ?? 0));
+}
+
 const maxVal = computed(() => {
   if (!props.data || props.data.length === 0) return 10;
-  const mx = Math.max(...props.data.map((d) => d.messages || 0));
+  const mx = Math.max(...props.data.map(calculateTotal));
   if (mx <= 5) return 5;
   if (mx <= 10) return 10;
   if (mx <= 20) return 20;
@@ -51,20 +102,68 @@ const barPositions = computed(() => {
   return props.data.map((d, i) => {
     const center = padding.left + i * step + step / 2;
     const x = center - effectiveBarWidth / 2;
-    const val = Math.max(0, d.messages || 0);
-    const barH = (val / maxVal.value) * chartHeight.value;
-    const y = padding.top + chartHeight.value - barH;
+    const total = calculateTotal(d);
+    const totalH = (total / maxVal.value) * chartHeight.value;
+    const barY = padding.top + chartHeight.value - totalH;
+
+    const segments: Array<{
+      key: string;
+      label: string;
+      color: string;
+      count: number;
+      y: number;
+      height: number;
+    }> = [];
+
+    if (isStacked.value) {
+      let currentBottom = padding.top + chartHeight.value;
+      for (const mod of MODALITY_CONFIG) {
+        const val = Math.max(0, Number(d[mod.key]) || 0);
+        if (val > 0) {
+          const segH = (val / maxVal.value) * chartHeight.value;
+          currentBottom -= segH;
+          segments.push({
+            key: mod.key,
+            label: mod.label,
+            color: mod.color,
+            count: val,
+            y: currentBottom,
+            height: segH,
+          });
+        }
+      }
+    } else {
+      if (total > 0) {
+        segments.push({
+          key: 'messages',
+          label: 'Messages',
+          color: 'var(--primary)',
+          count: total,
+          y: barY,
+          height: totalH,
+        });
+      }
+    }
+
+    const breakdown = MODALITY_CONFIG.map((m) => ({
+      key: m.key,
+      label: m.label,
+      color: m.color,
+      count: Math.max(0, Number(d[m.key]) || 0),
+    }));
 
     return {
-      name: d.name,
-      messages: val,
+      name: d.day || d.name || `D${i + 1}`,
+      total,
       x,
-      y,
+      y: barY,
       width: effectiveBarWidth,
-      height: barH,
+      height: totalH,
       columnX: padding.left + i * step,
       columnWidth: step,
       centerX: center,
+      segments,
+      breakdown,
     };
   });
 });
@@ -94,6 +193,23 @@ function handleMouseLeave() {
       preserveAspectRatio="none"
       class="w-full h-full overflow-visible"
     >
+      <defs>
+        <clipPath
+          v-for="(bar, idx) in barPositions"
+          :id="`bar-clip-${idx}`"
+          :key="`clip-${idx}`"
+        >
+          <rect
+            :x="bar.x"
+            :y="bar.y"
+            :width="bar.width"
+            :height="Math.max(bar.height, bar.total > 0 ? 3 : 0)"
+            rx="6"
+            ry="6"
+          />
+        </clipPath>
+      </defs>
+
       <!-- Horizontal Grid Lines -->
       <g class="grid-lines">
         <line
@@ -154,18 +270,35 @@ function handleMouseLeave() {
             fill="transparent"
           />
 
-          <!-- Actual filled bar -->
+          <!-- Base indicator for zero activities -->
           <rect
-            :x="bar.x"
-            :y="bar.y"
-            :width="bar.width"
-            :height="Math.max(bar.height, bar.messages > 0 ? 3 : 0)"
-            fill="var(--primary)"
-            rx="6"
-            ry="6"
-            class="transition-all duration-300"
-            :class="hoveredIndex === idx ? 'brightness-110' : ''"
+            v-if="bar.total === 0"
+            :x="bar.x + bar.width * 0.25"
+            :y="padding.top + chartHeight - 2"
+            :width="bar.width * 0.5"
+            :height="2"
+            fill="var(--border)"
+            opacity="0.6"
+            rx="1"
           />
+
+          <!-- Actual stacked bar segments clipped to rounded column -->
+          <g
+            v-if="bar.total > 0"
+            :clip-path="`url(#bar-clip-${idx})`"
+          >
+            <rect
+              v-for="seg in bar.segments"
+              :key="seg.key"
+              :x="bar.x"
+              :y="seg.y"
+              :width="bar.width"
+              :height="Math.max(seg.height, 1)"
+              :fill="seg.color"
+              class="transition-all duration-300"
+              :class="hoveredIndex === idx ? 'brightness-110' : ''"
+            />
+          </g>
         </g>
       </g>
 
@@ -184,21 +317,69 @@ function handleMouseLeave() {
       </g>
     </svg>
 
-    <!-- Floating Tooltip -->
+    <!-- Floating Tooltip Below / Top -->
     <div
       v-if="hoveredIndex !== null && barPositions[hoveredIndex]"
-      class="absolute pointer-events-none z-20 bg-surface border border-border rounded-xl shadow-md px-3 py-2 text-xs transition-opacity duration-150"
+      class="absolute pointer-events-none z-30 bg-surface/95 backdrop-blur-md border border-border rounded-2xl shadow-xl p-3 text-xs transition-opacity duration-150 min-w-[190px]"
       :style="{
         left: `${(barPositions[hoveredIndex].centerX / width) * 100}%`,
-        top: '15px',
-        transform: 'translateX(-50%)',
+        ...(props.tooltipPosition === 'top'
+          ? { top: '8px' }
+          : { top: 'calc(100% + 10px)' }),
+        transform: hoveredIndex === 0
+          ? 'translateX(-15%)'
+          : hoveredIndex === barPositions.length - 1
+          ? 'translateX(-85%)'
+          : 'translateX(-50%)',
       }"
     >
-      <div class="text-[11px] text-text-muted mb-0.5 font-medium">
-        {{ barPositions[hoveredIndex].name }}
+      <!-- Pointer arrow when positioned at bottom -->
+      <div
+        v-if="props.tooltipPosition === 'bottom'"
+        class="absolute -top-1.5 w-3 h-3 bg-surface border-t border-l border-border rotate-45 pointer-events-none"
+        :style="{
+          left: hoveredIndex === 0 ? '22%' : hoveredIndex === barPositions.length - 1 ? '78%' : '50%',
+          transform: 'translateX(-50%)',
+        }"
+      />
+
+      <!-- Header: Day and Total -->
+      <div class="flex items-center justify-between gap-3 mb-2 pb-1.5 border-b border-border/60">
+        <span class="font-bold text-text text-sm">{{ barPositions[hoveredIndex].name }}</span>
+        <span
+          class="px-2 py-0.5 rounded-full text-[10px] font-extrabold"
+          :class="barPositions[hoveredIndex].total > 0 ? 'bg-primary/10 text-primary' : 'bg-bg-secondary text-text-muted'"
+        >
+          {{ barPositions[hoveredIndex].total }} {{ isStacked ? 'activities' : 'msgs' }}
+        </span>
       </div>
-      <div class="text-text font-bold">
-        <span class="text-primary mr-1">{{ barPositions[hoveredIndex].messages }}</span> Messages
+
+      <!-- Stacked Breakdown by Modality -->
+      <div v-if="isStacked" class="space-y-1.5">
+        <template v-if="barPositions[hoveredIndex].total > 0">
+          <div
+            v-for="item in barPositions[hoveredIndex].breakdown.filter((m) => m.count > 0)"
+            :key="item.key"
+            class="flex items-center justify-between text-[11px]"
+          >
+            <div class="flex items-center gap-1.5">
+              <span
+                class="w-2.5 h-2.5 rounded-full shrink-0"
+                :style="{ backgroundColor: item.color }"
+              />
+              <span class="text-text-muted">{{ item.label }}</span>
+            </div>
+            <span class="font-bold text-text tabular-nums">{{ item.count }}</span>
+          </div>
+        </template>
+        <div v-else class="text-text-subtle text-[11px] italic py-0.5">
+          No activities recorded
+        </div>
+      </div>
+
+      <!-- Legacy Single Metric View -->
+      <div v-else class="text-text font-bold text-xs">
+        <span class="text-primary mr-1">{{ barPositions[hoveredIndex].total }}</span> Messages
       </div>
     </div>
   </div>

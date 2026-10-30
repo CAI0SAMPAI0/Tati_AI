@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from apps.authentication.models import User
 from apps.authentication.security import auth_required
+from .schemas import WeeklyActivityReportOut
 from .services import DashboardService
 
 
@@ -53,6 +54,17 @@ def get_reports_overview(request: HttpRequest):
     """
     require_staff_user(request)
     return DashboardService.get_reports_overview()
+
+
+@dashboard_router.get("/weekly-activity", response=WeeklyActivityReportOut, auth=auth_required)
+def get_weekly_activity(request: HttpRequest, week_offset: int = 0):
+    """
+    Relatório semanal de engajamento agrupado por modalidade detalhada
+    (Grammar, Reading, Listening, Pronunciation, Speaking, Vocabulary, Flashcards, Games, Musics, News, Exams, Other)
+    respeitando o fuso horário de Brasília (America/Sao_Paulo) e incluindo comparativo com a semana anterior.
+    """
+    require_staff_user(request)
+    return DashboardService.get_weekly_activity(week_offset=week_offset)
 
 
 @dashboard_router.get("/difficulties", auth=auth_required)

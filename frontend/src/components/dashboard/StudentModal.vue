@@ -14,7 +14,6 @@ import {
   RefreshCw,
   Sparkles,
   Send,
-  Flame,
 } from 'lucide-vue-next';
 import { apiGet, apiPut, apiPost, apiDelete } from '@/api/client';
 import { CEFR_LEVELS, normalizeLevel } from '@/constants/levels';

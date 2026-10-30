@@ -1506,6 +1506,229 @@ class DashboardService:
             "exercises_completed": ActivitySubmission.objects.filter(username=username).count(),
         }
     
+    @staticmethod
+    def get_weekly_activity(week_offset: int = 0) -> dict:
+        week_offset = max(0, min(52, int(week_offset or 0)))
+        cache_key = f"dashboard_weekly_activity_v2_{week_offset}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        now_sp = datetime.now(SP_TZ)
+
+        # 1. Usuários excluídos (staff e compradores)
+        excluded_staff_and_buyers = set(
+            User.objects.filter(
+                Q(role__iexact="buyer")
+                | Q(role__in=["programador", "professor", "teacher", "admin"])
+                | Q(username__in=["programador", "admin", "professor", "professora", "tatiana", "tati"])
+            ).values_list("username", flat=True)
+        )
+        excluded_set = {u.lower() for u in excluded_staff_and_buyers}
+        excluded_set.update({"programador", "admin", "professor", "professora", "tatiana", "tati"})
+
+        def _calc_week(offset: int):
+            ref_dt = now_sp - timedelta(weeks=offset)
+            start_week = (ref_dt - timedelta(days=ref_dt.weekday())).replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+            end_week = start_week + timedelta(
+                days=6, hours=23, minutes=59, seconds=59, microseconds=999999
+            )
+
+            days_map = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+            categories = [
+                "grammar", "reading", "listening", "pronunciation", "speaking",
+                "vocabulary", "flashcards", "games", "musics", "news", "exam", "other"
+            ]
+            days_data = {
+                (start_week.date() + timedelta(days=i)): {
+                    "day": days_map[i],
+                    **{cat: 0 for cat in categories}
+                }
+                for i in range(7)
+            }
+
+            active_students = set()
+            total_activities = 0
+
+            def resolve_submission_category(sub) -> str:
+                act = (sub.activity_type or "").strip().lower()
+                meta = sub.metadata if isinstance(sub.metadata, dict) else {}
+                cat = (meta.get("category") or "").strip().lower()
+
+                if act == "grammar" or cat == "grammar":
+                    return "grammar"
+                if act == "reading" or cat == "reading":
+                    return "reading"
+                if act in ("listening", "listenings", "podcast") or cat in ("listening", "listenings", "podcast"):
+                    return "listening"
+                if act in ("simulation", "simulations") or cat in ("simulation", "simulations"):
+                    return "speaking"
+                if act == "vocabulary" or cat == "vocabulary":
+                    return "vocabulary"
+                if act in ("flashcard", "flashcards") or cat == "flashcards":
+                    return "flashcards"
+                if act in ("games", "wordwall") or cat == "games":
+                    return "games"
+                if act in ("musics", "lingoclip") or cat == "musics":
+                    return "musics"
+                if act == "news" or cat == "news":
+                    return "news"
+                if act in ("trimestral_exam", "exam") or cat in ("trimestral_exam", "exam"):
+                    return "exam"
+                return "other"
+
+            subs = ActivitySubmission.objects.filter(
+                created_at__range=(start_week, end_week),
+                status="completed",
+            ).order_by("created_at")
+
+            seen_subs = set()
+            for s in subs:
+                uname = (s.username or "").strip().lower()
+                if not uname or uname in excluded_set:
+                    continue
+
+                local_dt = s.created_at.astimezone(SP_TZ)
+                local_date = local_dt.date()
+                if local_date not in days_data:
+                    continue
+
+                meta = s.metadata if isinstance(s.metadata, dict) else {}
+                item_id = (
+                    meta.get("activity_id")
+                    or meta.get("id")
+                    or meta.get("url")
+                    or meta.get("slug")
+                    or s.module_id
+                    or str(s.id)
+                )
+                cat = resolve_submission_category(s)
+
+                dedup_key = (uname, cat, str(item_id).strip().lower(), local_date)
+                if dedup_key in seen_subs:
+                    continue
+                seen_subs.add(dedup_key)
+
+                days_data[local_date][cat] += 1
+                total_activities += 1
+                active_students.add(uname)
+
+            from apps.activities.models import PronunciationHistory
+
+            pronunciations = (
+                PronunciationHistory.objects.filter(
+                    created_at__range=(start_week, end_week),
+                    score__gte=70,
+                )
+                .defer("user_audio_b64")
+                .order_by("created_at")
+            )
+
+            seen_prons = set()
+            for p in pronunciations:
+                uname = (p.username or "").strip().lower()
+                if not uname or uname in excluded_set:
+                    continue
+
+                local_dt = p.created_at.astimezone(SP_TZ)
+                local_date = local_dt.date()
+                if local_date not in days_data:
+                    continue
+
+                phrase_clean = (p.target_phrase or "").strip().lower()
+                dedup_key = (uname, phrase_clean, local_date)
+                if dedup_key in seen_prons:
+                    continue
+                seen_prons.add(dedup_key)
+
+                days_data[local_date]["pronunciation"] += 1
+                total_activities += 1
+                active_students.add(uname)
+
+            voice_msgs = (
+                Message.objects.filter(
+                    created_at__range=(start_week, end_week),
+                    role="user",
+                )
+                .exclude(audio_b64__isnull=True)
+                .exclude(audio_b64="")
+                .only("id", "username", "session_id", "created_at")
+                .order_by("created_at")
+            )
+
+            seen_voice = set()
+            for m in voice_msgs:
+                uname = (m.username or "").strip().lower()
+                if not uname or uname in excluded_set:
+                    continue
+
+                local_dt = m.created_at.astimezone(SP_TZ)
+                local_date = local_dt.date()
+                if local_date not in days_data:
+                    continue
+
+                session_key = m.session_id or str(m.id)
+                dedup_key = (uname, session_key, local_date)
+                if dedup_key in seen_voice:
+                    continue
+                seen_voice.add(dedup_key)
+
+                days_data[local_date]["speaking"] += 1
+                total_activities += 1
+                active_students.add(uname)
+
+            weekly_list = [
+                days_data[start_week.date() + timedelta(days=i)] for i in range(7)
+            ]
+
+            return {
+                "start_date": start_week.strftime("%Y-%m-%d"),
+                "end_date": end_week.strftime("%Y-%m-%d"),
+                "date_label": f"{start_week.strftime('%d %b')} – {end_week.strftime('%d %b %Y')}",
+                "active_students": len(active_students),
+                "total_activities": total_activities,
+                "weekly_activity": weekly_list,
+            }
+
+        current_data = _calc_week(week_offset)
+        prev_data = _calc_week(week_offset + 1)
+
+        diff_students = current_data["active_students"] - prev_data["active_students"]
+        diff_activities = current_data["total_activities"] - prev_data["total_activities"]
+
+        diff_students_pct = None
+        if prev_data["active_students"] > 0:
+            diff_students_pct = round((diff_students / prev_data["active_students"]) * 100, 1)
+
+        diff_activities_pct = None
+        if prev_data["total_activities"] > 0:
+            diff_activities_pct = round((diff_activities / prev_data["total_activities"]) * 100, 1)
+
+        comparison = {
+            "active_students_prev": prev_data["active_students"],
+            "total_activities_prev": prev_data["total_activities"],
+            "diff_students": diff_students,
+            "diff_activities": diff_activities,
+            "diff_students_pct": diff_students_pct,
+            "diff_activities_pct": diff_activities_pct,
+        }
+
+        result = {
+            "week_offset": week_offset,
+            "start_date": current_data["start_date"],
+            "end_date": current_data["end_date"],
+            "date_label": current_data["date_label"],
+            "is_current_week": week_offset == 0,
+            "active_students": current_data["active_students"],
+            "total_activities": current_data["total_activities"],
+            "comparison": comparison,
+            "weekly_activity": current_data["weekly_activity"],
+        }
+        cache.set(cache_key, result, 60)
+        return result
+        
     
     @staticmethod
     def update_student(username: str, data: dict) -> dict:

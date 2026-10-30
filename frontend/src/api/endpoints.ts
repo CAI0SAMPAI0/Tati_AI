@@ -89,6 +89,7 @@ export const ENDPOINTS = {
 
   // Admin & Dashboard
   DASHBOARD_STATS: '/dashboard/stats',
+  DASHBOARD_WEEKLY_ACTIVITY: '/dashboard/weekly-activity',
   DASHBOARD_STUDENTS: '/dashboard/students',
   DASHBOARD_DIFFICULTIES: '/dashboard/difficulties',
   DASHBOARD_BUYERS: '/dashboard/buyers',
