@@ -9,18 +9,17 @@ import {
   Loader2,
   RotateCw,
   Search,
-  Phone,
   Check,
   X,
   Edit2,
   Send,
   Bell,
   BellOff,
-  UserCheck,
   Users,
 } from 'lucide-vue-next';
 import { apiGet, apiPost, apiPut, apiFetch } from '@/api/client';
 import { useToast } from '@/composables/useToast';
+import WhatsAppIcon from '../icons/WhatsAppIcon.vue';
 
 interface SessionData {
   name: string;
@@ -280,7 +279,7 @@ onUnmounted(() => {
       <div class="p-6 border-b border-border bg-bg-secondary/30 flex items-center justify-between">
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold">
-            <span class="text-xl">💬</span>
+            <WhatsAppIcon class="h-5 w-5" />
           </div>
           <div>
             <h2 class="font-bold text-sm uppercase tracking-wider text-text">WhatsApp Connection (WAHA)</h2>
