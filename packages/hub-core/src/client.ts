@@ -24,8 +24,18 @@ export class ApiClientError<T = unknown> extends Error {
 }
 
 const DEFAULT_LOCAL_API_BASE = 'http://localhost:8000';
+let configuredApiUrl: string | null = null;
+
+export function configureApiClient(options: { apiUrl?: string }): void {
+  if (options?.apiUrl) {
+    configuredApiUrl = options.apiUrl.replace(/\/$/, '');
+  }
+}
 
 export function resolveApiBase(): string {
+  if (configuredApiUrl) {
+    return configuredApiUrl;
+  }
   if (typeof process !== 'undefined' && process.env) {
     if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
     if (process.env.NEXT_PUBLIC_API_BASE_URL) return process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -35,7 +45,7 @@ export function resolveApiBase(): string {
     if (metaEnv?.VITE_API_URL) return metaEnv.VITE_API_URL;
     if (metaEnv?.VITE_API_BASE_URL) return metaEnv.VITE_API_BASE_URL;
 
-    // Se estiver rodando em produção (Vercel/domínio público), fallback para backend de produção
+    // Fallback de producao enquanto VITE_API_URL nao apontar para outro backend
     const host = window.location.hostname;
     if (host && host !== 'localhost' && host !== '127.0.0.1' && !host.startsWith('192.168.')) {
       return 'https://caio007-tati-ai-backend.hf.space';
@@ -47,17 +57,7 @@ export function resolveApiBase(): string {
 function resolvePath(path: string): string {
   if (/^https?:\/\//i.test(path)) return path;
 
-  const base = resolveApiBase();
-  const isBypassRedirect = 
-    base.includes('localhost') || 
-    base.includes('127.0.0.1') || 
-    base.includes('hf.space') ||
-    (typeof window !== 'undefined' && 
-      (window.location.hostname === 'localhost' || 
-       window.location.hostname === '127.0.0.1' || 
-       window.location.hostname.includes('hf.space')));
-
-  // Apenas rotas estritas de pagamento/checkout acordam o container da Railway (NEXT_PUBLIC_RAILWAY_API_URL).
+  const base = resolveApiBase().replace(/\/$/, '');
   const isPaymentAction =
     path.includes('/payments/subscribe') ||
     path.includes('/payments/webhook') ||
@@ -69,6 +69,7 @@ function resolvePath(path: string): string {
 
   if (
     isPaymentAction &&
+    base.includes('hf.space') &&
     typeof process !== 'undefined' &&
     process.env?.NEXT_PUBLIC_RAILWAY_API_URL
   ) {

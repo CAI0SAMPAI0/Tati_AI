@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Migra esquema + dados do banco PostgreSQL atual (Supabase / Railway) para o PostgreSQL local da VPS
+# Migra esquema + dados do banco PostgreSQL atual (Supabase / Railway) para o PostgreSQL 18 local da VPS
 # Uso na VPS (dentro de /home/deploy/Tati_AI, apos a stack ja estar rodando):
 #   bash scripts/migrate_db_to_vps.sh
 
@@ -27,10 +27,12 @@ if [ -z "$DB_CONTAINER" ]; then
     exit 1
 fi
 
-echo "Cole a DATABASE_URL de ORIGEM (banco atual Supabase/Railway) e pressione ENTER"
-echo "(o texto nao aparecera na tela por seguranca):"
-read -rsp "SOURCE_DATABASE_URL: " SOURCE_DB_URL
-echo ""
+if [ -z "${SOURCE_DB_URL:-}" ]; then
+    echo "Cole a DATABASE_URL de ORIGEM (banco atual Supabase/Railway) e pressione ENTER"
+    echo "(o texto nao aparecera na tela por seguranca):"
+    read -rsp "SOURCE_DATABASE_URL: " SOURCE_DB_URL
+    echo ""
+fi
 
 if [ -z "$SOURCE_DB_URL" ]; then
     echo "[ERRO] URL de origem vazia."
@@ -41,10 +43,10 @@ echo ">>> 1/4 Gerando dump completo do schema public (esquema + dados) do banco 
 docker run --rm \
     -e SOURCE_DB_URL="$SOURCE_DB_URL" \
     -v /tmp:/tmp \
-    pgvector/pgvector:pg16 \
+    pgvector/pgvector:pg18 \
     sh -c 'pg_dump --format=custom --no-owner --no-acl --schema=public "$SOURCE_DB_URL" -f "'"$BACKUP_FILE"'"'
 
-echo ">>> 2/4 Garantindo extensao pgvector no banco da VPS..."
+echo ">>> 2/4 Garantindo extensao pgvector no banco PostgreSQL 18 da VPS..."
 docker exec -i "$DB_CONTAINER" psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "CREATE EXTENSION IF NOT EXISTS vector;"
 
 echo ">>> 3/4 Restaurando dump no container ${STACK_NAME}_db ($DB_CONTAINER)..."

@@ -4,7 +4,7 @@ services:
   traefik:
     image: traefik:v3.6
     command:
-      # API / Dashboard (desativado externamente por seguranca e para evitar falha HTTP-01 em subdominio inexistente)
+      # API / Dashboard (desativado externamente por seguranca)
       - "--api.dashboard=false"
       - "--api.insecure=false"
 
@@ -20,7 +20,7 @@ services:
       - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
       - "--entrypoints.websecure.address=:443"
 
-      # Let's Encrypt via HTTP-01 (funciona direto no dominio da VPS sem exigir Cloudflare)
+      # Let's Encrypt via HTTP-01 (direto no dominio da VPS sem exigir Cloudflare)
       - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:-admin@tati.ai}"
       - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
       - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
@@ -40,7 +40,7 @@ services:
         protocol: tcp
         mode: ingress
     volumes:
-      - letsencrypt:/letsencrypt
+      - tati_ai_letsencrypt:/letsencrypt
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - traefik_public
@@ -63,7 +63,7 @@ services:
           memory: 64M
 
   app:
-    image: ghcr.io/cai0sampai0/tati_ai:latest
+    image: ghcr.io/cai0sampai0/tati_ai:${APP_IMAGE_TAG:-latest}
     command: >
       gunicorn app.asgi:application
       --bind 0.0.0.0:8000
@@ -95,19 +95,20 @@ services:
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
       REDIS_URL: "redis://redis:6379/0"
       CELERY_BROKER_URL: "redis://redis:6379/0"
+      WAHA_API_URL: "http://waha:3000"
       FORWARD_WEBHOOK_URL: ""
       GOOGLE_REDIRECT_URI: "${GOOGLE_REDIRECT_URI:-https://tati-ai.vercel.app/auth/google/callback}"
       API_URL: "https://${DOMAIN}"
     volumes:
-      - media_data:/app/media
-      - static_data:/app/staticfiles
+      - tati_ai_media_data:/app/media
+      - tati_ai_static_data:/app/staticfiles
     networks:
       - traefik_public
       - tati_ai_internal
       - tati_ai_egress
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
-      interval: 30s
+      interval: 15s
       timeout: 10s
       retries: 3
       start_period: 60s
@@ -122,7 +123,7 @@ services:
       rollback_config:
         parallelism: 1
         delay: 5s
-        order: stop-first
+        order: start-first
       restart_policy:
         condition: on-failure
         delay: 10s
@@ -147,14 +148,13 @@ services:
           memory: 384M
 
   db:
-    image: pgvector/pgvector:pg16
-    env_file: .env
+    image: pgvector/pgvector:pg18
     environment:
       POSTGRES_DB: "${POSTGRES_DB:-tati_ai}"
       POSTGRES_USER: "${POSTGRES_USER:-tati_user}"
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
     volumes:
-      - pg_data:/var/lib/postgresql/data
+      - tati_ai_pg_data:/var/lib/postgresql
     networks:
       - tati_ai_internal
     healthcheck:
@@ -176,7 +176,7 @@ services:
       resources:
         limits:
           cpus: "1.0"
-          memory: 1024M
+          memory: 1280M
         reservations:
           cpus: "0.25"
           memory: 256M
@@ -185,7 +185,7 @@ services:
     image: redis:7-alpine
     command: redis-server --appendonly yes --maxmemory 384mb --maxmemory-policy allkeys-lru
     volumes:
-      - redis_data:/data
+      - tati_ai_redis_data:/data
     networks:
       - tati_ai_internal
     healthcheck:
@@ -213,7 +213,7 @@ services:
           memory: 64M
 
   celery_worker:
-    image: ghcr.io/cai0sampai0/tati_ai:latest
+    image: ghcr.io/cai0sampai0/tati_ai:${APP_IMAGE_TAG:-latest}
     entrypoint: ["/app/worker-entrypoint.sh"]
     command: celery -A app worker -l info --concurrency=2
     env_file: .env
@@ -235,11 +235,12 @@ services:
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
       REDIS_URL: "redis://redis:6379/0"
       CELERY_BROKER_URL: "redis://redis:6379/0"
+      WAHA_API_URL: "http://waha:3000"
       FORWARD_WEBHOOK_URL: ""
       GOOGLE_REDIRECT_URI: "${GOOGLE_REDIRECT_URI:-https://tati-ai.vercel.app/auth/google/callback}"
       API_URL: "https://${DOMAIN}"
     volumes:
-      - media_data:/app/media
+      - tati_ai_media_data:/app/media
     networks:
       - tati_ai_internal
       - tati_ai_egress
@@ -248,8 +249,13 @@ services:
       update_config:
         parallelism: 1
         delay: 10s
-        order: stop-first
+        order: start-first
         failure_action: rollback
+        monitor: 20s
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+        order: start-first
       restart_policy:
         condition: on-failure
         delay: 10s
@@ -258,13 +264,13 @@ services:
       resources:
         limits:
           cpus: "1.0"
-          memory: 1536M
+          memory: 1280M
         reservations:
           cpus: "0.2"
           memory: 256M
 
   celery_beat:
-    image: ghcr.io/cai0sampai0/tati_ai:latest
+    image: ghcr.io/cai0sampai0/tati_ai:${APP_IMAGE_TAG:-latest}
     entrypoint: ["/app/worker-entrypoint.sh"]
     command: celery -A app beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
     env_file: .env
@@ -286,11 +292,17 @@ services:
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
       REDIS_URL: "redis://redis:6379/0"
       CELERY_BROKER_URL: "redis://redis:6379/0"
+      WAHA_API_URL: "http://waha:3000"
     networks:
       - tati_ai_internal
       - tati_ai_egress
     deploy:
       replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 5s
+        order: stop-first
+        failure_action: rollback
       restart_policy:
         condition: on-failure
         delay: 10s
@@ -304,6 +316,35 @@ services:
           cpus: "0.05"
           memory: 96M
 
+  waha:
+    image: devlikeapro/waha:latest
+    env_file: .env
+    environment:
+      PORT: "3000"
+      WHATSAPP_RESTART_ALL_SESSIONS: "True"
+    volumes:
+      - tati_ai_waha_sessions:/app/.sessions
+    networks:
+      - tati_ai_internal
+      - tati_ai_egress
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 5
+        window: 120s
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1024M
+        reservations:
+          cpus: "0.1"
+          memory: 256M
+
 networks:
   traefik_public:
     external: true
@@ -313,8 +354,15 @@ networks:
     external: true
 
 volumes:
-  pg_data:
-  media_data:
-  static_data:
-  letsencrypt:
-  redis_data:
+  tati_ai_pg_data:
+    external: true
+  tati_ai_media_data:
+    external: true
+  tati_ai_static_data:
+    external: true
+  tati_ai_letsencrypt:
+    external: true
+  tati_ai_redis_data:
+    external: true
+  tati_ai_waha_sessions:
+    external: true
