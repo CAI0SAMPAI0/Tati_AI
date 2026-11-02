@@ -1,67 +1,78 @@
 #!/bin/sh
 set -e
 
-echo ">>> [app] Aguardando disponibilidade do PostgreSQL..."
+echo ">>> [app] Aguardando PostgreSQL e coordenando migrations sem bloqueio..."
 python - <<'PY'
 import os
 import sys
 import time
-import django
-from django.db import connections
-from django.db.utils import OperationalError
+from urllib.parse import quote_plus
+import psycopg2
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", os.getenv("DJANGO_SETTINGS_MODULE", "app.settings.production"))
-django.setup()
+host = os.getenv("POSTGRES_HOST", "db")
+port = int(os.getenv("POSTGRES_PORT", "5432"))
+dbname = os.getenv("POSTGRES_DB", "tati_ai")
+user = os.getenv("POSTGRES_USER", "tati_user")
+password = os.getenv("POSTGRES_PASSWORD", "")
+db_url = os.getenv("DATABASE_URL") or (
+    f"postgresql://{user}:{quote_plus(password)}@{host}:{port}/{dbname}" if host and password else ""
+)
 
-deadline = time.time() + 90
-while True:
-    try:
-        conn = connections["default"]
-        conn.ensure_connection()
-        print(">>> [app] Conexao com o banco estabelecida.")
-        break
-    except OperationalError as exc:
-        if time.time() >= deadline:
-            print(f">>> [app] Timeout aguardando o banco: {exc}", file=sys.stderr)
-            sys.exit(1)
-        time.sleep(2)
-PY
+if db_url:
+    deadline = time.time() + 90
+    conn = None
+    while True:
+        try:
+            conn = psycopg2.connect(db_url, connect_timeout=5)
+            conn.autocommit = True
+            print(">>> [app] Conexao com PostgreSQL estabelecida.")
+            break
+        except Exception as exc:
+            if time.time() >= deadline:
+                print(f">>> [app] Timeout aguardando banco: {exc}", file=sys.stderr)
+                sys.exit(1)
+            time.sleep(2)
 
-echo ">>> [app] Aplicando migrations com advisory lock..."
-python - <<'PY'
-import os
-import django
-from django.core.management import call_command
-from django.db import connection
+    cur = conn.cursor()
+    cur.execute("SELECT pg_try_advisory_lock(747101)")
+    acquired = bool(cur.fetchone()[0])
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", os.getenv("DJANGO_SETTINGS_MODULE", "app.settings.production"))
-django.setup()
+    if acquired:
+        try:
+            print(">>> [app] Advisory lock adquirido - verificando migrate e collectstatic...")
+            os.environ.setdefault("DJANGO_SETTINGS_MODULE", os.getenv("DJANGO_SETTINGS_MODULE", "app.settings.production"))
+            import django
+            from django.core.management import call_command
 
-if connection.vendor == "postgresql":
-    with connection.cursor() as cursor:
-        cursor.execute("SELECT pg_try_advisory_lock(747101)")
-        acquired = cursor.fetchone()[0]
-        if acquired:
+            django.setup()
+            call_command("migrate", "--noinput")
+            call_command("collectstatic", "--noinput", verbosity=0)
+            print(">>> [app] Migrate e collectstatic concluidos.")
+        finally:
             try:
-                try:
-                    cursor.execute("CREATE EXTENSION IF NOT EXISTS vector;")
-                except Exception as ext_err:
-                    print(f">>> [app] Aviso extensao vector: {ext_err}")
-                print(">>> [app] Lock adquirido - executando migrate...")
-                call_command("migrate", "--noinput")
-            finally:
-                cursor.execute("SELECT pg_advisory_unlock(747101)")
-            print(">>> [app] Migrations concluidas.")
-        else:
-            print(">>> [app] Outra replica esta migrando - aguardando conclusao...")
-            cursor.execute("SELECT pg_advisory_lock(747101)")
-            cursor.execute("SELECT pg_advisory_unlock(747101)")
-            print(">>> [app] Migrations concluidas pela outra replica.")
+                cur.execute("SELECT pg_advisory_unlock(747101)")
+            except Exception:
+                pass
+            conn.close()
+    else:
+        print(">>> [app] Outra replica esta executando migrate - aguardando liberacao...")
+        wait_deadline = time.time() + 90
+        while time.time() < wait_deadline:
+            time.sleep(2)
+            cur.execute("SELECT pg_try_advisory_lock(747101)")
+            if cur.fetchone()[0]:
+                cur.execute("SELECT pg_advisory_unlock(747101)")
+                break
+        conn.close()
+        print(">>> [app] Liberado para subir Gunicorn/Uvicorn.")
 else:
-    call_command("migrate", "--noinput")
-PY
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", os.getenv("DJANGO_SETTINGS_MODULE", "app.settings.production"))
+    import django
+    from django.core.management import call_command
 
-echo ">>> [app] Coletando arquivos estaticos..."
-python manage.py collectstatic --noinput || true
+    django.setup()
+    call_command("migrate", "--noinput")
+    call_command("collectstatic", "--noinput", verbosity=0)
+PY
 
 exec "$@"
