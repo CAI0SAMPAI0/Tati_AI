@@ -127,6 +127,13 @@ def _get_google_redirect_uri(request: HttpRequest) -> str:
     if is_local:
         return "http://localhost:8000/auth/google/callback"
 
+    explicit_redirect = (
+        getattr(settings, "GOOGLE_REDIRECT_URI", "")
+        or os.getenv("GOOGLE_REDIRECT_URI", "")
+    ).strip()
+    if explicit_redirect:
+        return explicit_redirect
+
     # 2. Em ambiente de hospedagem/produção, prioriza a URL base configurada
     backend_base = (
         getattr(settings, "BACKEND_BASE_URL", "")

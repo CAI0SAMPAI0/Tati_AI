@@ -96,6 +96,7 @@ services:
       REDIS_URL: "redis://redis:6379/0"
       CELERY_BROKER_URL: "redis://redis:6379/0"
       FORWARD_WEBHOOK_URL: ""
+      GOOGLE_REDIRECT_URI: "${GOOGLE_REDIRECT_URI:-https://tati-ai.vercel.app/auth/google/callback}"
       API_URL: "https://${DOMAIN}"
     volumes:
       - media_data:/app/media
@@ -235,6 +236,7 @@ services:
       REDIS_URL: "redis://redis:6379/0"
       CELERY_BROKER_URL: "redis://redis:6379/0"
       FORWARD_WEBHOOK_URL: ""
+      GOOGLE_REDIRECT_URI: "${GOOGLE_REDIRECT_URI:-https://tati-ai.vercel.app/auth/google/callback}"
       API_URL: "https://${DOMAIN}"
     volumes:
       - media_data:/app/media

@@ -19,7 +19,7 @@ from .schemas import (
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
-MP_ACCESS_TOKEN = os.getenv("MP_ACCESS_TOKEN", "")
+MP_ACCESS_TOKEN = os.getenv("MP_ACCESS_TOKEN") or os.getenv("MERCADOPAGO_ACCESS_TOKEN", "")
 FORWARD_WEBHOOK_URL = os.getenv("FORWARD_WEBHOOK_URL", "")
 
 SUBSCRIPTION_PLANS = {
@@ -61,6 +61,13 @@ class MercadoPagoService:
         if not MP_ACCESS_TOKEN:
             logger.warning("[MercadoPago] MP_ACCESS_TOKEN não configurado.")
         return mercadopago.SDK(MP_ACCESS_TOKEN)
+
+    @staticmethod
+    def _resolve_webhook_url() -> Optional[str]:
+        api_base = (os.getenv("API_URL") or "").strip().rstrip("/")
+        if api_base.startswith("https://") and "localhost" not in api_base and "127.0.0.1" not in api_base:
+            return f"{api_base}/api/v1/payments/mercadopago/webhook"
+        return None
 
     @classmethod
     def resolve_server_price(
@@ -159,6 +166,7 @@ class MercadoPagoService:
             "payment_method_id": "pix",
             "external_reference": external_reference,
             "payer": payer_data,
+            **({"notification_url": cls._resolve_webhook_url()} if cls._resolve_webhook_url() else {}),
         }
 
         try:
@@ -229,6 +237,7 @@ class MercadoPagoService:
                 "pending": f"{frontend_base}/payment/pending",
             },
             "auto_return": "approved",
+            **({"notification_url": cls._resolve_webhook_url()} if cls._resolve_webhook_url() else {}),
         }
 
         try:

@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
+import { API_BASE } from '../api/client';
 
 const routes: RouteRecordRaw[] = [
   // Public Landing & Leveling Test
@@ -52,6 +53,12 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/auth/callback',
     name: 'auth-callback',
+    component: () => import('../views/auth/LoginView.vue'),
+    meta: { public: true },
+  },
+  {
+    path: '/auth/google/callback',
+    name: 'auth-google-callback',
     component: () => import('../views/auth/LoginView.vue'),
     meta: { public: true },
   },
@@ -305,6 +312,17 @@ export const router = createRouter({
 });
 
 router.beforeEach((to, from, next) => {
+  if (
+    (to.path === '/auth/google/callback' || to.path === '/auth/callback') &&
+    (to.query.code || to.query.error) &&
+    !to.query.token
+  ) {
+    const apiBase = API_BASE.replace(/\/+$/, '');
+    if (apiBase && typeof window !== 'undefined') {
+      window.location.replace(`${apiBase}/auth/google/callback${window.location.search}`);
+      return;
+    }
+  }
   const authStore = useAuthStore();
 
   if (!authStore.isLoaded) {
