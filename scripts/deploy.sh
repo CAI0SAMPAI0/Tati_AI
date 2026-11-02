@@ -96,6 +96,7 @@ GIT_SHA="$(git rev-parse --short HEAD 2>/dev/null || echo manual)"
 if [ "$SKIP_BUILD" -eq 0 ]; then
     BRANCH="$(git branch --show-current 2>/dev/null || echo '')"
     if [ -n "$BRANCH" ]; then
+        git config core.fileMode false 2>/dev/null || true
         git pull origin "$BRANCH" || warn "git pull falhou; prosseguindo com o codigo local."
         GIT_SHA="$(git rev-parse --short HEAD 2>/dev/null || echo manual)"
     fi
