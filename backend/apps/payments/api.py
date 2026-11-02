@@ -195,4 +195,9 @@ def mercadopago_webhook(request: HttpRequest):
         body = json.loads(request.body.decode("utf-8"))
     except Exception:
         body = {}
+    if not body.get("id") and not (isinstance(body.get("data"), dict) and body["data"].get("id")):
+        topic = request.GET.get("topic") or request.GET.get("type") or ""
+        q_id = request.GET.get("data.id") or request.GET.get("id")
+        if q_id and topic in ("", "payment"):
+            body["id"] = q_id
     return MercadoPagoService.process_webhook(body)

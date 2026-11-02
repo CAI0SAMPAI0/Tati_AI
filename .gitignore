@@ -209,5 +209,8 @@ docker-compose1.yml
 
 test-results/
 playwright-report/
-scripts/
+scripts/*
+!scripts/deploy.sh
+!scripts/post_deploy.sh
+!scripts/migrate_db_to_vps.sh
 backend/scripts/

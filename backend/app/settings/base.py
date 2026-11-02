@@ -129,6 +129,11 @@ DATABASE_URL = (
     or _clean_db_url(os.getenv("SUPABASE_DB_URL"))
     or _clean_db_url(os.getenv("WHATSAPP_SESSIONS_POSTGRESQL_URL"))
     or _clean_db_url(os.getenv("POSTGRES_URL"))
+    or (
+        f"postgresql://{os.getenv('POSTGRES_USER', 'tati_user')}:{__import__('urllib.parse').parse.quote_plus(os.getenv('POSTGRES_PASSWORD', ''))}@{os.getenv('POSTGRES_HOST')}:{os.getenv('POSTGRES_PORT', '5432')}/{os.getenv('POSTGRES_DB', 'tati_ai')}"
+        if os.getenv("POSTGRES_HOST") and os.getenv("POSTGRES_PASSWORD")
+        else None
+    )
 )
 if DATABASE_URL:
     os.environ["DATABASE_URL"] = DATABASE_URL
@@ -396,6 +401,14 @@ if _railway_domain:
     _clean_rw = _railway_domain if _railway_domain.startswith(("http://", "https://")) else f"https://{_railway_domain}"
     if _clean_rw not in CSRF_TRUSTED_ORIGINS:
         CSRF_TRUSTED_ORIGINS.append(_clean_rw)
+
+_domain_env = (os.getenv("DOMAIN") or "").strip().rstrip("/")
+if _domain_env:
+    _clean_dom = _domain_env if _domain_env.startswith(("http://", "https://")) else f"https://{_domain_env}"
+    if _clean_dom not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(_clean_dom)
+    if _clean_dom not in CORS_ALLOWED_ORIGINS:
+        CORS_ALLOWED_ORIGINS.append(_clean_dom)
 
 _extra_csrf = [o.strip() for o in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",") if o.strip()]
 for _origin in _extra_csrf:

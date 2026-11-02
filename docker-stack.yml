@@ -1,0 +1,318 @@
+version: "3.9"
+
+services:
+  traefik:
+    image: traefik:v3.6
+    command:
+      # API / Dashboard (desativado externamente por seguranca e para evitar falha HTTP-01 em subdominio inexistente)
+      - "--api.dashboard=false"
+      - "--api.insecure=false"
+
+      # Docker Swarm provider
+      - "--providers.swarm=true"
+      - "--providers.swarm.endpoint=unix:///var/run/docker.sock"
+      - "--providers.swarm.exposedByDefault=false"
+      - "--providers.swarm.network=traefik_public"
+
+      # Entrypoints HTTP / HTTPS
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.websecure.address=:443"
+
+      # Let's Encrypt via HTTP-01 (funciona direto no dominio da VPS sem exigir Cloudflare)
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:-admin@tati.ai}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+
+      # Logs
+      - "--log.level=INFO"
+      - "--accesslog=true"
+      - "--accesslog.format=json"
+    ports:
+      - target: 80
+        published: 80
+        protocol: tcp
+        mode: ingress
+      - target: 443
+        published: 443
+        protocol: tcp
+        mode: ingress
+    volumes:
+      - letsencrypt:/letsencrypt
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - traefik_public
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 5
+        window: 120s
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
+
+  app:
+    image: ghcr.io/cai0sampai0/tati_ai:latest
+    command: >
+      gunicorn app.asgi:application
+      --bind 0.0.0.0:8000
+      --workers 2
+      --worker-class uvicorn.workers.UvicornWorker
+      --timeout 120
+      --graceful-timeout 30
+      --keep-alive 5
+      --forwarded-allow-ips '*'
+      --access-logfile -
+      --error-logfile -
+    env_file: .env
+    environment:
+      ENVIRONMENT: "production"
+      DJANGO_SETTINGS_MODULE: "app.settings.production"
+      DEBUG: "False"
+      SERVERLESS: "false"
+      ENABLE_NOTIFICATION_SCHEDULER: "false"
+      USE_REDIS_CHANNELS: "true"
+      DATABASE_URL: ""
+      DATABASE_PUBLIC_URL: ""
+      SUPABASE_DB_URL: ""
+      WHATSAPP_SESSIONS_POSTGRESQL_URL: ""
+      POSTGRES_URL: ""
+      POSTGRES_HOST: "db"
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: "${POSTGRES_DB:-tati_ai}"
+      POSTGRES_USER: "${POSTGRES_USER:-tati_user}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      REDIS_URL: "redis://redis:6379/0"
+      CELERY_BROKER_URL: "redis://redis:6379/0"
+      FORWARD_WEBHOOK_URL: ""
+      API_URL: "https://${DOMAIN}"
+    volumes:
+      - media_data:/app/media
+      - static_data:/app/staticfiles
+    networks:
+      - traefik_public
+      - tati_ai_internal
+      - tati_ai_egress
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 15s
+        order: start-first
+        failure_action: rollback
+        monitor: 30s
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+        order: stop-first
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 5
+        window: 120s
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.tati-api.rule=Host(`${DOMAIN}`)"
+        - "traefik.http.routers.tati-api.entrypoints=websecure"
+        - "traefik.http.routers.tati-api.tls=true"
+        - "traefik.http.routers.tati-api.tls.certresolver=letsencrypt"
+        - "traefik.http.services.tati-api.loadbalancer.server.port=8000"
+        - "traefik.http.services.tati-api.loadbalancer.healthcheck.path=/health"
+        - "traefik.http.services.tati-api.loadbalancer.healthcheck.interval=15s"
+        - "traefik.http.services.tati-api.loadbalancer.healthcheck.hostname=${DOMAIN}"
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 1536M
+        reservations:
+          cpus: "0.25"
+          memory: 384M
+
+  db:
+    image: pgvector/pgvector:pg16
+    env_file: .env
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB:-tati_ai}"
+      POSTGRES_USER: "${POSTGRES_USER:-tati_user}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    networks:
+      - tati_ai_internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-tati_user} -d $${POSTGRES_DB:-tati_ai}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 5
+        window: 120s
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --maxmemory 384mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - tati_ai_internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 5
+        window: 120s
+      resources:
+        limits:
+          cpus: "0.3"
+          memory: 448M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
+
+  celery_worker:
+    image: ghcr.io/cai0sampai0/tati_ai:latest
+    entrypoint: ["/app/worker-entrypoint.sh"]
+    command: celery -A app worker -l info --concurrency=2
+    env_file: .env
+    environment:
+      ENVIRONMENT: "production"
+      DJANGO_SETTINGS_MODULE: "app.settings.production"
+      DEBUG: "False"
+      SERVERLESS: "false"
+      ENABLE_NOTIFICATION_SCHEDULER: "false"
+      DATABASE_URL: ""
+      DATABASE_PUBLIC_URL: ""
+      SUPABASE_DB_URL: ""
+      WHATSAPP_SESSIONS_POSTGRESQL_URL: ""
+      POSTGRES_URL: ""
+      POSTGRES_HOST: "db"
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: "${POSTGRES_DB:-tati_ai}"
+      POSTGRES_USER: "${POSTGRES_USER:-tati_user}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      REDIS_URL: "redis://redis:6379/0"
+      CELERY_BROKER_URL: "redis://redis:6379/0"
+      FORWARD_WEBHOOK_URL: ""
+      API_URL: "https://${DOMAIN}"
+    volumes:
+      - media_data:/app/media
+    networks:
+      - tati_ai_internal
+      - tati_ai_egress
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: stop-first
+        failure_action: rollback
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 5
+        window: 120s
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1536M
+        reservations:
+          cpus: "0.2"
+          memory: 256M
+
+  celery_beat:
+    image: ghcr.io/cai0sampai0/tati_ai:latest
+    entrypoint: ["/app/worker-entrypoint.sh"]
+    command: celery -A app beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    env_file: .env
+    environment:
+      ENVIRONMENT: "production"
+      DJANGO_SETTINGS_MODULE: "app.settings.production"
+      DEBUG: "False"
+      SERVERLESS: "false"
+      ENABLE_NOTIFICATION_SCHEDULER: "false"
+      DATABASE_URL: ""
+      DATABASE_PUBLIC_URL: ""
+      SUPABASE_DB_URL: ""
+      WHATSAPP_SESSIONS_POSTGRESQL_URL: ""
+      POSTGRES_URL: ""
+      POSTGRES_HOST: "db"
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: "${POSTGRES_DB:-tati_ai}"
+      POSTGRES_USER: "${POSTGRES_USER:-tati_user}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      REDIS_URL: "redis://redis:6379/0"
+      CELERY_BROKER_URL: "redis://redis:6379/0"
+    networks:
+      - tati_ai_internal
+      - tati_ai_egress
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 5
+        window: 120s
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
+        reservations:
+          cpus: "0.05"
+          memory: 96M
+
+networks:
+  traefik_public:
+    external: true
+  tati_ai_internal:
+    external: true
+  tati_ai_egress:
+    external: true
+
+volumes:
+  pg_data:
+  media_data:
+  static_data:
+  letsencrypt:
+  redis_data:
