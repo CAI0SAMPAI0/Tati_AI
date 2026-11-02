@@ -14,11 +14,19 @@ services:
       - "--providers.swarm.exposedByDefault=false"
       - "--providers.swarm.network=traefik_public"
 
-      # Entrypoints HTTP / HTTPS
+      # Entrypoints HTTP / HTTPS / Metricas internas (Prometheus)
       - "--entrypoints.web.address=:80"
       - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
       - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
       - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.metrics.address=:8082"
+
+      # Metricas Prometheus (acessiveis apenas na rede interna Docker, sem porta publica)
+      - "--metrics.prometheus=true"
+      - "--metrics.prometheus.entryPoint=metrics"
+      - "--metrics.prometheus.addEntryPointsLabels=true"
+      - "--metrics.prometheus.addRoutersLabels=true"
+      - "--metrics.prometheus.addServicesLabels=true"
 
       # Let's Encrypt via HTTP-01 (direto no dominio da VPS sem exigir Cloudflare)
       - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:-admin@tati.ai}"

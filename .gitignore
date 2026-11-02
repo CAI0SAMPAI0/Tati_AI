@@ -211,6 +211,7 @@ test-results/
 playwright-report/
 scripts/*
 !scripts/deploy.sh
+!scripts/deploy_monitoring.sh
 !scripts/post_deploy.sh
 !scripts/migrate_db_to_vps.sh
 backend/scripts/
