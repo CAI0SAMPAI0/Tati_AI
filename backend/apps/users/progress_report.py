@@ -29,12 +29,12 @@ class ProgressReportGenerator:
         seven_days_ago = now - timedelta(days=7)
         thirty_days_ago = now - timedelta(days=30)
 
-        # Chat messages in last 7 days
+        # Mensagens de chat nos últimos 7 dias
         msgs_count = Message.objects.filter(
             username=username, role="user", created_at__gte=seven_days_ago
         ).count()
 
-        # Activities completed in last 30 days
+        # Atividades concluídas nos últimos 30 dias
         all_completed_30d = list(
             ActivitySubmission.objects.filter(
                 username=username, created_at__gte=thirty_days_ago
@@ -46,19 +46,36 @@ class ProgressReportGenerator:
             s for s in all_completed_30d if s.created_at and s.created_at >= seven_days_ago
         ]
 
-        total_weekly_activities = len(completed_7d)
-        total_monthly_activities = len(all_completed_30d)
+        # Práticas de pronúncia nos últimos 30 e 7 dias
+        try:
+            from apps.activities.models import PronunciationHistory
+            pron_30d = list(
+                PronunciationHistory.objects.filter(
+                    username=username, created_at__gte=thirty_days_ago
+                ).order_by("-created_at")
+            )
+            pron_7d = [p for p in pron_30d if p.created_at and p.created_at >= seven_days_ago]
+        except Exception as e:
+            pron_30d, pron_7d = [], []
 
-        # Count activities by category (filter/breakdown)
-        category_counts_weekly: dict[str, int] = {}
-        for s in completed_7d:
-            cat = (s.activity_type or "general").capitalize()
-            category_counts_weekly[cat] = category_counts_weekly.get(cat, 0) + 1
+        total_weekly_activities = len(completed_7d) + len(pron_7d)
+        total_monthly_activities = len(all_completed_30d) + len(pron_30d)
 
-        category_counts_monthly: dict[str, int] = {}
-        for s in all_completed_30d:
-            cat = (s.activity_type or "general").capitalize()
-            category_counts_monthly[cat] = category_counts_monthly.get(cat, 0) + 1
+        # Contagem de categorias sem duplicação de lógica
+        from collections import Counter
+
+        def count_categories(submissions, pron_list):
+            counts = Counter(
+                (s.activity_type or "general").capitalize()
+                for s in submissions
+                if getattr(s, "activity_type", None)
+            )
+            if pron_list:
+                counts["Pronunciation"] = len(pron_list)
+            return dict(counts)
+
+        category_counts_weekly = count_categories(completed_7d, pron_7d)
+        category_counts_monthly = count_categories(all_completed_30d, pron_30d)
 
         report_dir = Path(settings.BASE_DIR) / "assets" / "reports"
         os.makedirs(report_dir, exist_ok=True)
@@ -220,7 +237,7 @@ class ProgressReportGenerator:
                         Paragraph(f"{m_count}", center_card_style),
                     ]
                 )
-            
+
             # Add Total row
             breakdown_data.append(
                 [

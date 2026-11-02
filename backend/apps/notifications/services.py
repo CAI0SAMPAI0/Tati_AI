@@ -51,26 +51,25 @@ def get_verified_sender_email() -> str:
         if email and isinstance(email, str):
             email_clean = email.strip()
             if (
-                email_clean
-                and not email_clean.endswith("@smtp-brevo.com")
-                and "smtp-brevo" not in email_clean
+                    email_clean
+                    and not email_clean.endswith("@smtp-brevo.com")
+                    and "smtp-brevo" not in email_clean
             ):
                 return email_clean
     return fallback_email
 
 
-
 class BrevoEmailService:
     @classmethod
     def build_standard_email_html(
-        cls,
-        recipient_name: str,
-        body_paragraphs: list[str],
-        action_url: str,
-        action_label: str,
-        highlight_card_html: str = "",
-        title_header: str = "Teacher Tatiana Duarte",
-        subtitle_header: str = "Your personal AI English tutor",
+            cls,
+            recipient_name: str,
+            body_paragraphs: list[str],
+            action_url: str,
+            action_label: str,
+            highlight_card_html: str = "",
+            title_header: str = "Teacher Tatiana Duarte",
+            subtitle_header: str = "Your personal AI English tutor",
     ) -> str:
         body_paragraphs_html = "".join(
             f'<p style="font-size: 15px; color: #334155; margin: 12px 0; line-height: 1.6;">{p}</p>'
@@ -114,11 +113,11 @@ class BrevoEmailService:
 
     @staticmethod
     def send_email(
-        to_email: str,
-        subject: str,
-        html_content: str,
-        recipient_name: str = None,
-        attachments: Optional[List[dict]] = None,
+            to_email: str,
+            subject: str,
+            html_content: str,
+            recipient_name: str = None,
+            attachments: Optional[List[dict]] = None,
     ) -> bool:
         res = BrevoEmailService.send_email_detailed(
             to_email, subject, html_content, recipient_name, attachments=attachments
@@ -127,11 +126,11 @@ class BrevoEmailService:
 
     @staticmethod
     def send_email_detailed(
-        to_email: str,
-        subject: str,
-        html_content: str,
-        recipient_name: str = None,
-        attachments: Optional[List[dict]] = None,
+            to_email: str,
+            subject: str,
+            html_content: str,
+            recipient_name: str = None,
+            attachments: Optional[List[dict]] = None,
     ) -> dict:
         from apps.chat.audio_service import strip_emojis
 
@@ -334,10 +333,10 @@ class WahaWhatsAppService:
         if not isinstance(prof, dict):
             prof = {}
         phone = (
-            prof.get("whatsapp_number")
-            or getattr(user, "phone", None)
-            or getattr(user, "whatsapp_number", None)
-            or prof.get("phone")
+                prof.get("whatsapp_number")
+                or getattr(user, "phone", None)
+                or getattr(user, "whatsapp_number", None)
+                or prof.get("phone")
         )
         if not phone:
             return None
@@ -360,11 +359,11 @@ class WahaWhatsAppService:
 
     @staticmethod
     def send_message(
-        phone_number: str,
-        message: str,
-        sender_user: Optional[Any] = None,
-        recipient_user: Optional[Any] = None,
-        session: Optional[str] = None,
+            phone_number: str,
+            message: str,
+            sender_user: Optional[Any] = None,
+            recipient_user: Optional[Any] = None,
+            session: Optional[str] = None,
     ) -> bool:
         """
         Envia mensagem via WhatsApp usando o serviço WAHA no Render.
@@ -486,12 +485,13 @@ class NotificationService:
             "message": "Dispositivo cadastrado para notificações WebPush.",
         }
 
+
 def _send_fcm_v1_admin_sdk(
-    fcm_token: str, title: str, body: str, url: str
+        fcm_token: str, title: str, body: str, url: str
 ) -> Optional[bool]:
     """
     Tenta enviar via Firebase Admin SDK (HTTP v1) usando o arquivo de credenciais JSON.
-    Retorna True se enviou com sucesso, False se o token do dispositivo expirou, ou None se o JSON não foi encontrado.
+    Retorna True se enviou com sucesso, false se o token do dispositivo expirou, ou None se o JSON não foi encontrado.
     """
     try:
         import firebase_admin
@@ -644,11 +644,11 @@ class NotificationDispatcher:
 
     @staticmethod
     def send_push_to_user(
-        username: str,
-        title: str,
-        body: str,
-        url: str = "/dashboard",
-        tag: str = "tati-notif",
+            username: str,
+            title: str,
+            body: str,
+            url: str = "/dashboard",
+            tag: str = "tati-notif",
     ) -> dict:
         """
         Envia push notification para todos os dispositivos ativos cadastrados do usuário (PWA, Celular, PC, APK).
@@ -734,14 +734,14 @@ class NotificationDispatcher:
 
     @classmethod
     def dispatch_to_user(
-        cls,
-        username: str,
-        title: str,
-        body: str,
-        category: str = "general",
-        url: str = "/notifications",
-        send_push: bool = True,
-        send_whatsapp: bool = False,
+            cls,
+            username: str,
+            title: str,
+            body: str,
+            category: str = "general",
+            url: str = "/notifications",
+            send_push: bool = True,
+            send_whatsapp: bool = False,
     ) -> dict:
         """
         Despacha notificação in-app (Notification), push notification (FCM / WebPush)
@@ -799,12 +799,12 @@ class NotificationDispatcher:
 
     @staticmethod
     def notify_students_for_activity(
-        activity_type: str,
-        title: str,
-        levels: Any,
-        is_published: bool = True,
-        url: str = "/activities",
-        send_whatsapp: bool = True,
+            activity_type: str,
+            title: str,
+            levels: Any,
+            is_published: bool = True,
+            url: str = "/activities",
+            send_whatsapp: bool = True,
     ) -> dict:
         """
         Dispara notificações para alunos estritamente pertencentes ao nível da atividade lançada.
@@ -831,8 +831,8 @@ class NotificationDispatcher:
             raw_levels = ["ALL"]
 
         is_all_levels = (
-            any(lvl in ["ALL", "ALL LEVELS", "*"] for lvl in raw_levels)
-            or len(raw_levels) == 0
+                any(lvl in ["ALL", "ALL LEVELS", "*"] for lvl in raw_levels)
+                or len(raw_levels) == 0
         )
 
         # Filtra alunos do nível alvo estritamente
@@ -975,7 +975,7 @@ class NotificationDispatcher:
 
     @staticmethod
     def notify_streak_risk(
-        user: User, streak_count: int, send_whatsapp: bool = False
+            user: User, streak_count: int, send_whatsapp: bool = False
     ) -> dict:
         """
         Dispara alerta de ofensiva em risco para alunos que ainda não praticaram hoje (em inglês).
@@ -1059,7 +1059,7 @@ class NotificationSchedulerService:
     #    1. LEMBRETE DIÁRIO DE OFENSIVA (STREAK) — 20:00 BRT              
     @staticmethod
     def send_daily_streak_reminder_to_user(
-        user: User, force: bool = False
+            user: User, force: bool = False
     ) -> dict:
         """
         Dispara lembrete de streak para um aluno específico se ele NÃO tiver estudado hoje (Horário de Brasília)
@@ -1111,7 +1111,7 @@ class NotificationSchedulerService:
         streak_val = user.streak_count or 1
         title = "Keep Your Study Streak Alive - Teacher Tati"
         body = f"Hello {first_name}! You are on a {streak_val}-day streak. Practice 5 minutes today with Teacher Tati to keep your progress on track."
-        
+
         highlight_html = f"""
         <div style="background-color: #f8fafc; border-left: 4px solid #6366f1; padding: 16px; border-radius: 8px; margin-bottom: 24px; text-align: center;">
             <div style="font-size: 12px; font-weight: 800; color: #6366f1; text-transform: uppercase; letter-spacing: 1px;">Current Streak</div>
@@ -1171,7 +1171,7 @@ class NotificationSchedulerService:
 
     @staticmethod
     def send_daily_streak_reminders_to_all_active_students(
-        force: bool = False,
+            force: bool = False,
     ) -> dict:
         """
         Executa às 20:00 (Horário de Brasília).
@@ -1247,35 +1247,30 @@ class NotificationSchedulerService:
             if hasattr(ProgressReportService, "get_weekly_report")
             else {}
         )
-        mins_studied = report_data.get("study_time_minutes", 45)
-        acts_done = report_data.get("exercises_completed", 5)
-        vocab_learned = report_data.get("words_learned", 12)
+        mins_studied = report_data.get("study_time_minutes", 0)
+        acts_done = report_data.get("exercises_completed", 0)
 
         title = "Your Weekly English Progress Report - Teacher Tati"
-        body = f"Hello {first_name}! Your weekly report is ready: {mins_studied} min practiced, {acts_done} activities completed, and +{vocab_learned} words learned."
-        
+        body = f"Hello {first_name}! Your weekly report is ready: {mins_studied} min practiced and {acts_done} activities completed."
+
         stats_card_html = f"""
         <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
             <table style="width: 100%; border-collapse: collapse; text-align: center;">
                 <tr>
-                    <td style="padding: 10px; width: 33.3%;">
-                        <div style="font-size: 22px; font-weight: 800; color: #6366f1;">{mins_studied} min</div>
+                    <td style="padding: 10px; width: 50%;">
+                        <div style="font-size: 24px; font-weight: 800; color: #6366f1;">{mins_studied} min</div>
                         <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Study Time</div>
                     </td>
-                    <td style="padding: 10px; width: 33.3%; border-left: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0;">
-                        <div style="font-size: 22px; font-weight: 800; color: #16a34a;">{acts_done}</div>
-                        <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Activities</div>
-                    </td>
-                    <td style="padding: 10px; width: 33.3%;">
-                        <div style="font-size: 22px; font-weight: 800; color: #eab308;">+{vocab_learned}</div>
-                        <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Words Learned</div>
+                    <td style="padding: 10px; width: 50%; border-left: 1px solid #e2e8f0;">
+                        <div style="font-size: 24px; font-weight: 800; color: #16a34a;">{acts_done}</div>
+                        <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Activities Completed</div>
                     </td>
                 </tr>
             </table>
         </div>
         """
 
-        # Generate and attach PDF report
+        # Gerando e enviando o pdf no email
         attachments = None
         try:
             import base64
@@ -1320,23 +1315,8 @@ class NotificationSchedulerService:
             body=body,
         )
 
-        # WhatsApp Dispatch
-        student_phone = WahaWhatsAppService.extract_student_phone(user)
-        allow_wa = WahaWhatsAppService.is_whatsapp_allowed(user)
+        # WhatsApp Desativado
         wa_sent = False
-        if student_phone and allow_wa:
-            wa_msg = (
-                f"Hello {first_name}! Your Weekly Progress Report is ready.\n\n"
-                f"Study time: {mins_studied} min\n"
-                f"Completed activities: {acts_done}\n"
-                f"New words: +{vocab_learned}\n\n"
-                f"Your PDF report is in your email! Check your progress here: https://tati-ai.vercel.app/progress"
-            )
-            wa_sent = WahaWhatsAppService.send_message(
-                phone_number=student_phone,
-                message=wa_msg,
-                recipient_user=user,
-            )
 
         return {
             "success": True,
@@ -1412,7 +1392,7 @@ class NotificationSchedulerService:
 
         title = "Teacher Tatiana is Waiting for You - Let's Practice"
         body = f"Hello {first_name}, it has been a few days since your last practice. A quick 3-minute conversation keeps your English skills sharp."
-        
+
         highlight_html = f"""
         <div style="background-color: #f8fafc; border-left: 4px solid #6366f1; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
             <p style="margin: 0; font-size: 15px; font-style: italic; color: #1e293b;">"A quick 3-minute conversation today will keep your English fluent and natural."</p>
@@ -1457,7 +1437,7 @@ class NotificationSchedulerService:
 
     @staticmethod
     def send_inactivity_nudges_to_all_inactive_students(
-        force: bool = False,
+            force: bool = False,
     ) -> dict:
         """
         Executa às 14:00 (Horário de Brasília).
@@ -1532,7 +1512,7 @@ class NotificationSchedulerService:
 
         title = "A Fresh Start Awaits You - Teacher Tati"
         body = f"Hello {first_name}, your streak ended, but consistency is about bouncing right back. Today is Day 1 of your next streak!"
-        
+
         highlight_html = f"""
         <div style="background-color: #f8fafc; border-left: 4px solid #6366f1; padding: 16px; border-radius: 8px; margin-bottom: 24px; text-align: center;">
             <div style="font-size: 12px; font-weight: 800; color: #6366f1; text-transform: uppercase; letter-spacing: 1px;">Time for a Comeback</div>
@@ -1574,7 +1554,7 @@ class NotificationSchedulerService:
     #    5. STREAK MILESTONE (7, 14, 30 DIAS)                              
     @staticmethod
     def send_streak_milestone_to_user(
-        user: User, milestone: int = 7, force: bool = False
+            user: User, milestone: int = 7, force: bool = False
     ) -> dict:
         first_name = (
             (user.name or user.username or "Student").strip().split()[0].capitalize()
@@ -1598,7 +1578,7 @@ class NotificationSchedulerService:
             }
 
         body = f"Congratulations {first_name}! You have reached a {milestone}-day study streak. You are building a powerful English habit."
-        
+
         highlight_html = f"""
         <div style="background-color: #f8fafc; border-left: 4px solid #16a34a; padding: 16px; border-radius: 8px; margin-bottom: 24px; text-align: center;">
             <div style="font-size: 12px; font-weight: 800; color: #16a34a; text-transform: uppercase; letter-spacing: 1px;">Milestone Achieved</div>
@@ -1641,7 +1621,7 @@ class NotificationSchedulerService:
     #    6. DISPARO DE TESTE CONTROLADO (INDIVIDUAL OU GERAL)               
     @staticmethod
     def send_test_notification_to_user(
-        user: User, notification_type: str = "streak_reminder", force: bool = True
+            user: User, notification_type: str = "streak_reminder", force: bool = True
     ) -> dict:
         """
         Dispara APENAS a notificação solicitada para validação técnica individual,
@@ -1759,4 +1739,3 @@ class NotificationSchedulerService:
         return NotificationSchedulerService.send_test_notification_to_user(
             user, notification_type="all", force=True
         )
-

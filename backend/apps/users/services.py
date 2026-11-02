@@ -591,42 +591,85 @@ class ProgressReportService:
     def get_weekly_report(user: User) -> dict:
         now = datetime.now(timezone.utc)
         week_ago = now - timedelta(days=7)
+        week_ago_date = week_ago.date()
 
-        from apps.chat.models import Message
+        try:
+            from apps.chat.models import PronunciationHistory
+            pronunciation_history = list(
+                PronunciationHistory.objects.filter(
+                    username=user.username, created_at__gte=week_ago
+                ).only("id", "score", "created_at")
+            )
+        except Exception as e:
+            logger.warning(f"Erro ao buscar PronunciationHistory: {e}")
+            pronunciation_history = []
 
-        msgs = list(
-            Message.objects.filter(
-                username=user.username, role="user", created_at__gte=week_ago
-            ).only("id", "session_id", "created_at")
-        )
+        try:
+            from apps.activities.models import ActivitySubmission
+            weekly_submissions = list(
+                ActivitySubmission.objects.filter(
+                    username=user.username,
+                    status="completed",
+                    created_at__gte=week_ago,
+                ).only("id", "created_at", "activity_type", "score")
+            )
+        except Exception as e:
+            logger.warning(f"Erro ao buscar ActivitySubmission: {e}")
+            weekly_submissions = []
+
+        try:
+            from apps.chat.models import Message
+            msgs = list(
+                Message.objects.filter(
+                    username=user.username, role="user", created_at__gte=week_ago
+                ).only("id", "session_id", "created_at")
+            )
+        except Exception as e:
+            logger.warning(f"Erro ao buscar Message: {e}")
+            msgs = []
 
         days = [(now - timedelta(days=i)).strftime("%a") for i in range(6, -1, -1)]
         msg_counts = [0] * 7
         session_ids = set()
         study_days = set()
 
-        for m in msgs:
-            if m.created_at:
-                delta = (m.created_at.date() - week_ago.date()).days - 1
+        # Itera todos os eventos unificados em um único laço
+        all_events = pronunciation_history + weekly_submissions + msgs
+        for item in all_events:
+            dt = getattr(item, "created_at", None)
+            if dt:
+                d = dt.date() if hasattr(dt, "date") else dt
+                delta = (d - week_ago_date).days
                 if 0 <= delta < 7:
                     msg_counts[delta] += 1
-                study_days.add(m.created_at.date())
-            if m.session_id:
-                session_ids.add(m.session_id)
+                elif delta == 7:
+                    msg_counts[6] += 1
+                study_days.add(d)
 
-        streak = user.streak_count
+            # Coleta session_id (Mensagens) ou id (Atividades e Pronúncia)
+            sid = getattr(item, "session_id", None) or getattr(item, "id", None)
+            if sid:
+                session_ids.add(sid)
+
+        exercises_completed = len(weekly_submissions) + len(pronunciation_history)
+        study_time_minutes = (len(pronunciation_history) * 2) + (len(weekly_submissions) * 4)
+
+        scores = [p.score for p in pronunciation_history if getattr(p, "score", None) is not None]
+        accuracy_rate = round(sum(scores) / len(scores), 1) if scores else 90.0
+
+        streak = user.streak_count or 0
 
         return {
             "period": "weekly",
             "username": user.username,
             "total_conversations": len(session_ids),
-            "total_messages": len(msgs),
+            "total_messages": len(pronunciation_history),
             "study_days": len(study_days) or (1 if streak > 0 else 0),
-            "study_time_minutes": len(msgs) * 3,
-            "exercises_completed": len(msgs) // 2,
-            "words_learned": len(msgs) * 2,
-            "accuracy_rate": 92.5,
-            "unique_words_used": len(msgs) * 4,
+            "study_time_minutes": study_time_minutes,
+            "exercises_completed": exercises_completed,
+            "words_learned": 0,
+            "accuracy_rate": accuracy_rate,
+            "unique_words_used": 0,
             "current_streak": streak,
             "streak_count": streak,
             "total_xp": user.total_xp,
