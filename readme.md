@@ -1,387 +1,188 @@
-<div align="center">
+# Teacher Tatiana AI (Tati AI)
 
-# 🤖 Teacher Tati AI (Taty's English) 📚
-### *Plataforma Inteligente de Ensino de Inglês com IA Conversacional 24/7, Avatar Reativo e Ecossistema Multiplataforma*
+Plataforma educacional interativa para ensino e pratica da lingua inglesa alinhada ao quadro internacional **CEFR (A1 a C2)**. O ecossistema integra tutoria conversacional por texto e voz com Inteligencia Artificial, laboratorio de pronuncia, repeticao espacada (SRS), atividades multimodais, portal comercial de materiais didaticos digitais com leitura protegida (**Taty's Materials**) e painel administrativo docente.
 
-<br />
+- **Aplicacao Principal (Web)**: `https://tati-ai.vercel.app`
+- **Portal Hub de Materiais**: `https://tati-hub.vercel.app`
 
-<p align="center">
-  <img src="./frontend/public/images/tati_logo.jpg" alt="Teacher Tati Logo" width="140" style="border-radius: 50%; box-shadow: 0 4px 14px rgba(0,0,0,0.15); margin-right: 15px;" />
-</p>
-
-[![Next.js](https://img.shields.io/badge/Next.js_14-black?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org/)
-[![React](https://img.shields.io/badge/React_18-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://reactjs.org/)
-[![Vue.js](https://img.shields.io/badge/Vue.js_3-4FC08D?style=for-the-badge&logo=vue.js&logoColor=white)](https://vuejs.org/)
-[![Vite](https://img.shields.io/badge/Vite_6-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-[![Django](https://img.shields.io/badge/Django_5-092E20?style=for-the-badge&logo=django&logoColor=white)](https://www.djangoproject.com/)
-[![Django Ninja](https://img.shields.io/badge/Django_Ninja-092E20?style=for-the-badge&logo=fastapi&logoColor=white)](https://django-ninja.dev/)
-[![Django Channels](https://img.shields.io/badge/Django_Channels-2C3E50?style=for-the-badge&logo=websocket&logoColor=white)](https://channels.readthedocs.io/)
-[![Daphne](https://img.shields.io/badge/Daphne_ASGI-0B3C5D?style=for-the-badge&logo=python&logoColor=white)](https://github.com/django/daphne)
-[![Flutter](https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev/)
-[![GPT-OSS-20B](https://img.shields.io/badge/GPT--OSS--20B-10A37F?style=for-the-badge&logo=openai&logoColor=white)](https://groq.com/)
-[![Google Gemini](https://img.shields.io/badge/Google_Gemini-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev/)
-[![Mercado Pago](https://img.shields.io/badge/Mercado_Pago-009EE3?style=for-the-badge&logo=mercadopago&logoColor=white)](https://www.mercadopago.com.br/developers)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-336791?style=for-the-badge&logo=postgresql&logoColor=white)](https://supabase.com/)
-[![Redis](https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://upstash.com/)
-[![Celery](https://img.shields.io/badge/Celery-37814A?style=for-the-badge&logo=celery&logoColor=white)](https://docs.celeryq.dev/)
-
-<br />
-
-**[Visão Geral](#-visão-geral)** •
-**[Preview & Funcionalidades](#-preview--funcionalidades-chave)** •
-**[Arquitetura](#%EF%B8%8F-arquitetura-do-sistema)** •
-**[Estrutura do Monorepo](#-estrutura-do-monorepo)** •
-**[Como Começar](#-como-começar-desenvolvimento-local)** •
-**[Variáveis de Ambiente](#-variáveis-de-ambiente)** •
-**[Deploy](#-deploy--produção)**
+![Pagina Inicial da Plataforma Teacher Tati AI](./docs/assets/landing-page.png)
 
 ---
 
-</div>
+## 1. Funcionalidades Principais
 
-## 📖 Visão Geral
+- **Tutoria Conversacional por Texto e Voz (`/chat`, `/voice`, `/voice-only`)**: pratica disponivel 24/7 com correcoes gramaticais imediatas, sugestoes de vocabulario, exportacao da conversa em PDF/DOCX, suporte a multiplos sotaques (`en-US`, `en-GB`, `en-AU`, `en-CA`, `en-IE`, `en-IN`) e cenarios de roleplay baseados no nivel CEFR.
+- **Laboratorio Fonetico (`/pronunciation`)**: avaliacao automatica de acuracia e fluencia palavra por palavra com historico de gravacoes e feedback orientado.
+- **Central de Atividades e Gamificacao (`/activities`, `/flashcards/:deckId`, `/goals`, `/competitions`)**: flashcards visuais com repeticao espacada e revisao de sexta-feira, podcasts com transcricao, gramatica, leitura, listening, musica (LingoClip), jogos interativos (Wordwall), noticias graduadas, ofensiva diaria (streak), Objetivo da Semana e ranking de XP.
+- **Teste de Nivelamento e Exames Trimestrais (`/cefr-test`, `/exams`)**: diagnostico gratuito de nivel CEFR para visitantes (com emissao de relatorio) e sistema de avaliacoes trimestrais adaptativas (atualmente em validacao controlada para perfis autorizados).
+- **Hub de Materiais Protegido (`apps/hub-site/` e `/activities/hub`)**: vitrine publica de e-books e apostilas com compra avulsa via **Mercado Pago** (PIX com QR Code instantaneo e Cartao) e leitor seguro pagina a pagina em WebP com marca d'agua dinamica do usuario.
+- **Painel Administrativo Docente (`/dashboard`)**: gestao de alunos, curadoria e geracao automatica de materiais CEFR apoiada por **RAG**, revisao de feedbacks estudantis, upload de conteudos premium, exportacao de relatorios e envio de comunicados via WhatsApp (**WAHA**).
+- **Aplicativo Mobile (`mobile/`)**: aplicativo **Flutter** com `InAppWebView`, Google Sign-In nativo, notificacoes push via Firebase Cloud Messaging (FCM) e verificacao automatica de atualizacoes.
 
-O **Teacher Tati AI** é um ecossistema educacional de última geração voltado ao aprendizado prático, dinâmico e imersivo da língua inglesa. A plataforma reúne uma tutora virtual baseada em modelos de inteligência artificial de ponta — liderados por **GPT-OSS-20B** (via Groq) para diálogos velozes e pelo poder multimodal do **Google Gemini** (Gemini 1.5 Flash/Pro e Gemini Vision) — combinada à síntese de voz natural (Edge TTS / ElevenLabs) e a um **avatar animado reativo**, permitindo conversações realistas com sincronização labial e expressões em tempo real.
-
-O projeto é mantido em um **Monorepo gerenciado com NPM Workspaces**, conectando:
-- **Backend ASGI:** Construído com **Django 5**, **Django-Ninja** (para endpoints RESTful de alta tipagem e velocidade), **Django Channels** (para WebSockets bidirecionais de chat e voz) e servidor **Daphne**.
-- **Frontend do Aluno:** Aplicação moderna em **Next.js 14 (App Router)** com suporte a PWA, modo offline e design fluido com Tailwind CSS.
-- **Hub de Materiais (Hub Site):** Portal moderno em **Vue 3 (Vite + Pinia)** dedicado à venda, catálogo e leitura protegida de materiais didáticos.
-- **Mobile Nativo (Flutter):** App mobile Flutter com 120 FPS, gravação nativa de microfone e notificações push via Firebase (FCM).
-- **Pacote Compartilhado (`@tati/hub-core`):** SDK com tipagens, gerenciamento de sessão/cookies e contratos de API unificados.
-- **Pagamentos Integrados:** Checkout transparente e geração de PIX dinâmico com confirmação instantânea via **Mercado Pago**.
+![Hub de Atividades e Aprendizado](./docs/assets/activities-hub.png)
 
 ---
 
-## 📸 Preview & Funcionalidades Chave
+## 2. Stack Tecnologica Confirmada
 
-### 1. Avatar Reativo & Chat de Voz em Tempo Real
-A IA reage visual e auditivamente conforme a fala do aluno, comutando expressões faciais em tempo real de acordo com o estado da conversa:
-
-| Expressão Padrão | Ouvindo o Aluno | Falando / Ensinando | Reação / Feedback |
-| :---: | :---: | :---: | :---: |
-| <img src="./backend/assets/avatar/avatar_tati_normal.webp" width="160" alt="Tati Normal" style="border-radius:12px;" /> | <img src="./backend/assets/avatar/avatar_tati_ouvindo.webp" width="160" alt="Tati Ouvindo" style="border-radius:12px;" /> | <img src="./backend/assets/avatar/avatar_tati_aberta.webp" width="160" alt="Tati Falando" style="border-radius:12px;" /> | <img src="./backend/assets/avatar/tati_surpresa.webp" width="160" alt="Tati Surpresa" style="border-radius:12px;" /> |
-| **Pronta para interagir** | **Microfone ativo (STT)** | **Síntese de áudio (TTS)** | **Correção e incentivo** |
-
-* 🎙️ **Full Voice Mode via Django Channels:** Fluxo de áudio bidirecional e contínuo via WebSockets (`ws/live` e `chat/ws`), integrando Whisper (STT) e Edge TTS / ElevenLabs.
-* 🗣️ **Pronunciation Reader & Challenge:** Treinamento fonético com pontuação de precisão de pronúncia palavra por palavra.
-
----
-
-### 2. Destaques da Plataforma
-
-* 🧠 **Pipeline de IA com GPT-OSS-20B & Gemini:**
-  * **GPT-OSS-20B:** Modelo principal para conversação didática instantânea com baixíssima latência (Groq).
-  * **Google Gemini (1.5 Flash / 2.0 Flash / 1.5 Pro):** Geração inteligente de questionários, nivelamento pedagógico, fallback automático e **Gemini Vision** para leitura e OCR de documentos/apostilas.
-* 💳 **Pagamentos Nativos com Mercado Pago:**
-  * Cobranças via **PIX instantâneo** com QR Code dinâmico e código Copia e Cola.
-  * **Checkout Preferences** para pagamentos com cartão de crédito ou boleto.
-  * Processamento de **Webhooks** com liberação em tempo real de assinaturas e materiais didáticos.
-* 🎯 **Diagnóstico e Alinhamento CEFR (A1 a B2):** Prova de diagnóstico inicial e nivelamento contínuo das respostas do aluno.
-* 🗂️ **Sistema SRS (Spaced Repetition System):** Algoritmo de repetição espaçada para memorização eficiente de vocabulário.
-* 🏆 **Gamificação Completa:** Pontuação de experiência (XP), ofensivas diárias (*streaks*), troféus e ranking competitivo semanal.
-* 🎧 **Podcasts Interativos:** Recomendações e exercícios de áudio baseados no histórico de aprendizado.
-* 📚 **Hub de Materiais & Leitor Seguro:** Catálogo de apostilas com leitor seguro de PDF contra cópia e download não autorizado.
-* 📱 **Ecossistema Multiplataforma:** Web PWA instalável + App Nativo Flutter com áudio nativo e push notifications via Firebase.
+| Camada | Tecnologias |
+| :--- | :--- |
+| **Backend** | Python 3.11/3.12, Django 5, Django Ninja (REST + OpenAPI), Django Channels 4 (WebSockets ASGI com Daphne/Uvicorn), Pydantic v2, Celery 5 + Celery Beat |
+| **Frontend Principal (`frontend/`)** | Vue 3.5 (Composition API), Vite 6, TypeScript, Vue Router 4, Pinia, TanStack Vue Query 5, Tailwind CSS 3.4, Lucide Vue Next |
+| **Portal Hub (`apps/hub-site/`)** | Vue 3.5, Vite 6, TypeScript, Vue Router 4, Pinia, TanStack Vue Query 5, Tailwind CSS 3.4, `@tati/hub-core` (`packages/hub-core/`) |
+| **Mobile (`mobile/`)** | Flutter (Dart 3.2+), `flutter_inappwebview`, `firebase_messaging`, `google_sign_in` |
+| **Banco, Cache e Midia** | PostgreSQL (Supabase / Railway), Redis / Upstash (`django-redis` + `AICache`), IndexedDB (cliente), Cloudinary, LibreOffice + Poppler + PyMuPDF |
+| **IA e Audio** | Meta Llama 3.1 (HF Router), Groq (`gpt-oss-120b`/`20b` + Whisper Large V3 STT), Google Gemini, RAG com embeddings `BAAI/bge-large-en-v1.5`, Edge TTS + gTTS |
+| **Pagamentos e Mensageria** | Mercado Pago (PIX, Checkout Pro, Webhooks), WAHA (WhatsApp), Brevo / Resend / SMTP, WebPush (VAPID) |
 
 ---
 
-## 🏗️ Arquitetura do Sistema
-
-### Diagrama de Módulos & Integrações
+## 3. Visao de Arquitetura e Estrutura do Repositorio
 
 ```mermaid
-flowchart TB
-    subgraph Clients["📱 Clientes & Interfaces"]
-        WEB["App Aluno (Next.js 14)<br/>• App Router, Tailwind, Zustand<br/>• PWA & Suporte Offline"]
-        HUB["Hub Site (Vue 3 + Vite)<br/>• Catálogo de Materiais Didáticos<br/>• Leitor Seguro de PDFs"]
-        MOB["Mobile App (Flutter)<br/>• 120 FPS InAppWebView<br/>• Áudio Nativo & Firebase Push (FCM)"]
-    end
-
-    subgraph Shared["📦 Pacotes Compartilhados"]
-        CORE["@tati/hub-core<br/>Tipagens, SDK, Auth-Cookie & Sessão"]
-    end
-
-    subgraph Backend["⚙️ Backend ASGI (Django 5 + Django-Ninja + Channels)"]
-        DAPHNE["Daphne ASGI Server (Port 8080 / 7860)"]
-        WS["Django Channels (WebSockets)<br/>• chat/ws • ws/live • live audio stream"]
-        REST["Django-Ninja Router (REST API):<br/>• /auth • /profile • /users<br/>• /activities • /catalog • /cefr<br/>• /payments • /dashboard"]
-        CELERY["Workers Celery + Celery Beat<br/>Tarefas Async, Notificações, SRS"]
-    end
-
-    subgraph CloudServices["☁️ Serviços Externos & Infraestrutura"]
-        SUPABASE[("PostgreSQL / Supabase")]
-        REDIS[("Redis / Upstash<br/>(Channel Layer & Cache)")]
-        AI["Modelos de IA:<br/>• GPT-OSS-20B (Groq)<br/>• Google Gemini (Flash, Pro, Vision)"]
-        TTS["Áudio: Edge TTS, ElevenLabs, Whisper"]
-        MP["Pagamentos: Mercado Pago<br/>• PIX Instantâneo & Preferences"]
-        STORAGE["Mídia: Cloudinary & Poppler"]
-        FCM["Push: Firebase Cloud Messaging & WebPush"]
-    end
-
-    WEB --> CORE
-    HUB --> CORE
-    WEB -- "HTTP REST" --> REST
-    WEB -- "WebSockets" --> WS
-    HUB -- "HTTP REST" --> REST
-    MOB -- "HTTP & WebSockets" --> DAPHNE
-
-    DAPHNE --> WS
-    DAPHNE --> REST
-    REST --> CELERY
-    REST --> SUPABASE
-    WS --> REDIS
-    REST --> AI
-    WS --> AI
-    WS --> TTS
-    REST --> MP
-    REST --> STORAGE
-    CELERY --> FCM
+flowchart LR
+    FE["frontend/ (Vue 3 - Porta 3000)"] --> API["backend/ (Django 5 + Ninja + Channels - Porta 8000)"]
+    HUB["apps/hub-site/ (Vue 3 - Porta 3001)"] --> CORE["packages/hub-core/ (@tati/hub-core)"]
+    CORE --> API
+    MOB["mobile/ (Flutter App)"] --> FE
+    MOB --> API
+    API --> PG[("PostgreSQL")]
+    API --> RD[("Redis / Upstash")]
+    API --> AI["LLMs + RAG + Whisper + Edge TTS"]
+    API --> MP["Mercado Pago"]
 ```
 
----
-
-### Fluxo de Conversação de Voz em Tempo Real
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Aluno as 👤 Aluno
-    participant App as 💻 Frontend / Flutter
-    participant WS as ⚡ Django Channels (WebSocket)
-    participant LLM as 🧠 GPT-OSS-20B / Gemini
-    participant Audio as 🔊 TTS & Visemes (Edge / ElevenLabs)
-
-    Aluno->>App: Fala frase em inglês pelo microfone
-    App->>WS: Transmissão contínua de áudio via WebSocket (ws/live)
-    WS->>LLM: Contexto da conversa + perfil pedagógico CEFR
-    LLM-->>WS: Resposta didática da Teacher Tati + correções
-    WS->>Audio: Síntese de fala + extração de visemas e expressões
-    Audio-->>WS: Stream de áudio comprimido + estado do avatar (aberta, ouvindo, surpresa)
-    WS-->>App: Reprodução de voz sincronizada à animação facial
-    App-->>Aluno: Teacher Tati responde falando e expressando reação
-```
-
----
-
-## 📂 Estrutura do Monorepo
+Resumo dos diretorios principais na raiz do monorepo (consulte [`PROJECT_STRUCTURE.md`](./PROJECT_STRUCTURE.md) para a arvore detalhada):
 
 ```text
 Tati_AI/
-├   apps/
-│   └   hub-site/                # Portal público de catálogo e leitura de apostilas (Vue 3 + Vite + Pinia)
-├   packages/
-│   └   hub-core/                # SDK TypeScript, tipagens unificadas e controle de sessão
-├   frontend/                    # Aplicação web principal do aluno (Next.js 14 + App Router + PWA)
-│   ├   app/
-│   │   ├   (authenticated)/     # Rotas com autenticação: chat, voice, flashcards, progresso, etc.
-│   │   └   (public)/            # Rotas públicas: login, recuperação de senha
-│   ├   components/              # Componentes de UI, chat em tempo real, dashboard e gráficos
-│   ├   hooks/                   # Hooks customizados (useAuth, useChatSocket, useVoiceSocket)
-│   └   public/                  # Manifesto PWA, service worker, imagens e ícones
-├   backend/                     # API principal (Django 5 + Django-Ninja + Channels ASGI)
-│   ├   app/                     # Configuração Django, ASGI (ProtocolTypeRouter), Daphne e Celery
-│   ├   apps/                    # Módulos de domínio desacoplados:
-│   │   ├   activities/          # Quizzes, flashcards, podcasts e exercícios
-│   │   ├   authentication/      # JWT, Google OAuth e segurança de rotas
-│   │   ├   chat/                # Consumers Django Channels, GPT-OSS-20B, Gemini e áudio
-│   │   ├   dashboard/           # Métricas do aluno, estatísticas e rankings
-│   │   ├   notifications/       # Push notifications, WebPush e e-mails
-│   │   ├   payments/            # Integração com Mercado Pago (PIX, preferences e webhooks)
-│   │   └   users/               # Perfis, XP, streaks, níveis CEFR e avatares
-│   ├   assets/                  # Imagens e frames visuais da personagem Teacher Tati
-│   ├   manage.py                # Utilitário administrativo do Django
-│   └   requirements.txt         # Dependências Python (Django, Ninja, Channels, Daphne, etc.)
-├   mobile/                      # Aplicativo mobile nativo em Flutter (Android & iOS)
-│   ├   lib/                     # Código Dart com InAppWebView e gravação de áudio nativa
-│   └   android/ & ios/          # Configurações de plataforma e Firebase Cloud Messaging
-├   docs/                        # Documentação técnica e guias de arquitetura
-├   docker-compose.yml           # Orquestração de containers (PostgreSQL, Redis, Backend, Frontend)
-└   package.json                 # Configuração raiz do NPM Workspaces
+├── apps/hub-site/       # Portal SPA dedicado ao catalogo e leitura do Hub (@tati/hub-site)
+├── packages/hub-core/   # SDK TypeScript compartilhado de sessao, autenticacao e catalogo
+├── backend/             # API Django Ninja, WebSockets Channels, Celery, RAG e prompts de IA
+├── frontend/            # Aplicacao SPA principal (alunos e painel administrativo da professora)
+├── mobile/              # Aplicativo Android/iOS em Flutter
+├── mobile_app/          # Documentacao historica/planejada (notas legadas Capacitor/Tauri)
+├── pwa/                 # Utilitarios de icones e manifesto PWA
+└── docs/                # Documentacao tecnica completa e auditorias de engenharia
 ```
 
 ---
 
-## 🚀 Como Começar (Desenvolvimento Local)
+## 4. Pre-requisitos e Configuracao Local
 
-### 1. Pré-requisitos
-* **Node.js:** versão `18.x` ou superior
-* **Python:** versão `3.12` ou superior
-* **NPM:** versão `9.x` ou superior
-* *(Opcional)* **Docker & Docker Compose** para banco de dados e Redis
-* *(Opcional)* **Flutter SDK** para executar o aplicativo mobile
+### Pre-requisitos
+- **Python** `3.11` ou `3.12`
+- **Node.js** `20+` e **npm**
+- **PostgreSQL 15+** (ou URL de banco Supabase/Railway; há fallback SQLite apenas para inspecao basica)
+- **Redis** *(opcional em desenvolvimento; faz fallback para memoria local)*
 
----
+### Instalacao
 
-### 2. Instalação Geral do Monorepo
-
-Na raiz do projeto, instale as dependências de todos os workspaces:
-```bash
-npm install
-```
-
----
-
-### 3. Configurando e Rodando o Backend (Django + Channels)
-
-1. Entre na pasta do backend e crie o ambiente virtual:
+1. Instale as dependencias JavaScript de todos os workspaces:
    ```bash
-   cd backend
+   npm install
+   ```
+2. Crie o ambiente virtual Python e instale os pacotes do backend:
+   ```powershell
+   # Windows (PowerShell)
    python -m venv .venv
+   .\.venv\Scripts\Activate.ps1
+   pip install -r backend\requirements.txt
    ```
-
-2. Ative o ambiente virtual:
-   * **Windows (PowerShell):**
-     ```powershell
-     .venv\Scripts\Activate.ps1
-     ```
-   * **Linux / macOS:**
-     ```bash
-     source .venv/bin/activate
-     ```
-
-3. Instale as dependências:
    ```bash
-   pip install -r requirements.txt
+   # Linux / macOS
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install -r backend/requirements.txt
    ```
 
-4. Crie o arquivo `.env` com as configurações do banco e chaves de API.
+---
 
-5. Execute as migrações do banco de dados:
-   ```bash
-   python manage.py migrate
-   ```
+## 5. Variaveis de Ambiente
 
-6. Inicie o servidor ASGI com **Daphne** (necessário para suporte a WebSockets via Django Channels):
-   ```bash
-   daphne -p 8080 app.asgi:application
-   # Ou para desenvolvimento básico HTTP:
-   python manage.py runserver 8080
-   ```
-   > 📌 *Swagger / Documentação OpenAPI interativa disponível em:* `http://localhost:8080/docs`
+Copie os arquivos de exemplo e preencha as chaves necessarias (nunca versione arquivos `.env`):
+
+- Raiz / Backend: copie [`.env.example`](./.env.example) para `.env` (`DATABASE_URL`, `SECRET_KEY`, `JWT_SECRET_KEY`, `GROQ_API_KEY`, `HF_TOKEN`, `MERCADOPAGO_ACCESS_TOKEN`, `REDIS_URL`, `CLOUDINARY_*`, etc.).
+- Frontend Principal: copie [`frontend/.env.example`](./frontend/.env.example) para `frontend/.env` (`VITE_API_URL`, `VITE_WS_URL`, `VITE_HUB_SITE_URL`).
+- Portal Hub: copie [`apps/hub-site/.env.example`](./apps/hub-site/.env.example) para `apps/hub-site/.env` (`VITE_API_URL`, `VITE_MAIN_SITE_URL`).
+
+Consulte a tabela completa de variaveis em [`docs/setup.md`](./docs/setup.md).
 
 ---
 
-### 4. Rodando os Frontends (Web)
+## 6. Banco de Dados, Migrations e Execucao
 
-A partir da **raiz do projeto**, execute:
-
-* **Iniciar o App Principal do Aluno (Next.js):**
-  ```bash
-  npm run dev:frontend
-  ```
-  *Acesso no navegador:* `http://localhost:3000`
-
-* **Iniciar o Hub de Materiais Didáticos (Vue 3 + Vite):**
-  ```bash
-  npm run dev:hub
-  ```
-  *Acesso no navegador:* `http://localhost:3001`
-
----
-
-### 5. Rodando Tarefas Assíncronas (Celery)
-
-Em um terminal separado com o ambiente virtual ativado:
+### Verificacao e Migrations
 ```bash
-cd backend
-celery -A app.celery:app worker -l info
+python backend/manage.py check
+python backend/manage.py migrate
 ```
-Para agendamento automático de tarefas (Celery Beat):
+> A maioria dos modelos de dominio utiliza `managed = False` para preservar o esquema PostgreSQL existente em producao (sendo `PronunciationHistory` e tabelas internas do Django/Celery gerenciadas via `migrate`). Nos testes automatizados, o runner `app.settings.test` instancia todas as tabelas automaticamente em SQLite `:memory:`.
+
+### Executando os Servicos
+Em terminais separados na raiz do projeto:
+
 ```bash
-celery -A app.celery:app beat -l info
+# 1. Backend Django + Channels ASGI (http://localhost:8000)
+python backend/manage.py runserver 0.0.0.0:8000
+
+# 2. Frontend Principal (http://localhost:3000)
+npm run dev:frontend
+
+# 3. Portal Hub de Materiais (http://localhost:3001/materiais)
+npm run dev:hub
+```
+
+Alternativamente, para subir backend, frontend e workers Celery via containers:
+```bash
+docker compose up --build
 ```
 
 ---
 
-### 6. Rodando o App Mobile (Flutter)
+## 7. Documentacao da API e Testes
 
-No emulador ou dispositivo conectado via USB:
+### Documentacao Interativa da API (OpenAPI / Swagger)
+Com o backend em execucao, acesse:
+- Swagger UI: `http://localhost:8000/docs` (ou `http://localhost:8000/api/v1/docs`)
+- Healthcheck: `http://localhost:8000/health`
+
+### Suite de Testes e Verificacao de Tipos
 ```bash
-cd mobile
-flutter pub get
-flutter run
-```
-Para gerar o arquivo APK de produção:
-```bash
-flutter build apk --release
-```
-*Arquivo compilado:* `mobile/build/app/outputs/flutter-apk/app-release.apk`
+# Testes automatizados do Backend (SQLite em memoria)
+DJANGO_SETTINGS_MODULE=app.settings.test python backend/manage.py test app apps.authentication apps.activities --noinput
 
----
+# Verificacao TypeScript em todos os workspaces Vue/TS
+npm run typecheck
 
-### 7. Executando via Docker Compose
+# Build de producao dos frontends
+npm run build --workspace frontend
+npm run build --workspace @tati/hub-site
 
-Para rodar todo o ambiente (PostgreSQL, Redis, Backend Django e Frontend Next.js):
-```bash
-docker-compose up --build -d
-```
-
----
-
-## 🔒 Variáveis de Ambiente
-
-Crie os arquivos `.env` pertinentes tendo como base o `.env.example`. Principais parâmetros:
-
-| Grupo | Variável | Descrição |
-| :--- | :--- | :--- |
-| **Segurança & Sessão** | `JWT_SECRET_KEY` | Chave criptográfica para geração de tokens JWT |
-| | `COOKIE_SECRET` | Chave de segurança para cookies autenticados |
-| **Banco de Dados** | `DATABASE_URL` | Conexão PostgreSQL (ex: Supabase Pooler) |
-| | `SUPABASE_URL` / `SUPABASE_KEY` | Credenciais da API do Supabase |
-| **Modelos de IA** | `GROQ_API_KEY` | Chave da Groq para execução do modelo **GPT-OSS-20B** |
-| | `GEMINI_API_KEY` | Chave de API do **Google Gemini** (1.5 Flash, 2.0 Flash, Vision) |
-| | `HF_TOKEN_LLAMA` / `HUGGING_FACE_KEY` | Token de fallback para modelos Hugging Face |
-| **Pagamentos (Mercado Pago)**| `MP_ACCESS_TOKEN` | Token de acesso de produção ou testes do **Mercado Pago** |
-| | `FORWARD_WEBHOOK_URL` | URL de repasse de notificações de webhook (opcional) |
-| **Cache & WebSockets** | `REDIS_URL` / `UPSTASH_REDIS_URL` | Conexão Redis para o Channel Layer do Django Channels |
-| **Síntese de Áudio** | `ELEVENLABS_API_KEY` | Chave ElevenLabs (opcional, fallback nativo Edge TTS) |
-| **Armazenamento de Mídia** | `CLOUDINARY_URL` | URL de conexão Cloudinary para upload de arquivos |
-| **Frontend** | `NEXT_PUBLIC_API_URL` | Endpoint da API Backend (ex: `http://localhost:8080`) |
-
----
-
-## 🧪 Qualidade, Lint e Testes
-
-```bash
-# Executar testes do backend Django
-python manage.py test
-
-# Validação de tipagem TypeScript nos frontends
-npm run typecheck --workspace frontend
-npm run typecheck --workspace @tati/hub-site
-
-# Linter do código Python
-npm run lint
-
-# Formatação de código Python
-npm run format
+# Testes End-to-End com Playwright
+npx playwright test
 ```
 
 ---
 
-## 🚢 Deploy & Produção
+## 8. Deploy
 
-* **Backend (Django + Channels ASGI):** Configurado via [Dockerfile](./backend/Dockerfile) multi-stage baseado em Python e servidor ASGI (`app.asgi:application` com Gunicorn + Uvicorn Workers / Daphne), otimizado para **Railway** e **Hugging Face Spaces**.
-* **Frontend do Aluno (Next.js 14) & Hub Site (Vue 3 + Vite):** Prontos para deploy contínuo na **Vercel** com suporte a SSR e Edge caching.
-* **App Mobile (Flutter):** Build de release para distribuição direta via APK Android ou publicação nas lojas Google Play e App Store.
-
----
-
-## 📚 Documentação Adicional
-
-* 🏛️ [Visão Geral de Arquitetura](./docs/architecture.md)
-* ⚙️ [Documentação do Backend (Django-Ninja & DDD)](./docs/backend.md)
-* 🎨 [Documentação do Frontend (Next.js)](./docs/frontend.md)
-* 🗺️ [Mapeamento de Estrutura de Arquivos (PROJECT_STRUCTURE.md)](./PROJECT_STRUCTURE.md)
-* 📱 [Guia do Aplicativo Mobile Flutter](./mobile/README.md)
+- **Frontends (`frontend/` e `apps/hub-site/`)**: deploy continuo na **Vercel** configurado por [`vercel.json`](./vercel.json), [`frontend/vercel.json`](./frontend/vercel.json) e [`apps/hub-site/vercel.json`](./apps/hub-site/vercel.json).
+- **Backend (`backend/`)**: containerizado via [`backend/Dockerfile`](./backend/Dockerfile) com deploy automatizado para **Hugging Face Spaces** ([`.github/workflows/deploy-hf.yml`](./.github/workflows/deploy-hf.yml)) e suporte a **Railway** ([`railway.json`](./railway.json)).
+- **Mobile (`mobile/`)**: compilado com Flutter (`flutter build apk --release`), conforme [`mobile/README.md`](./mobile/README.md).
 
 ---
 
-<div align="center">
-  <sub>Desenvolvido com carinho para transformar o aprendizado de inglês com Inteligência Artificial. ✨</sub>
-  <br />
-  <sub>© 2026 Teacher Tati AI Team. Todos os direitos reservados.</sub>
-</div>
+## 9. Documentacao Tecnica Detalhada (`/docs`)
+
+- [Indice Geral da Documentacao](./docs/readme.md)
+- [Estrutura Completa do Projeto (`PROJECT_STRUCTURE.md`)](./PROJECT_STRUCTURE.md)
+- [Arquitetura do Sistema](./docs/architecture.md)
+- [Guia do Backend (Django 5 + Django Ninja)](./docs/backend.md)
+- [Guia do Frontend (Vue 3 + Vite + Hub)](./docs/frontend.md)
+- [Mapeamento de Rotas e Layouts](./docs/frontend_route_mapping.md)
+- [Configuracao e Execucao Local](./docs/setup.md)
+- [Diretrizes e Padroes de Codigo](./docs/guidelines.md)
+- [Analise de Bundle Vite](./docs/bundle_analysis.md)
+- [Auditoria de Navegacao Vue Router](./docs/navigation_audit.md)
+- [Auditoria de Estado Global e Ciclo de Vida](./docs/provider_audit.md)
