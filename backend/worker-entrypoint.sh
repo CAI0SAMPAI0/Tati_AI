@@ -14,9 +14,9 @@ port = int(os.getenv("POSTGRES_PORT", "5432"))
 dbname = os.getenv("POSTGRES_DB", "tati_ai")
 user = os.getenv("POSTGRES_USER", "tati_user")
 password = os.getenv("POSTGRES_PASSWORD", "")
-db_url = os.getenv("DATABASE_URL") or (
-    f"postgresql://{user}:{quote_plus(password)}@{host}:{port}/{dbname}" if host and password else ""
-)
+use_local_db = os.getenv("USE_LOCAL_DB", "false").lower() in ("true", "1", "yes")
+local_url = f"postgresql://{user}:{quote_plus(password)}@{host}:{port}/{dbname}" if host and password else ""
+db_url = local_url if (use_local_db and local_url) else (os.getenv("DATABASE_URL") or local_url)
 
 if db_url:
     deadline = time.time() + 120

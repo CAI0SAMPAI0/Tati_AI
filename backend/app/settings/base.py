@@ -135,6 +135,9 @@ DATABASE_URL = (
         else None
     )
 )
+if os.getenv("USE_LOCAL_DB", "false").lower() in ("true", "1", "yes") and os.getenv("POSTGRES_HOST") and os.getenv("POSTGRES_PASSWORD"):
+    DATABASE_URL = f"postgresql://{os.getenv('POSTGRES_USER', 'tati_user')}:{__import__('urllib.parse').parse.quote_plus(os.getenv('POSTGRES_PASSWORD', ''))}@{os.getenv('POSTGRES_HOST')}:{os.getenv('POSTGRES_PORT', '5432')}/{os.getenv('POSTGRES_DB', 'tati_ai')}"
+
 if DATABASE_URL:
     os.environ["DATABASE_URL"] = DATABASE_URL
     # Para o Supabase Pooler (limite estrito de conexões simultâneas no plano e timeouts do Supavisor),

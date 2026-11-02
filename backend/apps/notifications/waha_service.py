@@ -91,6 +91,12 @@ class WahaService:
         try:
             # Timeout estendido (35s) para permitir cold start quando o container estiver em sleep serverless
             with httpx.Client(timeout=35.0) as client:
+                st_res = client.get(f"{api_url}/api/sessions/{session_name}", headers=headers)
+                if st_res.status_code == 200 and st_res.json().get("status") == "FAILED":
+                    client.post(f"{api_url}/api/sessions/{session_name}/logout", headers=headers)
+                    res_clean = client.post(f"{api_url}/api/sessions/{session_name}/start", headers=headers)
+                    if res_clean.status_code in (200, 201):
+                        return {"success": True, "session": session_name, "status": res_clean.json().get("status", "SCAN_QR_CODE"), "data": res_clean.json()}
                 res = client.post(f"{api_url}/api/sessions/{session_name}/restart", headers=headers)
                 if res.status_code in (200, 201):
                     return {"success": True, "session": session_name, "status": "STARTING", "data": res.json()}

@@ -20,7 +20,7 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 MP_ACCESS_TOKEN = os.getenv("MP_ACCESS_TOKEN") or os.getenv("MERCADOPAGO_ACCESS_TOKEN", "")
-FORWARD_WEBHOOK_URL = os.getenv("FORWARD_WEBHOOK_URL", "")
+FORWARD_WEBHOOK_URL = "" if os.getenv("USE_LOCAL_DB", "false").lower() in ("true", "1", "yes") else os.getenv("FORWARD_WEBHOOK_URL", "")
 
 SUBSCRIPTION_PLANS = {
     "monthly": 49.90,
