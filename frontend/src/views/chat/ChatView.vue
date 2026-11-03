@@ -46,8 +46,18 @@ watch(
     activeConvId.value = newId;
     if (isCreatingConv.value) return;
     if (newId) {
+      try {
+        localStorage.setItem('tati_last_active_conv_id', newId);
+      } catch (_) {}
       loadConversationMessages(newId);
     } else {
+      const lastConvId = localStorage.getItem('tati_last_active_conv_id');
+      if (lastConvId) {
+        activeConvId.value = lastConvId;
+        router.replace({ path: '/chat', query: { conv_id: lastConvId } });
+        loadConversationMessages(lastConvId);
+        return;
+      }
       messages.value = [];
       convTitle.value = "Taty's Hub";
     }
@@ -90,6 +100,9 @@ async function loadConversationMessages(id: string) {
 
 function handleSelectConv(id: string, title: string) {
   convTitle.value = title || "Taty's Hub";
+  try {
+    localStorage.setItem('tati_last_active_conv_id', id);
+  } catch (_) {}
   if (window.innerWidth < 768) {
     isSidebarOpen.value = false;
   }
@@ -99,6 +112,9 @@ function handleSelectConv(id: string, title: string) {
 function handleNewChat() {
   messages.value = [];
   convTitle.value = "Taty's Hub";
+  try {
+    localStorage.removeItem('tati_last_active_conv_id');
+  } catch (_) {}
   if (window.innerWidth < 768) {
     isSidebarOpen.value = false;
   }

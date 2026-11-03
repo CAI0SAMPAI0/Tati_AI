@@ -17,12 +17,30 @@ const emit = defineEmits<{
 const toast = useToast();
 const conversations = ref<Conversation[]>([]);
 const isLoading = ref(true);
+const CACHE_KEY = 'tati_conversations_cache';
+
+// Carregamento instantâneo do cache de conversas (0ms de atraso)
+try {
+  const cached = localStorage.getItem(CACHE_KEY);
+  if (cached) {
+    const parsed = JSON.parse(cached);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      conversations.value = parsed;
+      isLoading.value = false;
+    }
+  }
+} catch (_) {}
 
 async function load() {
-  isLoading.value = true;
+  if (!conversations.value.length) {
+    isLoading.value = true;
+  }
   try {
     const list = await getConversations(50, 0);
     conversations.value = list || [];
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify(conversations.value));
+    } catch (_) {}
   } catch (err) {
     console.error('Error loading conversations:', err);
   } finally {

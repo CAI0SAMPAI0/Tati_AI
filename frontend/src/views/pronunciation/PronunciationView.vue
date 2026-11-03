@@ -268,12 +268,30 @@ const initialLevelIndex = computed(() => {
   return idx !== -1 ? idx : 0;
 });
 
+const PRONUNCIATION_STATE_KEY = 'tati_last_pronunciation_state';
+let hasRestoredState = false;
+
 const currentIndex = ref(0);
 
-// Inicializa currentIndex quando o nível do usuário for carregado
+// Restaura estado anterior de prática (índice da frase, modo e texto customizado)
+try {
+  const savedState = localStorage.getItem(PRONUNCIATION_STATE_KEY);
+  if (savedState) {
+    const parsed = JSON.parse(savedState);
+    if (typeof parsed.currentIndex === 'number') {
+      currentIndex.value = parsed.currentIndex;
+      hasRestoredState = true;
+    }
+    if (parsed.inputMode) inputMode.value = parsed.inputMode;
+    if (parsed.customText) customText.value = parsed.customText;
+  }
+} catch (_) {}
+
+// Inicializa currentIndex quando o nível do usuário for carregado (apenas se não houver estado salvo)
 watch(
   userLevel,
   (lvl) => {
+    if (hasRestoredState) return;
     const idx = allOrderedSentences.value.findIndex((s) => s.level === lvl);
     if (idx !== -1 && currentIndex.value === 0) {
       currentIndex.value = idx;
@@ -281,6 +299,17 @@ watch(
   },
   { immediate: true }
 );
+
+// Persiste o progresso e estado da prática no cache local
+watch([currentIndex, inputMode, customText], ([idx, mode, text]) => {
+  try {
+    localStorage.setItem(PRONUNCIATION_STATE_KEY, JSON.stringify({
+      currentIndex: idx,
+      inputMode: mode,
+      customText: text,
+    }));
+  } catch (_) {}
+});
 
 const displaySentence = computed(() => {
   const list = allOrderedSentences.value;
@@ -716,7 +745,21 @@ interface SavedHistoryItem {
   created_at: string;
 }
 
+const PRONUNCIATION_HISTORY_CACHE_KEY = 'tati_pronunciation_history_cache';
+
 const savedHistory = ref<SavedHistoryItem[]>([]);
+
+// Carregamento instantâneo do histórico a partir do cache local (0ms)
+try {
+  const cachedHistory = localStorage.getItem(PRONUNCIATION_HISTORY_CACHE_KEY);
+  if (cachedHistory) {
+    const parsed = JSON.parse(cachedHistory);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      savedHistory.value = parsed;
+    }
+  }
+} catch (_) {}
+
 const isLoadingHistory = ref(false);
 const isHistorySidebarOpen = ref(true);
 const playingHistoryAudioId = ref<string | null>(null);
@@ -752,11 +795,16 @@ async function playTatiHistoryReference(text: string, accent?: string) {
 }
 
 async function loadPronunciationHistory() {
-  isLoadingHistory.value = true;
+  if (!savedHistory.value.length) {
+    isLoadingHistory.value = true;
+  }
   try {
     const list = await apiGet<SavedHistoryItem[]>(ENDPOINTS.SPEECH_PRONUNCIATION_HISTORY);
     if (Array.isArray(list)) {
       savedHistory.value = list;
+      try {
+        localStorage.setItem(PRONUNCIATION_HISTORY_CACHE_KEY, JSON.stringify(list));
+      } catch (_) {}
     }
   } catch (err) {
     console.error('Error loading pronunciation history:', err);
