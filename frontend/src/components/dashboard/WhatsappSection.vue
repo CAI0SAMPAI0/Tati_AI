@@ -104,7 +104,8 @@ async function loadQrCode(isSilent = false) {
   qrError.value = null;
   try {
     const sessionParam = encodeURIComponent(activeSession.value || 'professor');
-    const response = await apiFetch(`/dashboard/waha/session/qr?session=${sessionParam}&t=${Date.now()}`, {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') || '' : '';
+    const response = await apiFetch(`/dashboard/waha/session/qr?session=${sessionParam}&token=${encodeURIComponent(token)}&t=${Date.now()}`, {
       headers: { Accept: 'image/png, image/*' },
     });
     if (response.ok) {

@@ -183,8 +183,9 @@ export function apiUpload<T>(path: string, form: FormData, options?: RequestOpti
 
 export async function apiFetch(path: string, options: RequestOptions = {}): Promise<Response> {
   const url = resolvePath(path);
+  const { headers: optHeaders, ...restOptions } = options;
   const headers: Record<string, string> = {
-    ...options.headers,
+    ...(optHeaders || {}),
   };
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
@@ -193,8 +194,8 @@ export async function apiFetch(path: string, options: RequestOptions = {}): Prom
   }
 
   return fetch(url, {
+    ...restOptions,
     headers,
-    ...options,
   });
 }
 

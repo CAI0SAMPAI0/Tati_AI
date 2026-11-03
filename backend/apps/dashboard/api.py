@@ -613,19 +613,33 @@ def stop_waha_session(request: HttpRequest):
     return WahaService.stop_session(session_name)
 
 
-@dashboard_router.get("/waha/session/qr", auth=auth_required)
-def get_waha_session_qr(request: HttpRequest, session: Optional[str] = None):
+@dashboard_router.get("/waha/session/qr")
+def get_waha_session_qr(request: HttpRequest, session: Optional[str] = None, token: Optional[str] = None):
     """
     Obtém a imagem do QRCode para autenticação no WhatsApp sem cache.
+    Permite autenticação via Bearer token no cabeçalho ou parâmetro de consulta 'token'.
     """
-    require_staff_user(request)
     from apps.notifications.waha_service import WahaService
+    from apps.authentication.services import AuthService
     from django.http import HttpResponse
 
-    user = request.auth
-    session_name = session or (
-        getattr(user, "username", "default") if user else "default"
-    )
+    user = getattr(request, "auth", None)
+    if not user:
+        raw_token = token
+        if not raw_token:
+            auth_hdr = request.headers.get("Authorization", "")
+            if auth_hdr.startswith("Bearer "):
+                raw_token = auth_hdr.split(" ", 1)[1].strip()
+        if raw_token:
+            try:
+                user = AuthService.get_user_from_token(raw_token)
+            except Exception:
+                user = None
+
+    if not user or not (getattr(user, "is_staff", False) or getattr(user, "role", "") in ("staff", "admin", "teacher", "professora", "professor", "programador")):
+        return HttpResponse(b"Unauthorized", content_type="text/plain", status=401)
+
+    session_name = session or getattr(user, "username", "default") or "default"
     qr_bytes = WahaService.get_qr_image(session_name)
     if qr_bytes:
         resp = HttpResponse(qr_bytes, content_type="image/png")
