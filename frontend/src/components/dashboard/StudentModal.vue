@@ -99,9 +99,14 @@ watch(
         recommendations.value = [];
         analytics.value = null;
         activityProgress.value = null;
+        pronunciationData.value = null;
+        pronunciationFilter.value = 'all';
         nudgeMessage.value = `Hi ${std.name || std.username}! Teacher Tati here...`;
         if (activeTab.value === 'analytics') fetchAnalytics();
-        else if (activeTab.value === 'progress') fetchActivityProgress();
+        else if (activeTab.value === 'progress') {
+          fetchActivityProgress();
+          fetchPronunciationPractice();
+        }
       }
     }
   },

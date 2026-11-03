@@ -236,6 +236,18 @@ class DashboardService:
         except Exception:
             pass
 
+        # Mapeia última prática de pronúncia
+        latest_prons = {}
+        try:
+            from apps.activities.models import PronunciationHistory
+
+            pron_stats = PronunciationHistory.objects.values("username").annotate(
+                last_active=Max("created_at")
+            )
+            latest_prons = {p["username"]: p["last_active"] for p in pron_stats}
+        except Exception:
+            pass
+
         results = []
         for u in users:
             st = u.streak_data if isinstance(u.streak_data, dict) else {}
@@ -261,6 +273,7 @@ class DashboardService:
                     parse_dt_to_sp(last_sub),
                     parse_dt_to_sp(last_v),
                     parse_dt_to_sp(last_f),
+                    parse_dt_to_sp(latest_prons.get(u.username)),
                     updated_at_dt,
                     created_at_dt,
                 ]
@@ -308,8 +321,16 @@ class DashboardService:
                     "messages_count": msg_counts.get(u.username, 0),
                     "total_messages": msg_counts.get(u.username, 0),
                     "msgs": msg_counts.get(u.username, 0),
-                    "risk_level": "active" if u.streak_count > 0 else "inactive",
-                    "days_inactive": 0 if u.streak_count > 0 else 7,
+                    "risk_level": (
+                        "active"
+                        if (latest_dt and max(0, (datetime.now(timezone.utc) - latest_dt.astimezone(timezone.utc)).days) <= 2) or u.streak_count > 0
+                        else ("warning" if latest_dt and max(0, (datetime.now(timezone.utc) - latest_dt.astimezone(timezone.utc)).days) <= 6 else "inactive")
+                    ),
+                    "days_inactive": (
+                        max(0, (datetime.now(timezone.utc) - latest_dt.astimezone(timezone.utc)).days)
+                        if latest_dt
+                        else (0 if u.streak_count > 0 else 7)
+                    ),
                     "created_at": created_iso or format_sp_date(created_at_dt),
                     "joined": format_sp_date(created_at_dt),
                     "whatsapp_number": clean_wa,
@@ -1051,12 +1072,20 @@ class DashboardService:
     def get_student_detail_analytics(username: str) -> dict:
         u = User.objects.filter(username=username).first()
         if not u:
+            u = User.objects.filter(username__iexact=username).first()
+        if not u:
             raise HttpError(404, "Estudante não encontrado.")
+
+        usernames = [u.username, username, username.strip().lower()]
+        if u.email:
+            same_email = list(User.objects.filter(email__iexact=u.email).values_list("username", flat=True))
+            usernames.extend(same_email)
+        usernames = list(set([un for un in usernames if un]))
 
         # 1. Progresso dos Módulos
         modules = Module.objects.filter(is_published=True).order_by("order")
         submissions = list(
-            ActivitySubmission.objects.filter(username=username).only(
+            ActivitySubmission.objects.filter(username__in=usernames).only(
             "id", "module_id", "activity_type", "metadata"
         ))
 
@@ -1107,7 +1136,7 @@ class DashboardService:
 
         daily_msgs = (
             Message.objects.filter(
-                username=username, role="user", created_at__date__gte=seven_days_ago
+                username__in=usernames, role="user", created_at__date__gte=seven_days_ago
             )
             .annotate(day=TruncDate("created_at"))
             .values("day")
@@ -1117,7 +1146,7 @@ class DashboardService:
 
         daily_subs = (
             ActivitySubmission.objects.filter(
-                username=username, created_at__date__gte=seven_days_ago
+                username__in=usernames, created_at__date__gte=seven_days_ago
             )
             .annotate(day=TruncDate("created_at"))
             .values("day")
@@ -1127,7 +1156,7 @@ class DashboardService:
 
         daily_prons = (
             PronunciationHistory.objects.filter(
-                Q(username__iexact=username) | Q(username=username),
+                Q(username__in=usernames) | Q(username__iexact=username),
                 created_at__date__gte=seven_days_ago,
             )
             .annotate(day=TruncDate("created_at"))

@@ -2800,18 +2800,11 @@ class SpeechService:
             base_prompt += f"\n\nObservação de sotaque preferido pelo aluno: {accent}. Adapte a tolerância fonética ao dialeto correspondente."
 
 
-        # Prioriza modelos rápidos e ativos com timeout adequado para processamento de áudio
-        models_to_try = [
-            os.getenv("GEMINI_AUDIO_MODEL", "gemini-3.5-flash-lite"),
-            "gemini-3.5-flash-lite",
-            "gemini-flash-lite-latest",
-        ]
-        unique_models = []
-        for m in models_to_try:
-            if m and m not in unique_models:
-                unique_models.append(m)
+        # Prioriza modelo rápido com timeout curto (4.0s) para evitar atraso (fallback Whisper assume se falhar)
+        primary_model = os.getenv("GEMINI_AUDIO_MODEL", "gemini-3.5-flash-lite")
+        models_to_try = [primary_model] if primary_model else ["gemini-3.5-flash-lite"]
 
-        for model in unique_models:
+        for model in models_to_try:
             try:
                 from google.genai import types
                 prompt = base_prompt
@@ -2829,7 +2822,7 @@ class SpeechService:
                         contents=contents,
                         config=config,
                     ),
-                    timeout=15.0,
+                    timeout=4.0,
                 )
 
                 if resp and resp.text:
@@ -2837,8 +2830,12 @@ class SpeechService:
                     if isinstance(parsed, dict) and "score" in parsed:
                         return parsed
             except Exception as e:
-                logger.warning(f"[SpeechService] Tentativa multimodal com modelo {model} falhou ({type(e).__name__}): {e}")
-                continue
+                err_str = str(e).lower()
+                logger.warning(f"[SpeechService] Tentativa Gemini multimodal ({model}) falhou ({type(e).__name__}): {e}")
+                # Se for erro de quota (429/RESOURCE_EXHAUSTED) ou timeout, sai imediatamente para fallback Whisper
+                if "429" in err_str or "quota" in err_str or "resource_exhausted" in err_str or isinstance(e, asyncio.TimeoutError):
+                    logger.info("[SpeechService] Gemini indisponível/sem cota. Indo direto para Whisper.")
+                    break
         return None
 
 

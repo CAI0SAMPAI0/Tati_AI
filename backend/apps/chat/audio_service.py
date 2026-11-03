@@ -445,7 +445,7 @@ class AudioService:
                             contents=contents,
                             config=types.GenerateContentConfig(temperature=0.0),
                         ),
-                        timeout=15.0,
+                        timeout=4.0,
                     )
                     if not resp or not resp.candidates:
                         continue
@@ -462,7 +462,11 @@ class AudioService:
                                 if text_found:
                                     return text_found
                 except Exception as mod_err:
+                    err_str = str(mod_err).lower()
                     logger.warning(f"[AudioService] Gemini STT ({model}) falhou ({type(mod_err).__name__}): {mod_err}")
+                    if "429" in err_str or "quota" in err_str or "resource_exhausted" in err_str or isinstance(mod_err, asyncio.TimeoutError):
+                        logger.info("[AudioService] Gemini STT quota excedida ou timeout, abortando tentativa de outros modelos Gemini.")
+                        break
 
             return ""
         except Exception as e:
