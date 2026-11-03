@@ -50,7 +50,7 @@ watch([isLoaded, hasAccess], ([loaded, access]) => {
   if (loaded && !access) {
     router.replace('/chat');
   }
-});
+}, { immediate: true });
 
 // Sincronização da seção ativa com a URL
 const validSections: DashSection[] = [
