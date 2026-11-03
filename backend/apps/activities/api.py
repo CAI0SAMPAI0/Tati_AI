@@ -2062,6 +2062,24 @@ def get_trimestral_history(request: HttpRequest):
     return TrimestralExamService.get_history(request.auth)
 
 
+@exams_router.post("/trimestral/reset", auth=auth_required)
+@exams_router.post("/exams/trimestral/reset", auth=auth_required)
+@exams_router.get("/trimestral/reset", auth=auth_required)
+@exams_router.get("/exams/trimestral/reset", auth=auth_required)
+def reset_trimestral_exam(request: HttpRequest):
+    """
+    Endpoint de teste para desenvolvedores: reseta os exames do usuário para testar novamente.
+    Registrado ANTES de {exam_id} para evitar colisão de rota wildcard e erro 405.
+    """
+    from .trimestral_exams import TrimestralExamService, is_user_authorized
+
+    if not is_user_authorized(request.auth):
+        raise HttpError(403, "Acesso restrito.")
+
+    TrimestralExamService.reset_user_exams(request.auth)
+    return {"success": True, "message": "Exames trimestrais resetados com sucesso para testes."}
+
+
 @exams_router.get("/trimestral/{exam_id}", auth=auth_required)
 @exams_router.get("/exams/trimestral/{exam_id}", auth=auth_required)
 def get_trimestral_exam_detail(request: HttpRequest, exam_id: str):
@@ -2073,18 +2091,4 @@ def get_trimestral_exam_detail(request: HttpRequest, exam_id: str):
     if not detail:
         raise HttpError(404, "Exame não encontrado.")
     return detail
-
-
-@exams_router.api_operation(["POST", "GET"], "/trimestral/reset", auth=auth_required)
-def reset_trimestral_exam(request: HttpRequest):
-    """
-    Endpoint de teste para desenvolvedores: reseta os exames do usuário para testar novamente.
-    """
-    from .trimestral_exams import TrimestralExamService, is_user_authorized
-
-    if not is_user_authorized(request.auth):
-        raise HttpError(403, "Acesso restrito.")
-
-    TrimestralExamService.reset_user_exams(request.auth)
-    return {"success": True, "message": "Exames trimestrais resetados com sucesso para testes."}
 

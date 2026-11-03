@@ -3299,8 +3299,9 @@ class StudentFeedbackService:
         for f in qs:
             results.append({
                 "id": str(f.id),
+                "username": f.student_username,
                 "student_username": f.student_username,
-                "student_name": f.student_name,
+                "student_name": f.student_name or f.student_username,
                 "student_avatar_url": user_avatars.get(f.student_username, ""),
                 "cefr_level": f.cefr_level,
                 "area": f.area,
@@ -3310,6 +3311,7 @@ class StudentFeedbackService:
                 "comment": f.comment,
                 "teacher_reply": f.teacher_reply,
                 "status": f.status,
+                "is_resolved": f.status == "resolved",
                 "created_at": f.created_at.isoformat() if f.created_at else None,
             })
         return results
