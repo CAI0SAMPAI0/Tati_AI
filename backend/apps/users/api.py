@@ -255,6 +255,39 @@ def get_weekly_plan_progress(request: HttpRequest):
     }
 
 
+#  TRILHA DE APRENDIZADO GAMIFICADA (LEARNING TRAILS & BOSS FIGHT)
+
+
+@users_router.get("/trail", auth=auth_required)
+def get_student_trail(request: HttpRequest):
+    """
+    Retorna a trilha gamificada do aluno com fases, etapas e status do Boss Fight.
+    """
+    from .learning_trails import LearningTrailService
+    return LearningTrailService.get_student_trail(request.auth)
+
+
+class StepToggleInput(BaseModel):
+    phase_id: Optional[str] = ""
+    step_id: str
+    is_completed: Optional[bool] = None
+
+
+@users_router.post("/trail/step/toggle", auth=auth_required)
+def toggle_trail_step(request: HttpRequest, payload: StepToggleInput):
+    """
+    Alterna o status de conclusão de uma etapa da trilha.
+    """
+    from .learning_trails import LearningTrailService
+    return LearningTrailService.toggle_step(
+        user=request.auth,
+        student_username=request.auth.username,
+        phase_id=payload.phase_id or "",
+        step_id=payload.step_id,
+        is_completed=payload.is_completed,
+    )
+
+
 #  ONBOARDING 
 
 

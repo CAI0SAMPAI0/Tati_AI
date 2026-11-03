@@ -16,6 +16,7 @@ import {
 import TatiLogo from '../ui/TatiLogo.vue';
 import WhatsAppIcon from '../icons/WhatsAppIcon.vue';
 import ExamIcon from '../icons/ExamIcon.vue';
+import { Compass } from 'lucide-vue-next';
 
 export type DashSection =
   | 'overview'
@@ -29,7 +30,8 @@ export type DashSection =
   | 'exams'
   | 'premium'
   | 'feedbacks'
-  | 'whatsapp';
+  | 'whatsapp'
+  | 'learning_trails';
 
 defineProps<{
   activeSection: DashSection;
@@ -51,6 +53,7 @@ const navItems: Array<{ id: DashSection; icon: any; label: string }> = [
   { id: 'news', icon: Newspaper, label: 'News' },
   { id: 'cefr', icon: BookOpen, label: 'CEFR Materials' },
   { id: 'exams', icon: ExamIcon, label: 'Exams' },
+  { id: 'learning_trails', icon: Compass, label: 'Learning Trails' },
   { id: 'premium', icon: Zap, label: "Taty's Materials" },
   { id: 'feedbacks', icon: MessageSquare, label: 'Feedbacks' },
   { id: 'whatsapp', icon: WhatsAppIcon, label: 'WhatsApp Config' },

@@ -27,6 +27,7 @@ import FeedbacksSection from '@/components/dashboard/FeedbacksSection.vue';
 import WhatsappSection from '@/components/dashboard/WhatsappSection.vue';
 import CefrSection from '@/components/dashboard/CefrSection.vue';
 import ExamSection from '@/components/dashboard/ExamSection.vue';
+import LearningTrailsSection from '@/components/dashboard/LearningTrailsSection.vue';
 import PremiumSection from '@/components/dashboard/PremiumSection.vue';
 import { useToast } from '@/composables/useToast';
 import {
@@ -65,6 +66,7 @@ const validSections: DashSection[] = [
   'premium',
   'feedbacks',
   'whatsapp',
+  'learning_trails',
 ];
 
 function getInitialSection(): DashSection {
@@ -229,6 +231,7 @@ const sectionTitles: Record<DashSection, { title: string; subtitle: string }> = 
   premium: { title: "Taty's Materials", subtitle: 'Premium materials & payments' },
   feedbacks: { title: 'Student Feedback', subtitle: 'Opinions and reviews submitted by students' },
   whatsapp: { title: 'WhatsApp Connection', subtitle: 'Connect and manage WhatsApp WAHA sessions' },
+  learning_trails: { title: 'Learning Trails & Goals', subtitle: 'Gamified student learning phases, quests, and boss fights' },
 };
 
 
@@ -528,6 +531,9 @@ const sectionTitles: Record<DashSection, { title: string; subtitle: string }> = 
 
         <!-- 11. WHATSAPP CONFIG SECTION -->
         <WhatsappSection v-else-if="activeSection === 'whatsapp'" />
+
+        <!-- 12. LEARNING TRAILS & GOALS SECTION -->
+        <LearningTrailsSection v-else-if="activeSection === 'learning_trails'" />
       </main>
     </div>
 

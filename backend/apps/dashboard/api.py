@@ -228,6 +228,126 @@ def delete_student(request: HttpRequest, username: str):
     return DashboardService.delete_student(username)
 
 
+# ---------------------------------------------------------------------------
+#  LEARNING TRAILS (TRILHAS DE APRENDIZADO & BOSS FIGHT)
+# ---------------------------------------------------------------------------
+
+
+class TrailSaveInput(BaseModel):
+    trail: Dict[str, Any]
+
+
+class TrailTemplateInput(BaseModel):
+    level: str = "B1"
+
+
+class TrailUnlockBossInput(BaseModel):
+    phase_id: str
+
+
+class TrailStepToggleInput(BaseModel):
+    phase_id: Optional[str] = ""
+    step_id: str
+    is_completed: Optional[bool] = None
+
+
+@dashboard_router.get("/trails/templates", auth=auth_required)
+def list_trail_templates(request: HttpRequest):
+    """
+    Retorna os templates prontos de trilha para cada nível CEFR.
+    """
+    require_staff_user(request)
+    from apps.users.learning_trails import TRAIL_TEMPLATES
+    return {"success": True, "templates": TRAIL_TEMPLATES}
+
+
+@dashboard_router.get("/students/{username}/trail", auth=auth_required)
+def get_student_trail_admin(request: HttpRequest, username: str):
+    """
+    Retorna a trilha de aprendizagem do aluno para visualização e edição da professora.
+    """
+    require_staff_user(request)
+    from apps.users.learning_trails import LearningTrailService
+    from apps.authentication.models import User
+
+    student = User.objects.filter(username=username).first()
+    if not student:
+        raise HttpError(404, f"Aluno {username} não encontrado.")
+    return LearningTrailService.get_student_trail(student)
+
+
+@dashboard_router.post("/students/{username}/trail", auth=auth_required)
+def save_student_trail_admin(request: HttpRequest, username: str, payload: TrailSaveInput):
+    """
+    Salva ou atualiza a trilha personalizada do aluno (adicionar fases, atividades, boss fight).
+    """
+    require_staff_user(request)
+    from apps.users.learning_trails import LearningTrailService
+    return LearningTrailService.save_student_trail(
+        teacher_user=request.auth,
+        student_username=username,
+        trail_data=payload.trail,
+    )
+
+
+@dashboard_router.post("/students/{username}/trail/template", auth=auth_required)
+def apply_trail_template_admin(request: HttpRequest, username: str, payload: TrailTemplateInput):
+    """
+    Aplica um template padrão de nível CEFR (A1, A2, B1, B2, C1) na trilha do aluno.
+    """
+    require_staff_user(request)
+    from apps.users.learning_trails import LearningTrailService
+    return LearningTrailService.apply_template_to_student(
+        teacher_user=request.auth,
+        student_username=username,
+        template_level=payload.level,
+    )
+
+
+@dashboard_router.post("/students/{username}/trail/unlock-boss", auth=auth_required)
+def unlock_trail_boss_admin(request: HttpRequest, username: str, payload: TrailUnlockBossInput):
+    """
+    Libera manualmente o Boss Fight (Exame Trimestral) de uma fase da trilha.
+    """
+    require_staff_user(request)
+    from apps.users.learning_trails import LearningTrailService
+    return LearningTrailService.unlock_boss(
+        teacher_user=request.auth,
+        student_username=username,
+        phase_id=payload.phase_id,
+    )
+
+
+@dashboard_router.post("/students/{username}/trail/step-toggle", auth=auth_required)
+def toggle_trail_step_admin(request: HttpRequest, username: str, payload: TrailStepToggleInput):
+    """
+    Alterna o status de uma etapa da trilha do aluno.
+    """
+    require_staff_user(request)
+    from apps.users.learning_trails import LearningTrailService
+    return LearningTrailService.toggle_step(
+        user=request.auth,
+        student_username=username,
+        phase_id=payload.phase_id or "",
+        step_id=payload.step_id,
+        is_completed=payload.is_completed,
+    )
+
+
+@dashboard_router.post("/students/{username}/trail/reset", auth=auth_required)
+def reset_student_trail_admin(request: HttpRequest, username: str):
+    """
+    Restaura a trilha do aluno para o padrão do nível dele.
+    """
+    require_staff_user(request)
+    from apps.users.learning_trails import LearningTrailService
+    return LearningTrailService.reset_student_trail(
+        teacher_user=request.auth,
+        student_username=username,
+    )
+
+
+
 from pydantic import BaseModel
 
 
