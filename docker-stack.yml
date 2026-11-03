@@ -78,6 +78,7 @@ services:
         - "traefik.http.routers.traefik-dashboard.service=api@internal"
         - "traefik.http.routers.traefik-dashboard.middlewares=traefik-auth"
         - "traefik.http.middlewares.traefik-auth.basicauth.users=admin:$$2b$$12$$ejsA6pdJNsljVJT2BhdJAeQtVZ4P9p.25bIJQFMPgN4ngQ26s6cTO"
+        - "traefik.http.services.traefik.loadbalancer.server.port=8080"
 
   app:
     image: ghcr.io/cai0sampai0/tati_ai:${APP_IMAGE_TAG:-latest}
