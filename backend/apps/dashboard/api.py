@@ -761,9 +761,11 @@ class QuestionManualUpdateInput(BaseModel):
 
 
 class ExamTeacherGradeInput(BaseModel):
-    teacher_score: float = Field(..., ge=0, le=100)
-    teacher_feedback: Optional[str] = ""
+    teacher_score: Optional[float] = Field(default=None, ge=0, le=100)
+    teacher_feedback: Optional[str] = None
+    question_comments: Optional[Dict[str, Optional[str]]] = None
     passed: Optional[bool] = None
+    clear_score: Optional[bool] = False
     approval_status: Optional[str] = None
     admin_notes: Optional[str] = None
 
@@ -970,9 +972,11 @@ def grade_exam_by_teacher(
         return AdminExamReviewService.teacher_grade_exam(
             exam_id=exam_id,
             teacher_score=payload.teacher_score,
-            teacher_feedback=payload.teacher_feedback or "",
+            teacher_feedback=payload.teacher_feedback,
+            question_comments=payload.question_comments,
             teacher_username=staff.username,
             passed=payload.passed,
+            clear_score=bool(payload.clear_score),
         )
     except ValueError as e:
         raise HttpError(400, str(e))

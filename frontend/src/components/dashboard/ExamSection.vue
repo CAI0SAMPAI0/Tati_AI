@@ -31,6 +31,7 @@ import {
   Sliders,
   Save,
   GraduationCap,
+  MessageSquare,
 } from 'lucide-vue-next';
 import { apiGet, apiPost, apiPatch } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
@@ -96,10 +97,13 @@ const isSavingManual = ref(false);
 // Teacher Grading State
 const isSavingTeacherGrade = ref(false);
 const teacherGradeForm = ref({
+  hasCustomScore: false,
   score: 70,
   feedback: '',
   passed: true,
 });
+const teacherQuestionComments = ref<Record<string, string>>({});
+const isSavingQuestionComment = ref<Record<string, boolean>>({});
 
 const QUICK_AI_SUGGESTIONS = [
   'Simplificar o vocabulário e a estrutura frasal para este nível',
@@ -148,11 +152,27 @@ watch(
   selectedAnsweredExam,
   (exam) => {
     if (exam) {
+      const hasTeacherScore = exam.teacher_score !== undefined && exam.teacher_score !== null;
       teacherGradeForm.value = {
-        score: exam.teacher_score ?? exam.score ?? 70,
+        hasCustomScore: hasTeacherScore,
+        score: hasTeacherScore ? Number(exam.teacher_score) : (exam.ai_score ?? exam.score ?? 70),
         feedback: exam.teacher_feedback || '',
         passed: exam.passed ?? true,
       };
+
+      const qComments: Record<string, string> = {};
+      if (exam.teacher_question_comments && typeof exam.teacher_question_comments === 'object') {
+        Object.assign(qComments, exam.teacher_question_comments);
+      }
+      if (Array.isArray(exam.corrections)) {
+        exam.corrections.forEach((c: any, idx: number) => {
+          const qId = String(c.question_id || `q${idx + 1}`);
+          if (c.teacher_comment && !qComments[qId]) {
+            qComments[qId] = c.teacher_comment;
+          }
+        });
+      }
+      teacherQuestionComments.value = qComments;
     }
   },
   { immediate: true }
@@ -464,7 +484,19 @@ async function handleExecuteManualSave() {
   }
 }
 
-// Teacher Grading
+function applyUpdatedExam(examId: string, updatedExam: any) {
+  const cList = studentDetail.value?.completed_exams || [];
+  const idx = cList.findIndex((e: any) => e.id === examId);
+  if (idx !== -1) {
+    cList[idx] = updatedExam;
+  }
+  if (studentDetail.value?.active_exam?.id === examId) {
+    studentDetail.value.active_exam = updatedExam;
+  }
+  syncStudentRowInList(studentDetail.value);
+}
+
+// Teacher Grading (Geral + Notas + Todas as Questões)
 async function handleSaveTeacherGrade() {
   if (!selectedAnsweredExam.value) return;
   const examId = selectedAnsweredExam.value.id || selectedAnsweredExam.value.exam_id;
@@ -473,27 +505,56 @@ async function handleSaveTeacherGrade() {
   isSavingTeacherGrade.value = true;
   try {
     const res = await apiPost<any>(ENDPOINTS.DASHBOARD_EXAMS_GRADE(examId), {
-      teacher_score: Number(teacherGradeForm.value.score),
+      teacher_score: teacherGradeForm.value.hasCustomScore ? Number(teacherGradeForm.value.score) : null,
+      clear_score: !teacherGradeForm.value.hasCustomScore,
       teacher_feedback: teacherGradeForm.value.feedback,
       passed: Boolean(teacherGradeForm.value.passed),
+      question_comments: teacherQuestionComments.value,
     });
     if (res.exam) {
-      const cList = studentDetail.value?.completed_exams || [];
-      const idx = cList.findIndex((e: any) => e.id === examId);
-      if (idx !== -1) {
-        cList[idx] = res.exam;
-      }
-      if (studentDetail.value?.active_exam?.id === examId) {
-        studentDetail.value.active_exam = res.exam;
-      }
-      syncStudentRowInList(studentDetail.value);
+      applyUpdatedExam(examId, res.exam);
     }
-    toast.success('Nota da professora salva com sucesso!');
+    toast.success('Avaliação da professora salva com sucesso!');
   } catch (err: any) {
-    toast.error(err?.message || 'Erro ao salvar nota da professora.');
+    toast.error(err?.message || 'Erro ao salvar avaliação da professora.');
   } finally {
     isSavingTeacherGrade.value = false;
   }
+}
+
+// Salvar comentário específico de uma única questão
+async function handleSaveSingleQuestionComment(qId: string) {
+  if (!selectedAnsweredExam.value) return;
+  const examId = selectedAnsweredExam.value.id || selectedAnsweredExam.value.exam_id;
+  if (!examId) return;
+
+  isSavingQuestionComment.value[qId] = true;
+  try {
+    const payloadComment = teacherQuestionComments.value[qId] || '';
+    const res = await apiPost<any>(ENDPOINTS.DASHBOARD_EXAMS_GRADE(examId), {
+      question_comments: {
+        [qId]: payloadComment,
+      },
+    });
+    if (res.exam) {
+      applyUpdatedExam(examId, res.exam);
+    }
+    if (payloadComment.trim()) {
+      toast.success(`Comentário da questão ${qId} salvo!`);
+    } else {
+      toast.success(`Comentário da questão ${qId} removido!`);
+    }
+  } catch (err: any) {
+    toast.error(err?.message || 'Erro ao salvar comentário da questão.');
+  } finally {
+    isSavingQuestionComment.value[qId] = false;
+  }
+}
+
+// Apagar comentário específico de uma única questão
+async function handleDeleteQuestionComment(qId: string) {
+  teacherQuestionComments.value[qId] = '';
+  await handleSaveSingleQuestionComment(qId);
 }
 
 async function handlePlayAudio(keyId: string, audioText?: string | null, rawAudioBase64?: string | null) {
@@ -1054,11 +1115,21 @@ onUnmounted(() => {
                   <!-- Teacher Score Input Block -->
                   <div class="p-3.5 bg-primary/5 border border-primary/20 rounded-xl space-y-2">
                     <div class="flex items-center justify-between">
-                      <span class="text-[0.65rem] font-bold text-primary uppercase tracking-wider block">Nota Oficial da Tatiana</span>
-                      <span class="text-xs font-black text-primary">{{ teacherGradeForm.score }}%</span>
+                      <label class="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          v-model="teacherGradeForm.hasCustomScore"
+                          class="rounded text-primary focus:ring-primary"
+                        />
+                        <span class="text-[0.68rem] font-bold text-primary uppercase tracking-wider">
+                          Atribuir Nota Oficial da Tatiana (Opcional)
+                        </span>
+                      </label>
+                      <span v-if="teacherGradeForm.hasCustomScore" class="text-xs font-black text-primary">{{ teacherGradeForm.score }}%</span>
+                      <span v-else class="text-[0.65rem] text-text-muted italic">Mantendo nota da IA</span>
                     </div>
 
-                    <div class="flex items-center gap-3">
+                    <div v-if="teacherGradeForm.hasCustomScore" class="flex items-center gap-3 pt-1">
                       <input
                         type="range"
                         min="0"
@@ -1074,22 +1145,42 @@ onUnmounted(() => {
                         v-model.number="teacherGradeForm.score"
                         class="w-16 px-2 py-1 text-center bg-surface border border-border rounded-lg text-xs font-bold text-text outline-none focus:border-primary"
                       />
+                      <button
+                        type="button"
+                        @click="teacherGradeForm.score = selectedAnsweredExam?.ai_score ?? 70"
+                        class="text-[0.65rem] text-text-muted hover:text-primary transition-colors cursor-pointer px-2 py-1 border border-border rounded-lg"
+                        title="Restaurar valor original calculado pela IA"
+                      >
+                        Restaurar IA
+                      </button>
                     </div>
                   </div>
                 </div>
 
                 <!-- Teacher Feedback Textarea -->
                 <div class="space-y-1.5">
-                  <label class="text-xs font-bold text-text flex items-center justify-between">
-                    <span>Parecer &amp; Comentários da Professora para o Aluno</span>
-                    <span class="text-[0.65rem] text-text-muted font-normal">Visível no histórico de exames do aluno</span>
-                  </label>
+                  <div class="flex items-center justify-between">
+                    <label class="text-xs font-bold text-text flex items-center justify-between w-full">
+                      <span>Parecer &amp; Comentários da Professora para o Aluno (Geral)</span>
+                      <span class="text-[0.65rem] text-text-muted font-normal">Visível no histórico de exames do aluno</span>
+                    </label>
+                  </div>
                   <textarea
                     rows="3"
                     v-model="teacherGradeForm.feedback"
-                    placeholder="Ex: Excelente evolução na fala e vocabulário! Continuar praticando as preposições de tempo..."
+                    placeholder="Ex: Excelente evolução na fala e vocabulário! Continuar praticando as preposições de tempo... (Opcional, deixe em branco para nenhum parecer geral)"
                     class="w-full px-3.5 py-2.5 bg-bg border border-border rounded-xl text-xs text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all resize-y"
                   ></textarea>
+                  <div v-if="teacherGradeForm.feedback" class="flex justify-end">
+                    <button
+                      type="button"
+                      @click="teacherGradeForm.feedback = ''"
+                      class="text-[0.65rem] text-destructive hover:underline cursor-pointer inline-flex items-center gap-1"
+                    >
+                      <Trash2 class="w-3 h-3" />
+                      <span>Limpar parecer geral</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div class="flex items-center justify-between pt-1">
@@ -1180,8 +1271,51 @@ onUnmounted(() => {
 
                   <!-- Pedagogical Feedback from AI -->
                   <div v-if="corr.explanation" class="text-xs text-text-muted leading-relaxed bg-bg p-3 rounded-xl border border-border/80">
-                    <span class="font-bold text-text block mb-0.5">Explicação pedagógica:</span>
+                    <span class="font-bold text-text block mb-0.5">Explicação pedagógica da IA:</span>
                     <span>{{ corr.explanation }}</span>
+                  </div>
+
+                  <!-- Teacher Per-Question Comment (Optional, Editable & Deletable) -->
+                  <div class="p-3.5 bg-primary/5 rounded-xl border border-primary/20 space-y-2">
+                    <div class="flex items-center justify-between">
+                      <span class="text-xs font-bold text-primary flex items-center gap-1.5">
+                        <MessageSquare class="w-3.5 h-3.5" />
+                        <span>Comentário da Tatiana para esta questão (Opcional)</span>
+                      </span>
+
+                      <button
+                        v-if="teacherQuestionComments[corr.question_id || `q${cIdx + 1}`]"
+                        type="button"
+                        @click="handleDeleteQuestionComment(corr.question_id || `q${cIdx + 1}`)"
+                        :disabled="isSavingQuestionComment[corr.question_id || `q${cIdx + 1}`]"
+                        class="text-[0.65rem] text-destructive hover:underline inline-flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                      >
+                        <Trash2 class="w-3 h-3" />
+                        <span>Apagar comentário</span>
+                      </button>
+                    </div>
+
+                    <textarea
+                      rows="2"
+                      v-model="teacherQuestionComments[corr.question_id || `q${cIdx + 1}`]"
+                      placeholder="Ex: Excelente clareza na pronúncia! Apenas cuide da entonação na pergunta... (Opcional)"
+                      class="w-full px-3 py-2 bg-bg border border-border rounded-xl text-xs text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all resize-y"
+                    ></textarea>
+
+                    <div class="flex items-center justify-between pt-0.5">
+                      <span class="text-[0.65rem] text-text-muted">
+                        {{ teacherQuestionComments[corr.question_id || `q${cIdx + 1}`] ? 'Comentário personalizado pronto para o aluno' : 'Sem comentário específico nesta questão' }}
+                      </span>
+                      <button
+                        type="button"
+                        @click="handleSaveSingleQuestionComment(corr.question_id || `q${cIdx + 1}`)"
+                        :disabled="isSavingQuestionComment[corr.question_id || `q${cIdx + 1}`]"
+                        class="px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary text-primary hover:text-white text-[0.68rem] font-bold transition-all inline-flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                      >
+                        <Save class="w-3 h-3" :class="isSavingQuestionComment[corr.question_id || `q${cIdx + 1}`] ? 'animate-spin' : ''" />
+                        <span>{{ isSavingQuestionComment[corr.question_id || `q${cIdx + 1}`] ? 'Salvando...' : 'Salvar nesta questão' }}</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

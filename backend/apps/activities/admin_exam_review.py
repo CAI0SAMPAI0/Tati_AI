@@ -150,8 +150,14 @@ class AdminExamReviewService:
             else []
         )
 
+        teacher_question_comments = (
+            fb.get("teacher_question_comments")
+            if isinstance(fb.get("teacher_question_comments"), dict)
+            else {}
+        )
+
         # Enriquece cada resposta do aluno com o texto de Reading, script de Listening,
-        # todas as alternativas (A/B/C/D) e áudio gravado de Speaking (se disponível).
+        # todas as alternativas (A/B/C/D), áudio gravado e comentários da professora.
         enriched_corrections: List[Dict[str, Any]] = []
         for idx, corr in enumerate(raw_corrections, start=1):
             c_item = dict(corr)
@@ -168,6 +174,7 @@ class AdminExamReviewService:
             c_item["max_points"] = int(q_src.get("points") or 10)
             c_item["raw_student_answer"] = raw_ans
             c_item["improvements"] = c_item.get("improvements") if isinstance(c_item.get("improvements"), list) else []
+            c_item["teacher_comment"] = str(teacher_question_comments.get(q_id) or "")
 
             audio_data = audio_map.get(q_id)
             if not audio_data and raw_ans.startswith("data:audio"):
@@ -200,9 +207,14 @@ class AdminExamReviewService:
             "ai_score": fb.get("ai_score") if fb.get("ai_score") is not None else exam.score,
             "teacher_score": fb.get("teacher_score"),
             "teacher_feedback": fb.get("teacher_feedback") or "",
+            "teacher_question_comments": teacher_question_comments,
             "teacher_graded_at": fb.get("teacher_graded_at"),
             "teacher_graded_by": fb.get("teacher_graded_by"),
-            "is_teacher_graded": fb.get("teacher_score") is not None,
+            "is_teacher_graded": (
+                fb.get("teacher_score") is not None
+                or bool(fb.get("teacher_feedback"))
+                or bool(teacher_question_comments)
+            ),
             "review_meta": fb.get("review_meta", {}),
             "started_at": exam.started_at.isoformat() if exam.started_at else None,
             "completed_at": exam.completed_at.isoformat() if exam.completed_at else None,
@@ -682,14 +694,16 @@ class AdminExamReviewService:
     def teacher_grade_exam(
         cls,
         exam_id: str,
-        teacher_score: float,
-        teacher_feedback: str = "",
+        teacher_score: Optional[float] = None,
+        teacher_feedback: Optional[str] = None,
+        question_comments: Optional[Dict[str, Optional[str]]] = None,
         teacher_username: str = "tatiana",
         passed: Optional[bool] = None,
+        clear_score: bool = False,
     ) -> Dict[str, Any]:
         """
-        Permite à professora Tatiana lançar ou alterar a nota manual e o feedback do exame,
-        mantendo a nota original calculada pela IA intacta para fins comparativos e de auditoria.
+        Permite à professora Tatiana lançar, editar ou apagar nota manual, parecer geral
+        e comentários pontuais por questão do exame, de forma 100% modular e opcional.
         """
         exam = TrimestralExam.objects.filter(id=exam_id).first()
         if not exam:
@@ -699,14 +713,47 @@ class AdminExamReviewService:
         if "ai_score" not in fb:
             fb["ai_score"] = exam.score
 
-        clamped_score = max(0, min(100, int(round(teacher_score))))
-        fb["teacher_score"] = clamped_score
-        fb["teacher_feedback"] = (teacher_feedback or "").strip()
+        # Ajuste de Nota Oficial (opcional ou resetável para a nota original da IA)
+        if clear_score:
+            fb.pop("teacher_score", None)
+            exam.score = int(fb.get("ai_score", exam.score))
+            exam.passed = (exam.score >= 70) if passed is None else bool(passed)
+        elif teacher_score is not None:
+            clamped_score = max(0, min(100, int(round(teacher_score))))
+            fb["teacher_score"] = clamped_score
+            exam.score = clamped_score
+            exam.passed = (clamped_score >= 70) if passed is None else bool(passed)
+        elif passed is not None:
+            exam.passed = bool(passed)
+
+        # Parecer geral da professora (opcional, editável e apagável com texto vazio)
+        if teacher_feedback is not None:
+            clean_fb = str(teacher_feedback).strip()
+            if clean_fb:
+                fb["teacher_feedback"] = clean_fb
+            else:
+                fb.pop("teacher_feedback", None)
+
+        # Comentários pontuais por questão (opcional, editável e apagável por questão)
+        if question_comments is not None:
+            existing_qc = dict(fb.get("teacher_question_comments") or {})
+            for q_id, q_comment in question_comments.items():
+                clean_q_id = str(q_id).strip()
+                if not clean_q_id:
+                    continue
+                clean_comment = str(q_comment or "").strip()
+                if clean_comment:
+                    existing_qc[clean_q_id] = clean_comment
+                else:
+                    existing_qc.pop(clean_q_id, None)
+            if existing_qc:
+                fb["teacher_question_comments"] = existing_qc
+            else:
+                fb.pop("teacher_question_comments", None)
+
         fb["teacher_graded_at"] = django_timezone.now().isoformat()
         fb["teacher_graded_by"] = teacher_username
 
-        exam.score = clamped_score
-        exam.passed = (clamped_score >= 70) if passed is None else bool(passed)
         exam.feedback = fb
         exam.save(update_fields=["score", "passed", "feedback", "updated_at"])
 
@@ -715,15 +762,16 @@ class AdminExamReviewService:
             ActivitySubmission.objects.filter(
                 username=exam.username,
                 activity_type="trimestral_exam",
-            ).update(score=clamped_score)
+            ).update(score=exam.score)
         except Exception as e:
             logger.warning(f"Erro ao sincronizar submissão do exame com nota da professora: {e}")
 
         return {
             "success": True,
             "exam": cls.format_admin_exam(exam),
-            "teacher_score": clamped_score,
-            "teacher_feedback": fb["teacher_feedback"],
+            "teacher_score": fb.get("teacher_score"),
+            "teacher_feedback": fb.get("teacher_feedback", ""),
+            "teacher_question_comments": fb.get("teacher_question_comments", {}),
         }
 
     @classmethod

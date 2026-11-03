@@ -2628,7 +2628,14 @@ class TrimestralExamService:
         history = []
         for e in exams:
             fb = e.feedback if isinstance(e.feedback, dict) else {}
-            corrections = fb.get("corrections") or cls._reconstruct_corrections(e)
+            raw_corrections = fb.get("corrections") or cls._reconstruct_corrections(e)
+            t_comments = fb.get("teacher_question_comments") if isinstance(fb.get("teacher_question_comments"), dict) else {}
+            enriched_corrections = []
+            for idx, c in enumerate(raw_corrections or [], start=1):
+                c_dict = dict(c) if isinstance(c, dict) else {}
+                qid = str(c_dict.get("question_id") or f"q{idx}")
+                c_dict["teacher_comment"] = str(t_comments.get(qid) or "")
+                enriched_corrections.append(c_dict)
             summary_text = fb.get("summary", "")
             history.append({
                 "id": str(e.id),
@@ -2642,15 +2649,20 @@ class TrimestralExamService:
                 "ai_score": fb.get("ai_score") if fb.get("ai_score") is not None else e.score,
                 "teacher_score": fb.get("teacher_score"),
                 "teacher_feedback": fb.get("teacher_feedback") or "",
+                "teacher_question_comments": t_comments,
                 "teacher_graded_at": fb.get("teacher_graded_at"),
                 "teacher_graded_by": fb.get("teacher_graded_by"),
-                "is_teacher_graded": fb.get("teacher_score") is not None,
+                "is_teacher_graded": (
+                    fb.get("teacher_score") is not None
+                    or bool(fb.get("teacher_feedback"))
+                    or bool(t_comments)
+                ),
                 "feedback": summary_text,
                 "summary_feedback": summary_text,
                 "can_do_statements": fb.get("can_do_statements", []),
                 "skills_breakdown": fb.get("skills_breakdown", {}),
                 "points_to_improve": fb.get("points_to_improve", []),
-                "corrections": corrections,
+                "corrections": enriched_corrections,
                 "questions": e.questions or [],
                 "answers": e.answers or {},
             })
@@ -2672,7 +2684,14 @@ class TrimestralExamService:
             return None
 
         fb = exam.feedback if isinstance(exam.feedback, dict) else {}
-        corrections = fb.get("corrections") or cls._reconstruct_corrections(exam)
+        raw_corrections = fb.get("corrections") or cls._reconstruct_corrections(exam)
+        t_comments = fb.get("teacher_question_comments") if isinstance(fb.get("teacher_question_comments"), dict) else {}
+        enriched_corrections = []
+        for idx, c in enumerate(raw_corrections or [], start=1):
+            c_dict = dict(c) if isinstance(c, dict) else {}
+            qid = str(c_dict.get("question_id") or f"q{idx}")
+            c_dict["teacher_comment"] = str(t_comments.get(qid) or "")
+            enriched_corrections.append(c_dict)
         summary_text = fb.get("summary", "")
         return {
             "id": str(exam.id),
@@ -2686,15 +2705,20 @@ class TrimestralExamService:
             "ai_score": fb.get("ai_score") if fb.get("ai_score") is not None else exam.score,
             "teacher_score": fb.get("teacher_score"),
             "teacher_feedback": fb.get("teacher_feedback") or "",
+            "teacher_question_comments": t_comments,
             "teacher_graded_at": fb.get("teacher_graded_at"),
             "teacher_graded_by": fb.get("teacher_graded_by"),
-            "is_teacher_graded": fb.get("teacher_score") is not None,
+            "is_teacher_graded": (
+                fb.get("teacher_score") is not None
+                or bool(fb.get("teacher_feedback"))
+                or bool(t_comments)
+            ),
             "feedback": summary_text,
             "summary_feedback": summary_text,
             "can_do_statements": fb.get("can_do_statements", []),
             "skills_breakdown": fb.get("skills_breakdown", {}),
             "points_to_improve": fb.get("points_to_improve", []),
-            "corrections": corrections,
+            "corrections": enriched_corrections,
             "questions": exam.questions or [],
             "answers": exam.answers or {},
         }
