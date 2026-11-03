@@ -212,6 +212,7 @@ playwright-report/
 scripts/*
 !scripts/deploy.sh
 !scripts/deploy_monitoring.sh
+!scripts/deploy_vps_autocommit.sh
 !scripts/post_deploy.sh
 !scripts/migrate_db_to_vps.sh
 backend/scripts/

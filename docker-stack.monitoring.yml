@@ -29,6 +29,15 @@ services:
         reservations:
           cpus: "0.05"
           memory: 128M
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.prometheus.rule=Host(`prometheus.${DOMAIN}`)"
+        - "traefik.http.routers.prometheus.entrypoints=websecure"
+        - "traefik.http.routers.prometheus.tls=true"
+        - "traefik.http.routers.prometheus.tls.certresolver=letsencrypt"
+        - "traefik.http.routers.prometheus.middlewares=prom-auth"
+        - "traefik.http.middlewares.prom-auth.basicauth.users=admin:$$2b$$12$$ejsA6pdJNsljVJT2BhdJAeQtVZ4P9p.25bIJQFMPgN4ngQ26s6cTO"
+        - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
 
   node_exporter:
     image: prom/node-exporter:v1.9.0

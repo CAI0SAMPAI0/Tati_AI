@@ -4,8 +4,8 @@ services:
   traefik:
     image: traefik:v3.6
     command:
-      # API / Dashboard (desativado externamente por seguranca)
-      - "--api.dashboard=false"
+      # API / Dashboard
+      - "--api.dashboard=true"
       - "--api.insecure=false"
 
       # Docker Swarm provider
@@ -69,6 +69,15 @@ services:
         reservations:
           cpus: "0.1"
           memory: 64M
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.${DOMAIN}`)"
+        - "traefik.http.routers.traefik-dashboard.entrypoints=websecure"
+        - "traefik.http.routers.traefik-dashboard.tls=true"
+        - "traefik.http.routers.traefik-dashboard.tls.certresolver=letsencrypt"
+        - "traefik.http.routers.traefik-dashboard.service=api@internal"
+        - "traefik.http.routers.traefik-dashboard.middlewares=traefik-auth"
+        - "traefik.http.middlewares.traefik-auth.basicauth.users=admin:$$2b$$12$$ejsA6pdJNsljVJT2BhdJAeQtVZ4P9p.25bIJQFMPgN4ngQ26s6cTO"
 
   app:
     image: ghcr.io/cai0sampai0/tati_ai:${APP_IMAGE_TAG:-latest}
