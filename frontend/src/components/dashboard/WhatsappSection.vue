@@ -404,10 +404,11 @@ onUnmounted(() => {
               <p>{{ qrError || 'Gerando QR code...' }}</p>
               <button
                 type="button"
-                @click="loadQrCode()"
-                class="px-3 py-1.5 rounded-lg border border-border text-xs font-bold text-primary hover:underline cursor-pointer"
+                @click="handleRestartSession()"
+                :disabled="isStartingOrStopping"
+                class="px-3 py-1.5 rounded-lg border border-border text-xs font-bold text-primary hover:underline cursor-pointer disabled:opacity-50"
               >
-                Tentar novamente
+                Gerar Novo QR Code
               </button>
             </div>
           </div>

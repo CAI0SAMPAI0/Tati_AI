@@ -128,13 +128,27 @@ class WahaService:
     @classmethod
     def get_qr_image(cls, session_name: str = "default") -> Optional[bytes]:
         url = f"{cls._get_api_url()}/api/{session_name}/auth/qr"
+        headers = cls._get_headers()
         try:
-            with httpx.Client(timeout=12.0) as client:
-                res = client.get(url, headers=cls._get_headers())
+            with httpx.Client(timeout=15.0) as client:
+                res = client.get(url, headers=headers)
                 if res.status_code == 200 and res.content and len(res.content) > 100:
                     return res.content
-                elif res.status_code == 422:
-                    logger.debug(f"[WAHA] QR endpoint returned 422 for {session_name}: session not in SCAN_QR_CODE")
+                elif res.status_code in (404, 422):
+                    logger.info(f"[WAHA] QR endpoint returned {res.status_code} for {session_name}. Auto-restarting session to generate fresh QR...")
+                    try:
+                        client.post(f"{cls._get_api_url()}/api/sessions/{session_name}/restart", headers=headers)
+                    except Exception as re:
+                        logger.warning(f"[WAHA] Auto-restart attempt warning: {re}")
+                    import time
+                    for _ in range(5):
+                        time.sleep(1.0)
+                        try:
+                            retry_res = client.get(url, headers=headers)
+                            if retry_res.status_code == 200 and retry_res.content and len(retry_res.content) > 100:
+                                return retry_res.content
+                        except Exception:
+                            pass
         except Exception as e:
             logger.warning(f"[WAHA] Error fetching QR for {session_name}: {e}")
         return None
