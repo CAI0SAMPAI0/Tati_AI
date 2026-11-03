@@ -75,7 +75,7 @@ services:
     command: >
       gunicorn app.asgi:application
       --bind 0.0.0.0:8000
-      --workers 2
+      --workers 1
       --worker-class uvicorn.workers.UvicornWorker
       --timeout 120
       --graceful-timeout 30
@@ -93,6 +93,7 @@ services:
       ENABLE_NOTIFICATION_SCHEDULER: "false"
       USE_REDIS_CHANNELS: "true"
       USE_LOCAL_DB: "true"
+      DB_CONN_MAX_AGE: "0"
       POSTGRES_HOST: "db"
       POSTGRES_PORT: "5432"
       POSTGRES_DB: "${POSTGRES_DB:-tati_ai}"
@@ -233,6 +234,7 @@ services:
       SERVERLESS: "false"
       ENABLE_NOTIFICATION_SCHEDULER: "false"
       USE_LOCAL_DB: "true"
+      DB_CONN_MAX_AGE: "0"
       POSTGRES_HOST: "db"
       POSTGRES_PORT: "5432"
       POSTGRES_DB: "${POSTGRES_DB:-tati_ai}"
@@ -287,6 +289,7 @@ services:
       SERVERLESS: "false"
       ENABLE_NOTIFICATION_SCHEDULER: "false"
       USE_LOCAL_DB: "true"
+      DB_CONN_MAX_AGE: "0"
       POSTGRES_HOST: "db"
       POSTGRES_PORT: "5432"
       POSTGRES_DB: "${POSTGRES_DB:-tati_ai}"
