@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
+import { canAccessDashboard } from '../utils';
 import { API_BASE } from '../api/client';
 
 const routes: RouteRecordRaw[] = [
@@ -392,6 +393,14 @@ router.beforeEach((to, from, next) => {
   if (!isPublic && !authStore.isAuthenticated) {
     return next('/login');
   }
+
+  // Proteção estrita do Dashboard para professores/administradores
+  if (to.path === '/dashboard' || to.path.startsWith('/dashboard/') || to.name === 'dashboard') {
+    if (!authStore.isAuthenticated || !canAccessDashboard(authStore.user)) {
+      return next('/chat');
+    }
+  }
+
 
   next();
 });
