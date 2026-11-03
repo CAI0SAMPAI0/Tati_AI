@@ -1585,7 +1585,11 @@ class DashboardService:
         pronunciation_list = [
             {
                 "id": str(p.id),
-                "target_phrase": p.target_phrase or p.spoken_phrase or "(Fala Livre)",
+                "target_phrase": p.target_phrase or p.spoken_phrase or (
+                    "Fala Livre"
+                    if p.mode == "free"
+                    else ("Frase Escrita" if p.mode == "write" else "Áudio sem fala detectada")
+                ),
                 "spoken_phrase": p.spoken_phrase,
                 "score": p.score,
                 "accuracy_score": p.accuracy_score,

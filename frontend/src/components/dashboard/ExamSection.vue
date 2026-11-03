@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import {
   Search,
   CheckCircle2,
@@ -27,6 +27,10 @@ import {
   UserCheck,
   Wand2,
   X,
+  Clock,
+  Sliders,
+  Save,
+  GraduationCap,
 } from 'lucide-vue-next';
 import { apiGet, apiPost, apiPatch } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
@@ -60,41 +64,48 @@ const levelCounts = ref<Record<string, number>>({
   C1: 0,
   C2: 0,
 });
+
 const overviewSummary = ref({
   filtered_students: 0,
   pending_review_exams: 0,
   approved_exams: 0,
   completed_exams: 0,
 });
+
 const studentsList = ref<any[]>([]);
 const selectedUsername = ref<string | null>(null);
 const studentDetail = ref<any | null>(null);
 const activeTab = ref<WorkspaceTab>('questions');
 const selectedCompletedExamIdx = ref(0);
 
-// Question AI & Manual editing states
-const openAiBoxByQuestion = ref<Record<string, boolean>>({});
-const aiSuggestionByQuestion = ref<Record<string, string>>({});
-const aiLoadingByQuestion = ref<Record<string, boolean>>({});
+// Status loading & TTS
 const statusLoadingByQuestion = ref<Record<string, boolean>>({});
-const recentlyUpdatedByQuestion = ref<Record<string, boolean>>({});
-
-const openManualEditByQuestion = ref<Record<string, boolean>>({});
-const manualDraftByQuestion = ref<Record<string, any>>({});
-const manualSavingByQuestion = ref<Record<string, boolean>>({});
-
-// Expanded scraped activities in DB tab
-const expandedActivities = ref<Record<string, boolean>>({});
-
-// Audio TTS preview player for Listening questions
 const playingAudioQId = ref<string | null>(null);
 const audioPlayer = ref<HTMLAudioElement | null>(null);
 
+// Modal AI Improve
+const aiModalQuestion = ref<any | null>(null);
+const aiModalSuggestion = ref('');
+const isAiImproving = ref(false);
+
+// Modal Manual Edit
+const manualModalQuestion = ref<any | null>(null);
+const manualDraft = ref<any>({});
+const isSavingManual = ref(false);
+
+// Teacher Grading State
+const isSavingTeacherGrade = ref(false);
+const teacherGradeForm = ref({
+  score: 70,
+  feedback: '',
+  passed: true,
+});
+
 const QUICK_AI_SUGGESTIONS = [
-  'Simplify the vocabulary and sentence structure for this level',
-  'Change the theme to everyday routine, family, or travel',
-  'Make the distractors clearer so only one option is unambiguously correct',
-  'Rewrite the question to match the student completed activities more closely',
+  'Simplificar o vocabulário e a estrutura frasal para este nível',
+  'Mudar o contexto para cotidiano, família, trabalho ou viagens',
+  'Tornar as alternativas incorretas mais claras e sem ambiguidade',
+  'Alinhar a questão mais diretamente com as atividades feitas pelo aluno',
 ];
 
 const filteredStudents = computed(() => {
@@ -111,7 +122,6 @@ const filteredStudents = computed(() => {
 const activeExam = computed(() => studentDetail.value?.active_exam || null);
 const completedExams = computed<any[]>(() => studentDetail.value?.completed_exams || []);
 
-// Combine completed exams + any in-progress exam that already has partial answers so the teacher can always inspect responses
 const answerableExams = computed<any[]>(() => {
   const list: any[] = [];
   if (activeExam.value && (activeExam.value.answered_count || 0) > 0) {
@@ -134,9 +144,19 @@ const selectedAnsweredExam = computed(() => {
 
 const completedActivities = computed<any[]>(() => studentDetail.value?.completed_activities || []);
 
-const hasAnyExamToReset = computed(() => {
-  return Boolean(activeExam.value) || completedExams.value.length > 0;
-});
+watch(
+  selectedAnsweredExam,
+  (exam) => {
+    if (exam) {
+      teacherGradeForm.value = {
+        score: exam.teacher_score ?? exam.score ?? 70,
+        feedback: exam.teacher_feedback || '',
+        passed: exam.passed ?? true,
+      };
+    }
+  },
+  { immediate: true }
+);
 
 function countWords(text?: string | null): number {
   if (!text || !text.trim()) return 0;
@@ -146,9 +166,9 @@ function countWords(text?: string | null): number {
 function formatDate(iso?: string | null): string {
   if (!iso) return '—';
   try {
-    return new Date(iso).toLocaleDateString('en-US', {
-      month: 'short',
+    return new Date(iso).toLocaleDateString('pt-BR', {
       day: '2-digit',
+      month: '2-digit',
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
@@ -158,17 +178,19 @@ function formatDate(iso?: string | null): string {
   }
 }
 
-function isOptionSelectedByStudent(opt: string, corr: any): boolean {
-  const raw = String(corr?.raw_student_answer || corr?.student_answer || '').trim().toLowerCase();
-  if (!raw || raw === '(not answered)') return false;
-  return String(opt || '').trim().toLowerCase() === raw;
+function getModalityBadge(type?: string) {
+  const t = (type || '').toLowerCase();
+  if (t === 'reading') return { label: 'Reading', color: 'bg-blue-500/10 text-blue-500 border-blue-500/25', icon: BookOpen };
+  if (t === 'grammar') return { label: 'Grammar', color: 'bg-purple-500/10 text-purple-500 border-purple-500/25', icon: FileText };
+  if (t === 'vocabulary') return { label: 'Vocabulary', color: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/25', icon: Sparkles };
+  if (t === 'listening') return { label: 'Listening', color: 'bg-cyan-500/10 text-cyan-500 border-cyan-500/25', icon: HeadphonesIcon };
+  if (t === 'writing') return { label: 'Writing', color: 'bg-amber-500/10 text-amber-500 border-amber-500/25', icon: Edit3 };
+  if (t === 'speaking') return { label: 'Speaking', color: 'bg-rose-500/10 text-rose-500 border-rose-500/25', icon: Mic };
+  return { label: type || 'Question', color: 'bg-primary/10 text-primary border-primary/25', icon: FileText };
 }
 
-function isOptionCorrect(opt: string, corr: any): boolean {
-  const expected = String(corr?.correct_answer || '').trim().toLowerCase();
-  if (!expected) return false;
-  return String(opt || '').trim().toLowerCase() === expected;
-}
+// Headphones icon fallback
+const HeadphonesIcon = Volume2;
 
 async function loadOverview(preserveSelection = true) {
   isLoadingOverview.value = true;
@@ -196,7 +218,7 @@ async function loadOverview(preserveSelection = true) {
       studentDetail.value = null;
     }
   } catch (err: any) {
-    toast.error(err?.message || 'Could not load exams overview.');
+    toast.error(err?.message || 'Erro ao carregar exames.');
   } finally {
     isLoadingOverview.value = false;
   }
@@ -211,15 +233,15 @@ async function selectStudent(username: string, preferredTab?: WorkspaceTab) {
     studentDetail.value = detail;
     if (preferredTab) {
       activeTab.value = preferredTab;
-    } else if (detail.active_exam) {
-      activeTab.value = 'questions';
     } else if (detail.completed_exams && detail.completed_exams.length > 0) {
       activeTab.value = 'answers';
+    } else if (detail.active_exam) {
+      activeTab.value = 'questions';
     } else {
       activeTab.value = 'questions';
     }
   } catch (err: any) {
-    toast.error(err?.message || 'Error loading student exam details.');
+    toast.error(err?.message || 'Erro ao carregar detalhes do estudante.');
   } finally {
     isLoadingStudent.value = false;
   }
@@ -268,11 +290,11 @@ async function handleSyncPlaywright(forceRefresh = false) {
     const total = res.sync_result?.total_scraped ?? 0;
     toast.success(
       newly > 0
-        ? `Playwright extracted ${newly} new activity(ies)! (${total} saved in DB)`
-        : `All ${total} completed level activity(ies) are verified in the database.`
+        ? `Playwright extraiu ${newly} nova(s) atividade(s)! (${total} salvas no banco)`
+        : `Todas as ${total} atividades de Grammar a Reading estão verificadas no banco.`
     );
   } catch (err: any) {
-    toast.error(err?.message || 'Error verifying activities with Playwright.');
+    toast.error(err?.message || 'Erro ao sincronizar com Playwright.');
   } finally {
     isSyncingPlaywright.value = false;
   }
@@ -288,9 +310,9 @@ async function handleGenerateExam() {
     studentDetail.value = res;
     syncStudentRowInList(res);
     activeTab.value = 'questions';
-    toast.success(`New ${res.student?.level} exam generated from student's completed activities!`);
+    toast.success(`Novo exame nível ${res.student?.level} gerado com base nas atividades do aluno!`);
   } catch (err: any) {
-    toast.error(err?.message || 'Could not generate exam.');
+    toast.error(err?.message || 'Não foi possível gerar o exame.');
   } finally {
     isGeneratingExam.value = false;
   }
@@ -298,7 +320,7 @@ async function handleGenerateExam() {
 
 async function handleResetExam(mode: 'reopen' | 'clear_all' | 'delete_one', examId?: string) {
   if (!selectedUsername.value || isResettingExam.value) return;
-  if (mode === 'delete_one' && !confirm('Delete this specific exam attempt?')) return;
+  if (mode === 'delete_one' && !confirm('Excluir esta tentativa específica do exame?')) return;
 
   isResettingExam.value = true;
   try {
@@ -313,26 +335,15 @@ async function handleResetExam(mode: 'reopen' | 'clear_all' | 'delete_one', exam
 
     if (mode === 'reopen') {
       activeTab.value = 'questions';
-      toast.success('Exam reopened! The student can retake it immediately with the current questions.');
+      toast.success('Exame reaberto! O aluno já pode refazê-lo com as questões atuais.');
     } else if (mode === 'delete_one') {
-      toast.success('Exam attempt removed.');
+      toast.success('Tentativa de exame excluída.');
     } else {
       activeTab.value = 'questions';
-      toast.success('Student exam cycle completely reset!');
+      toast.success('Ciclo de exames do aluno resetado com sucesso.');
     }
-    // Refresh KPI counters silently
-    const params = new URLSearchParams();
-    if (selectedLevel.value !== 'ALL') params.set('level', selectedLevel.value);
-    const qs = params.toString();
-    const overviewUrl = qs ? `${ENDPOINTS.DASHBOARD_EXAMS_OVERVIEW}?${qs}` : ENDPOINTS.DASHBOARD_EXAMS_OVERVIEW;
-    apiGet<any>(overviewUrl)
-      .then((ov) => {
-        if (ov?.summary) overviewSummary.value = ov.summary;
-        if (ov?.level_counts) levelCounts.value = ov.level_counts;
-      })
-      .catch(() => {});
   } catch (err: any) {
-    toast.error(err?.message || 'Error resetting student exam.');
+    toast.error(err?.message || 'Erro ao resetar exame.');
   } finally {
     isResettingExam.value = false;
   }
@@ -353,18 +364,15 @@ async function handleSetQuestionStatus(q: any, status: 'approved' | 'rejected' |
       studentDetail.value.active_exam = res.exam;
       syncStudentRowInList(studentDetail.value);
     }
-    if (status === 'rejected') {
-      openAiBoxByQuestion.value[q.id] = true;
-    }
     toast.success(
       status === 'approved'
-        ? `Question ${q.id.toUpperCase()} approved!`
+        ? `Questão ${q.id.toUpperCase()} aprovada!`
         : status === 'rejected'
-        ? `Question ${q.id.toUpperCase()} marked for adjustment.`
-        : `Question ${q.id.toUpperCase()} reset to pending.`
+        ? `Questão ${q.id.toUpperCase()} marcada para ajuste.`
+        : `Questão ${q.id.toUpperCase()} pendente.`
     );
   } catch (err: any) {
-    toast.error(err?.message || 'Could not update question status.');
+    toast.error(err?.message || 'Erro ao atualizar status da questão.');
   } finally {
     statusLoadingByQuestion.value[q.id] = false;
   }
@@ -381,140 +389,146 @@ async function handleApproveAll() {
       studentDetail.value.active_exam = res.exam;
       syncStudentRowInList(studentDetail.value);
     }
-    toast.success('All exam questions approved!');
+    toast.success('Todas as 10 questões foram aprovadas!');
   } catch (err: any) {
-    toast.error(err?.message || 'Error approving all questions.');
+    toast.error(err?.message || 'Erro ao aprovar questões em lote.');
   } finally {
     isBulkApproving.value = false;
   }
 }
 
-function toggleAiBox(qId: string) {
-  openAiBoxByQuestion.value[qId] = !openAiBoxByQuestion.value[qId];
-  if (openAiBoxByQuestion.value[qId]) {
-    openManualEditByQuestion.value[qId] = false;
-  }
+// Open AI modal
+function openAiModal(q: any) {
+  aiModalQuestion.value = q;
+  aiModalSuggestion.value = '';
 }
 
-async function handleApplyAiImprovement(q: any) {
-  if (!activeExam.value) return;
-  const suggestion = (aiSuggestionByQuestion.value[q.id] || '').trim();
+async function handleExecuteAiImprovement() {
+  if (!activeExam.value || !aiModalQuestion.value) return;
+  const suggestion = aiModalSuggestion.value.trim();
   if (!suggestion) {
-    toast.error('Type what you want the AI to improve or change in this question.');
+    toast.error('Informe o que a IA deve ajustar nesta questão.');
     return;
   }
 
-  aiLoadingByQuestion.value[q.id] = true;
+  isAiImproving.value = true;
   try {
     const res = await apiPost<any>(
-      ENDPOINTS.DASHBOARD_EXAMS_AI_IMPROVE(activeExam.value.id, q.id),
+      ENDPOINTS.DASHBOARD_EXAMS_AI_IMPROVE(activeExam.value.id, aiModalQuestion.value.id),
       { suggestion }
     );
     if (studentDetail.value && res.exam) {
       studentDetail.value.active_exam = res.exam;
       syncStudentRowInList(studentDetail.value);
     }
-    aiSuggestionByQuestion.value[q.id] = '';
-    openAiBoxByQuestion.value[q.id] = false;
-    recentlyUpdatedByQuestion.value[q.id] = true;
-    setTimeout(() => {
-      recentlyUpdatedByQuestion.value[q.id] = false;
-    }, 4500);
-    toast.success(`Question ${q.id.toUpperCase()} updated in real time by AI!`);
+    toast.success(`Questão ${aiModalQuestion.value.id.toUpperCase()} atualizada pela IA!`);
+    aiModalQuestion.value = null;
   } catch (err: any) {
-    toast.error(err?.message || 'AI could not update the question right now.');
+    toast.error(err?.message || 'Não foi possível atualizar a questão com IA.');
   } finally {
-    aiLoadingByQuestion.value[q.id] = false;
+    isAiImproving.value = false;
   }
 }
 
-function toggleManualEdit(q: any) {
-  const isOpen = !openManualEditByQuestion.value[q.id];
-  openManualEditByQuestion.value[q.id] = isOpen;
-  if (isOpen) {
-    openAiBoxByQuestion.value[q.id] = false;
-    manualDraftByQuestion.value[q.id] = {
-      question: q.question || '',
-      reading_text: q.reading_text || '',
-      audio_text: q.audio_text || '',
-      options: Array.isArray(q.options) ? [...q.options] : [],
-      correct_answer: q.correct_answer || '',
-      explanation: q.explanation || '',
-    };
-  }
+// Open manual edit modal
+function openManualModal(q: any) {
+  manualModalQuestion.value = q;
+  manualDraft.value = {
+    question: q.question || '',
+    reading_text: q.reading_text || '',
+    audio_text: q.audio_text || '',
+    options: Array.isArray(q.options) ? [...q.options] : [],
+    correct_answer: q.correct_answer || '',
+    explanation: q.explanation || '',
+  };
 }
 
-async function handleSaveManualEdit(q: any) {
-  if (!activeExam.value) return;
-  const draft = manualDraftByQuestion.value[q.id];
-  if (!draft) return;
-
-  manualSavingByQuestion.value[q.id] = true;
+async function handleExecuteManualSave() {
+  if (!activeExam.value || !manualModalQuestion.value) return;
+  isSavingManual.value = true;
   try {
     const res = await apiPatch<any>(
-      ENDPOINTS.DASHBOARD_EXAMS_QUESTION_EDIT(activeExam.value.id, q.id),
-      draft
+      ENDPOINTS.DASHBOARD_EXAMS_QUESTION_EDIT(activeExam.value.id, manualModalQuestion.value.id),
+      manualDraft.value
     );
     if (studentDetail.value && res.exam) {
       studentDetail.value.active_exam = res.exam;
       syncStudentRowInList(studentDetail.value);
     }
-    openManualEditByQuestion.value[q.id] = false;
-    toast.success(`Question ${q.id.toUpperCase()} saved!`);
+    toast.success(`Questão ${manualModalQuestion.value.id.toUpperCase()} salva com sucesso!`);
+    manualModalQuestion.value = null;
   } catch (err: any) {
-    toast.error(err?.message || 'Could not save manual changes.');
+    toast.error(err?.message || 'Erro ao salvar alterações da questão.');
   } finally {
-    manualSavingByQuestion.value[q.id] = false;
+    isSavingManual.value = false;
   }
 }
 
-async function handlePlayListeningPreview(keyId: string, audioText?: string | null) {
+// Teacher Grading
+async function handleSaveTeacherGrade() {
+  if (!selectedAnsweredExam.value) return;
+  const examId = selectedAnsweredExam.value.id || selectedAnsweredExam.value.exam_id;
+  if (!examId) return;
+
+  isSavingTeacherGrade.value = true;
+  try {
+    const res = await apiPost<any>(ENDPOINTS.DASHBOARD_EXAMS_GRADE(examId), {
+      teacher_score: Number(teacherGradeForm.value.score),
+      teacher_feedback: teacherGradeForm.value.feedback,
+      passed: Boolean(teacherGradeForm.value.passed),
+    });
+    if (res.exam) {
+      const cList = studentDetail.value?.completed_exams || [];
+      const idx = cList.findIndex((e: any) => e.id === examId);
+      if (idx !== -1) {
+        cList[idx] = res.exam;
+      }
+      if (studentDetail.value?.active_exam?.id === examId) {
+        studentDetail.value.active_exam = res.exam;
+      }
+      syncStudentRowInList(studentDetail.value);
+    }
+    toast.success('Nota da professora salva com sucesso!');
+  } catch (err: any) {
+    toast.error(err?.message || 'Erro ao salvar nota da professora.');
+  } finally {
+    isSavingTeacherGrade.value = false;
+  }
+}
+
+async function handlePlayAudio(keyId: string, audioText?: string | null, rawAudioBase64?: string | null) {
   if (playingAudioQId.value === keyId && audioPlayer.value) {
     audioPlayer.value.pause();
     playingAudioQId.value = null;
     return;
   }
+
+  if (rawAudioBase64) {
+    if (audioPlayer.value) audioPlayer.value.pause();
+    const src = rawAudioBase64.startsWith('data:audio') ? rawAudioBase64 : `data:audio/webm;base64,${rawAudioBase64}`;
+    audioPlayer.value = new Audio(src);
+    playingAudioQId.value = keyId;
+    audioPlayer.value.onended = () => { playingAudioQId.value = null; };
+    await audioPlayer.value.play();
+    return;
+  }
+
   if (!audioText) return;
   try {
     const tts = await getTtsAudio(audioText, 'en-US');
     if (!tts?.audio_b64) {
-      toast.error('Audio preview unavailable.');
+      toast.error('Prévia de áudio indisponível.');
       return;
     }
-    if (audioPlayer.value) {
-      audioPlayer.value.pause();
-    }
+    if (audioPlayer.value) audioPlayer.value.pause();
     audioPlayer.value = new Audio(`data:audio/mp3;base64,${tts.audio_b64}`);
     playingAudioQId.value = keyId;
-    audioPlayer.value.onended = () => {
-      playingAudioQId.value = null;
-    };
+    audioPlayer.value.onended = () => { playingAudioQId.value = null; };
     await audioPlayer.value.play();
   } catch {
     playingAudioQId.value = null;
-    toast.error('Failed to play TTS audio preview.');
+    toast.error('Erro ao reproduzir áudio.');
   }
-}
-
-function toggleActivityExpand(key: string) {
-  expandedActivities.value[key] = !expandedActivities.value[key];
-}
-
-function getApprovalBadgeClass(status?: string) {
-  if (status === 'approved') return 'bg-success/15 text-success border-success/30';
-  if (status === 'rejected' || status === 'changes_requested') return 'bg-danger/15 text-danger border-danger/30';
-  return 'bg-amber-500/15 text-amber-500 border-amber-500/30';
-}
-
-function getModalityBadgeClass(type?: string) {
-  const t = (type || '').toLowerCase();
-  if (t === 'reading') return 'bg-blue-500/10 text-blue-500 border-blue-500/25';
-  if (t === 'grammar') return 'bg-purple-500/10 text-purple-500 border-purple-500/25';
-  if (t === 'vocabulary') return 'bg-emerald-500/10 text-emerald-500 border-emerald-500/25';
-  if (t === 'listening') return 'bg-cyan-500/10 text-cyan-500 border-cyan-500/25';
-  if (t === 'writing') return 'bg-amber-500/10 text-amber-500 border-amber-500/25';
-  if (t === 'speaking') return 'bg-rose-500/10 text-rose-500 border-rose-500/25';
-  return 'bg-primary/10 text-primary border-primary/25';
 }
 
 onMounted(() => {
@@ -530,116 +544,145 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="space-y-5">
-    <!-- Top Filter & Summary Header -->
-    <div class="bg-surface border border-border rounded-2xl p-5 shadow-xs space-y-4">
-      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
-            <ExamIcon class="w-5 h-5" />
-          </div>
-          <div>
-            <h2 class="text-base md:text-lg font-bold text-text">
-              Exams — Verification, AI Adjustments &amp; Student Answers
-            </h2>
-          </div>
-        </div>
-
-        <!-- KPI Badges -->
-        <div class="flex flex-wrap items-center gap-2 text-xs">
-          <div class="px-3 py-1.5 rounded-xl bg-bg border border-border font-semibold text-text-muted">
-            Students: <strong class="text-text">{{ overviewSummary.filtered_students }}</strong>
-          </div>
-          <div class="px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/25 font-semibold text-amber-500">
-            Pending Review: <strong>{{ overviewSummary.pending_review_exams }}</strong>
-          </div>
-          <div class="px-3 py-1.5 rounded-xl bg-success/10 border border-success/25 font-semibold text-success">
-            Approved: <strong>{{ overviewSummary.approved_exams }}</strong>
-          </div>
-          <div class="px-3 py-1.5 rounded-xl bg-primary/10 border border-primary/25 font-semibold text-primary">
-            Submitted Exams: <strong>{{ overviewSummary.completed_exams }}</strong>
-          </div>
-        </div>
-      </div>
-
-      <!-- Level Filter Pills + Search -->
-      <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-2 border-t border-border/60">
-        <div class="flex flex-wrap items-center gap-1.5">
-          <button
-            v-for="lvl in LEVELS"
-            :key="lvl"
-            type="button"
-            @click="handleChangeLevel(lvl)"
-            class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border"
-            :class="
-              selectedLevel === lvl
-                ? 'bg-primary text-white border-primary shadow-glow'
-                : 'bg-bg border-border text-text-muted hover:text-primary hover:border-primary/40'
-            "
-          >
-            <span>{{ lvl === 'ALL' ? 'All Levels' : lvl }}</span>
-            <span
-              class="text-[0.65rem] px-1.5 py-0.2 rounded-full font-black"
-              :class="selectedLevel === lvl ? 'bg-white/20 text-white' : 'bg-surface-hover text-text-subtle'"
-            >
-              {{ levelCounts[lvl] ?? 0 }}
+  <div class="space-y-6">
+    <!-- 1. CLEAN TOP HEADER & METRIC CARDS -->
+    <div class="space-y-4">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-xl md:text-2xl font-black text-text tracking-tight flex items-center gap-2.5">
+            <span class="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+              <ExamIcon class="w-4 h-4" />
             </span>
-          </button>
+            <span>Exames Trimestrais</span>
+          </h2>
+          <p class="text-xs text-text-muted mt-0.5">
+            Revisão de questões com IA, sincronização Playwright e avaliação da professora.
+          </p>
         </div>
 
-        <div class="flex items-center gap-2 w-full md:w-80">
-          <div class="relative flex-1">
+        <div class="flex items-center gap-2">
+          <!-- Search Input -->
+          <div class="relative w-64 sm:w-72">
             <Search class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle" />
             <input
               v-model="searchQuery"
               type="text"
-              placeholder="Search student by name or @username..."
-              class="w-full pl-9 pr-3 py-2 bg-bg border border-border rounded-xl text-xs text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+              placeholder="Buscar aluno ou @username..."
+              class="w-full pl-9 pr-3 py-2 bg-surface border border-border rounded-xl text-xs text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
             />
           </div>
+
           <button
             type="button"
             @click="loadOverview(true)"
-            class="p-2 rounded-xl bg-bg border border-border text-text-muted hover:text-primary hover:border-primary/40 transition-colors cursor-pointer"
-            title="Refresh list"
+            class="p-2.5 rounded-xl bg-surface border border-border text-text-muted hover:text-primary hover:border-primary/40 transition-colors cursor-pointer shadow-2xs"
+            title="Atualizar listagem"
           >
             <RefreshCw class="w-4 h-4" :class="isLoadingOverview ? 'animate-spin text-primary' : ''" />
           </button>
         </div>
       </div>
+
+      <!-- 4 Compact Stat Cards -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div class="p-3.5 bg-surface border border-border rounded-2xl shadow-2xs flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-bg-secondary flex items-center justify-center text-text-muted shrink-0">
+            <UserCheck class="w-4 h-4" />
+          </div>
+          <div>
+            <span class="text-[0.68rem] font-bold text-text-muted uppercase tracking-wider block">Alunos</span>
+            <span class="text-lg font-black text-text">{{ overviewSummary.filtered_students }}</span>
+          </div>
+        </div>
+
+        <div class="p-3.5 bg-surface border border-border rounded-2xl shadow-2xs flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
+            <Clock class="w-4 h-4" />
+          </div>
+          <div>
+            <span class="text-[0.68rem] font-bold text-amber-500 uppercase tracking-wider block">Pendente Revisão</span>
+            <span class="text-lg font-black text-text">{{ overviewSummary.pending_review_exams }}</span>
+          </div>
+        </div>
+
+        <div class="p-3.5 bg-surface border border-border rounded-2xl shadow-2xs flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-success/10 text-success flex items-center justify-center shrink-0">
+            <CheckCircle2 class="w-4 h-4" />
+          </div>
+          <div>
+            <span class="text-[0.68rem] font-bold text-success uppercase tracking-wider block">Exames Aprovados</span>
+            <span class="text-lg font-black text-text">{{ overviewSummary.approved_exams }}</span>
+          </div>
+        </div>
+
+        <div class="p-3.5 bg-surface border border-border rounded-2xl shadow-2xs flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+            <GraduationCap class="w-4 h-4" />
+          </div>
+          <div>
+            <span class="text-[0.68rem] font-bold text-primary uppercase tracking-wider block">Entregues / Feitos</span>
+            <span class="text-lg font-black text-text">{{ overviewSummary.completed_exams }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- CEFR Level Pills -->
+      <div class="flex items-center gap-1.5 overflow-x-auto py-1 custom-scrollbar">
+        <button
+          v-for="lvl in LEVELS"
+          :key="lvl"
+          type="button"
+          @click="handleChangeLevel(lvl)"
+          class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 border"
+          :class="
+            selectedLevel === lvl
+              ? 'bg-primary text-white border-primary shadow-xs'
+              : 'bg-surface border-border text-text-muted hover:text-primary hover:border-primary/40'
+          "
+        >
+          <span>{{ lvl === 'ALL' ? 'Todos os Níveis' : lvl }}</span>
+          <span
+            class="text-[0.62rem] px-1.5 py-0.2 rounded-full font-bold"
+            :class="selectedLevel === lvl ? 'bg-white/20 text-white' : 'bg-bg-secondary text-text-muted'"
+          >
+            {{ levelCounts[lvl] ?? 0 }}
+          </span>
+        </button>
+      </div>
     </div>
 
-    <!-- Master-Detail Grid (Side-by-Side Equal Height with Internal Scrollbars) -->
+    <!-- 2. TWO-COLUMN WORKSPACE: Clean & Structured -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-      <!-- LEFT COLUMN: Students List -->
-      <div class="lg:col-span-4 bg-surface border border-border rounded-2xl overflow-hidden shadow-xs flex flex-col lg:h-[78vh]">
-        <div class="px-4 py-3.5 border-b border-border flex items-center justify-between bg-bg-secondary/40 shrink-0">
-          <span class="text-xs font-bold uppercase tracking-wider text-text-subtle">
-            Students ({{ filteredStudents.length }})
+      <!-- LEFT: Students Sidebar -->
+      <div class="lg:col-span-4 bg-surface border border-border rounded-2xl overflow-hidden shadow-xs flex flex-col lg:h-[76vh]">
+        <div class="px-4 py-3 border-b border-border bg-bg-secondary/30 flex items-center justify-between shrink-0">
+          <span class="text-xs font-bold uppercase tracking-wider text-text-muted">
+            Estudantes ({{ filteredStudents.length }})
           </span>
-          <span v-if="selectedLevel !== 'ALL'" class="text-[0.65rem] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-            Level {{ selectedLevel }}
+          <span v-if="selectedLevel !== 'ALL'" class="text-[0.65rem] font-black px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+            {{ selectedLevel }}
           </span>
         </div>
 
         <div v-if="isLoadingOverview" class="p-8 text-center space-y-2 flex-1 flex flex-col items-center justify-center">
-          <div class="w-7 h-7 mx-auto rounded-full border-3 border-primary/20 border-t-primary animate-spin" />
-          <p class="text-xs text-text-muted font-medium">Loading students &amp; exams...</p>
+          <div class="w-7 h-7 mx-auto rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
+          <p class="text-xs text-text-muted">Carregando alunos...</p>
         </div>
 
         <div v-else-if="filteredStudents.length === 0" class="p-8 text-center text-xs text-text-muted flex-1 flex items-center justify-center">
-          No students found for this level filter.
+          Nenhum estudante encontrado neste filtro.
         </div>
 
-        <div v-else class="flex-1 min-h-0 max-h-[65vh] lg:max-h-none overflow-y-auto divide-y divide-border custom-scrollbar">
+        <div v-else class="flex-1 min-h-0 overflow-y-auto divide-y divide-border/60 custom-scrollbar">
           <div
             v-for="stu in filteredStudents"
             :key="stu.username"
             @click="selectStudent(stu.username)"
-            class="w-full p-4 text-left transition-all cursor-pointer flex items-start gap-3 hover:bg-bg-secondary/40"
+            class="w-full p-3.5 text-left transition-all cursor-pointer flex items-center gap-3 hover:bg-bg-secondary/40"
             :class="selectedUsername === stu.username ? 'bg-primary/8 border-l-4 border-l-primary' : ''"
           >
-            <div class="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary shrink-0 overflow-hidden mt-0.5">
+            <!-- Avatar -->
+            <div class="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary shrink-0 overflow-hidden">
               <img
                 v-if="stu.avatar_url && stu.avatar_url !== DEFAULT_AVATAR_URL"
                 :src="stu.avatar_url"
@@ -650,188 +693,154 @@ onUnmounted(() => {
               <span v-else>{{ (stu.name || stu.username || '?').charAt(0).toUpperCase() }}</span>
             </div>
 
-            <div class="min-w-0 flex-1 space-y-1.5">
-              <div class="flex items-center justify-between gap-2">
-                <div class="flex items-center gap-1.5 min-w-0">
-                  <span class="text-xs sm:text-sm font-bold text-text truncate">{{ stu.name || stu.username }}</span>
-                  <span
-                    v-if="stu.is_admin_account"
-                    class="text-[0.58rem] font-bold uppercase px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-500 border border-amber-500/30 shrink-0"
-                    title="Admin account visible only during test mode; hidden automatically once exams are released to all students."
-                  >
-                    Admin
-                  </span>
-                </div>
-                <span class="text-[0.65rem] font-black px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 shrink-0">
+            <!-- Info -->
+            <div class="min-w-0 flex-1 space-y-1">
+              <div class="flex items-center justify-between gap-1.5">
+                <span class="text-xs font-bold text-text truncate">{{ stu.name || stu.username }}</span>
+                <span class="text-[0.62rem] font-black px-2 py-0.5 rounded-full bg-primary/10 text-primary shrink-0">
                   {{ stu.level }}
                 </span>
               </div>
 
-              <div class="text-[0.68rem] text-text-muted truncate">@{{ stu.username }}</div>
+              <div class="text-[0.65rem] text-text-muted truncate">@{{ stu.username }}</div>
 
-              <div class="flex flex-wrap items-center gap-1.5 pt-0.5">
-                <span class="text-[0.62rem] font-semibold px-2 py-0.5 rounded-md bg-bg border border-border text-text-subtle">
-                  {{ stu.completed_activities_summary?.total || 0 }} done ({{ stu.completed_activities_summary?.scraped_count || 0 }} DB)
-                </span>
-
+              <!-- Status badge -->
+              <div class="flex items-center gap-1.5 pt-0.5">
                 <span
-                  v-if="stu.active_exam"
-                  class="text-[0.62rem] font-bold px-2 py-0.5 rounded-md border"
-                  :class="getApprovalBadgeClass(stu.active_exam.approval_summary?.overall_status)"
-                >
-                  {{
-                    stu.active_exam.approval_summary?.overall_status === 'approved'
-                      ? 'Exam Approved'
-                      : stu.active_exam.approval_summary?.overall_status === 'changes_requested'
-                      ? `${stu.active_exam.approval_summary?.rejected} Rejected`
-                      : `${stu.active_exam.approval_summary?.approved}/${stu.active_exam.approval_summary?.total} Approved`
-                  }}
-                </span>
-
-                <button
                   v-if="stu.completed_exams_count > 0"
-                  type="button"
-                  @click.stop="selectStudent(stu.username, 'answers')"
-                  class="text-[0.62rem] font-bold px-2 py-0.5 rounded-md bg-primary text-white hover:opacity-90 inline-flex items-center gap-1 cursor-pointer shadow-xs"
-                  title="Click to inspect student's submitted exam answers"
+                  class="text-[0.6rem] font-bold px-2 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20 flex items-center gap-1"
                 >
-                  <Eye class="w-3 h-3" />
-                  <span>
-                    Answers ({{ stu.completed_exams_count }})
-                    <template v-if="stu.latest_completed_exam"> • {{ stu.latest_completed_exam.score }}%</template>
-                  </span>
-                </button>
+                  <Award class="w-2.5 h-2.5" />
+                  <span>{{ stu.completed_exams_count }} concluído(s) • {{ stu.latest_completed_exam?.score }}%</span>
+                </span>
+                <span
+                  v-else-if="stu.active_exam"
+                  class="text-[0.6rem] font-bold px-2 py-0.5 rounded-md border"
+                  :class="stu.active_exam.approval_summary?.overall_status === 'approved' ? 'bg-success/10 text-success border-success/20' : 'bg-amber-500/10 text-amber-500 border-amber-500/20'"
+                >
+                  {{ stu.active_exam.approval_summary?.overall_status === 'approved' ? '✓ Aprovado' : `${stu.active_exam.approval_summary?.approved}/10 Aprovadas` }}
+                </span>
+                <span v-else class="text-[0.6rem] text-text-subtle">Sem exame ativo</span>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- RIGHT COLUMN: Selected Student Workspace (Fixed height matching left column + internal scroll) -->
-      <div class="lg:col-span-8 flex flex-col gap-4 lg:h-[78vh] min-h-0">
+      <!-- RIGHT: Student Workspace -->
+      <div class="lg:col-span-8 flex flex-col gap-4 lg:h-[76vh] min-h-0">
         <div
           v-if="isLoadingStudent"
-          class="bg-surface border border-border rounded-2xl p-12 text-center space-y-3 flex-1 flex flex-col items-center justify-center"
+          class="bg-surface border border-border rounded-2xl p-12 text-center space-y-3 flex-1 flex flex-col items-center justify-center shadow-xs"
         >
-          <div class="w-9 h-9 mx-auto rounded-full border-3 border-primary/20 border-t-primary animate-spin" />
-          <p class="text-xs font-bold text-text-muted">Loading student exam &amp; verified activities...</p>
+          <div class="w-8 h-8 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
+          <p class="text-xs text-text-muted font-medium">Carregando exames e atividades do estudante...</p>
         </div>
 
         <div
           v-else-if="!studentDetail"
-          class="bg-surface border border-border rounded-2xl p-12 text-center text-xs text-text-muted flex-1 flex items-center justify-center"
+          class="bg-surface border border-border rounded-2xl p-12 text-center text-xs text-text-muted flex-1 flex items-center justify-center shadow-xs"
         >
-          Select a student on the left to review exam questions, apply real-time AI adjustments, or inspect exam answers.
+          Selecione um aluno na coluna à esquerda para revisar questões, aplicar ajustes com IA ou lançar notas.
         </div>
 
         <template v-else>
-          <!-- Pinned Student Header & Actions Card -->
-          <div class="bg-surface border border-border rounded-2xl p-5 shadow-xs space-y-4 shrink-0">
-            <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+          <!-- Modern Student Pinned Header -->
+          <div class="bg-surface border border-border rounded-2xl p-4 md:p-5 shadow-xs space-y-3.5 shrink-0">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div class="space-y-1">
-                <div class="flex flex-wrap items-center gap-2">
-                  <h3 class="text-base md:text-lg font-bold text-text">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <h3 class="text-base font-black text-text">
                     {{ studentDetail.student.name }}
                   </h3>
                   <span class="text-xs font-black px-2.5 py-0.5 rounded-full bg-primary text-white">
-                    Current Level: {{ studentDetail.student.level }}
+                    Nível {{ studentDetail.student.level }}
                   </span>
                   <span class="text-xs text-text-muted">@{{ studentDetail.student.username }}</span>
                 </div>
-                <p class="text-xs text-text-muted">
-                  Completed in Level {{ studentDetail.student.level }}:
-                  <strong class="text-text">{{ studentDetail.completed_activities_summary.by_category.grammar }}</strong> Grammar •
-                  <strong class="text-text">{{ studentDetail.completed_activities_summary.by_category.vocabulary }}</strong> Vocabulary •
-                  <strong class="text-text">{{ studentDetail.completed_activities_summary.by_category.listening }}</strong> Listening •
-                  <strong class="text-text">{{ studentDetail.completed_activities_summary.by_category.reading }}</strong> Reading
-                  ({{ studentDetail.completed_activities_summary.scraped_count }}/{{ studentDetail.completed_activities_summary.total }} scraped in DB)
+                <p class="text-xs text-text-muted flex items-center gap-2 flex-wrap">
+                  <span>Atividades feitas no nível {{ studentDetail.student.level }}:</span>
+                  <span class="font-bold text-text">{{ studentDetail.completed_activities_summary.by_category.grammar }} Grammar</span> •
+                  <span class="font-bold text-text">{{ studentDetail.completed_activities_summary.by_category.vocabulary }} Vocab</span> •
+                  <span class="font-bold text-text">{{ studentDetail.completed_activities_summary.by_category.listening }} Listening</span> •
+                  <span class="font-bold text-text">{{ studentDetail.completed_activities_summary.by_category.reading }} Reading</span>
+                  <span class="text-[0.65rem] px-2 py-0.5 rounded-md bg-bg-secondary text-text-muted border border-border">
+                    {{ studentDetail.completed_activities_summary.scraped_count }}/{{ studentDetail.completed_activities_summary.total }} salvas no banco
+                  </span>
                 </p>
               </div>
 
-              <div class="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  @click="handleSyncPlaywright(false)"
-                  :disabled="isSyncingPlaywright || isGeneratingExam || isResettingExam"
-                  class="px-3 py-2 rounded-xl bg-bg border border-border hover:border-primary/50 text-xs font-bold text-text flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
-                >
-                  <RefreshCw class="w-3.5 h-3.5 text-primary" :class="isSyncingPlaywright ? 'animate-spin' : ''" />
-                  <span>{{ isSyncingPlaywright ? 'Scraping...' : 'Verify (Playwright)' }}</span>
-                </button>
-
-                <button
-                  v-if="hasAnyExamToReset"
-                  type="button"
-                  @click="isResetModalOpen = true"
-                  :disabled="isResettingExam || isGeneratingExam"
-                  class="px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500 hover:text-white text-xs font-bold text-amber-500 flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
-                  title="Reset or reopen this student's exam"
-                >
-                  <RotateCcw class="w-3.5 h-3.5" :class="isResettingExam ? 'animate-spin' : ''" />
-                  <span>Reset Exam</span>
-                </button>
-
+              <!-- Quick Actions Toolbar -->
+              <div class="flex items-center gap-2 shrink-0">
                 <button
                   type="button"
                   @click="handleGenerateExam"
-                  :disabled="isGeneratingExam || isSyncingPlaywright || isResettingExam"
-                  class="px-4 py-2 rounded-xl bg-primary text-white hover:opacity-90 text-xs font-bold flex items-center gap-1.5 shadow-glow transition-all cursor-pointer disabled:opacity-50"
+                  :disabled="isGeneratingExam"
+                  class="px-3.5 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-hover transition-all flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
+                  title="Gera ou regenera o exame com IA baseado nas atividades que o aluno fez"
                 >
                   <Sparkles class="w-3.5 h-3.5" :class="isGeneratingExam ? 'animate-spin' : ''" />
-                  <span>
-                    {{
-                      isGeneratingExam
-                        ? 'Generating Exam...'
-                        : activeExam
-                        ? `Regenerate ${studentDetail.student.level} Exam`
-                        : `Generate ${studentDetail.student.level} Exam`
-                    }}
-                  </span>
+                  <span>{{ isGeneratingExam ? 'Gerando...' : 'Gerar Exame IA' }}</span>
+                </button>
+
+                <button
+                  type="button"
+                  @click="handleSyncPlaywright(false)"
+                  :disabled="isSyncingPlaywright"
+                  class="px-3 py-2 rounded-xl bg-surface border border-border text-xs font-bold text-text-muted hover:text-primary hover:border-primary/40 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-2xs"
+                  title="Executa o Playwright para extrair as atividades concluídas pelo aluno"
+                >
+                  <RefreshCw class="w-3.5 h-3.5" :class="isSyncingPlaywright ? 'animate-spin text-primary' : ''" />
+                  <span>Playwright Sync</span>
+                </button>
+
+                <button
+                  v-if="activeExam && activeExam.approval_summary?.overall_status !== 'approved'"
+                  type="button"
+                  @click="handleApproveAll"
+                  :disabled="isBulkApproving"
+                  class="px-3 py-2 rounded-xl bg-success/15 border border-success/30 text-xs font-bold text-success hover:bg-success/20 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <CheckCircle2 class="w-3.5 h-3.5" />
+                  <span>Aprovar Todas</span>
+                </button>
+
+                <!-- Options / Reset -->
+                <button
+                  type="button"
+                  @click="isResetModalOpen = true"
+                  class="p-2 rounded-xl bg-surface border border-border text-text-muted hover:text-danger hover:border-danger/30 transition-colors cursor-pointer shadow-2xs"
+                  title="Opções de Reset do Exame"
+                >
+                  <RotateCcw class="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
 
-            <!-- Sub-navigation Tabs -->
-            <div class="flex flex-wrap items-center gap-2 pt-3 border-t border-border/60">
+            <!-- Segmented Modern Tabs -->
+            <div class="flex items-center gap-1 bg-bg-secondary/40 p-1 rounded-xl border border-border/80">
               <button
                 type="button"
                 @click="activeTab = 'questions'"
-                class="px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer"
-                :class="
-                  activeTab === 'questions'
-                    ? 'bg-primary text-white shadow-xs'
-                    : 'bg-bg border border-border text-text-muted hover:text-text'
-                "
+                class="flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2"
+                :class="activeTab === 'questions' ? 'bg-surface text-primary shadow-xs' : 'text-text-muted hover:text-text'"
               >
-                <CheckCircle2 class="w-3.5 h-3.5" />
-                <span>Verify Questions &amp; AI Adjust</span>
-                <span
-                  v-if="activeExam"
-                  class="px-1.5 py-0.2 rounded-full text-[0.65rem]"
-                  :class="activeTab === 'questions' ? 'bg-white/20 text-white' : 'bg-primary/10 text-primary'"
-                >
-                  {{ activeExam.total_questions }}
+                <FileText class="w-3.5 h-3.5" />
+                <span>Questões do Exame</span>
+                <span v-if="activeExam?.questions?.length" class="text-[0.65rem] px-1.5 py-0.2 rounded-full bg-primary/10 text-primary">
+                  {{ activeExam.questions.length }}
                 </span>
               </button>
 
               <button
                 type="button"
                 @click="activeTab = 'answers'"
-                class="px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer"
-                :class="
-                  activeTab === 'answers'
-                    ? 'bg-primary text-white shadow-xs'
-                    : answerableExams.length > 0
-                    ? 'bg-primary/10 border border-primary/30 text-primary hover:bg-primary/15'
-                    : 'bg-bg border border-border text-text-muted hover:text-text'
-                "
+                class="flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2"
+                :class="activeTab === 'answers' ? 'bg-surface text-primary shadow-xs' : 'text-text-muted hover:text-text'"
               >
-                <UserCheck class="w-3.5 h-3.5" />
-                <span>View Student Answers</span>
-                <span
-                  class="px-1.5 py-0.2 rounded-full text-[0.65rem] font-black"
-                  :class="activeTab === 'answers' ? 'bg-white/20 text-white' : 'bg-primary/15 text-primary'"
-                >
+                <Award class="w-3.5 h-3.5" />
+                <span>Respostas &amp; Avaliação</span>
+                <span v-if="answerableExams.length" class="text-[0.65rem] px-1.5 py-0.2 rounded-full bg-success/15 text-success">
                   {{ answerableExams.length }}
                 </span>
               </button>
@@ -839,808 +848,410 @@ onUnmounted(() => {
               <button
                 type="button"
                 @click="activeTab = 'activities'"
-                class="px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer"
-                :class="
-                  activeTab === 'activities'
-                    ? 'bg-primary text-white shadow-xs'
-                    : 'bg-bg border border-border text-text-muted hover:text-text'
-                "
+                class="flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2"
+                :class="activeTab === 'activities' ? 'bg-surface text-primary shadow-xs' : 'text-text-muted hover:text-text'"
               >
                 <Layers class="w-3.5 h-3.5" />
-                <span>Playwright Scraped Base (DB)</span>
-                <span
-                  class="px-1.5 py-0.2 rounded-full text-[0.65rem]"
-                  :class="activeTab === 'activities' ? 'bg-white/20 text-white' : 'bg-primary/10 text-primary'"
-                >
+                <span>Base Playwright</span>
+                <span class="text-[0.65rem] px-1.5 py-0.2 rounded-full bg-bg border border-border text-text-subtle">
                   {{ completedActivities.length }}
                 </span>
               </button>
             </div>
           </div>
 
-          <!-- SCROLLABLE TAB CONTENT CONTAINER (Matches left Students List scroll) -->
-          <div class="flex-1 min-h-0 max-h-[70vh] lg:max-h-none overflow-y-auto pr-1.5 space-y-4 custom-scrollbar">
-            <!-- TAB 1: QUESTION VERIFICATION & REAL-TIME AI IMPROVEMENT -->
-            <div v-if="activeTab === 'questions'" class="space-y-4 pb-2">
-              <div v-if="!activeExam" class="bg-surface border border-border rounded-2xl p-10 text-center space-y-4">
-                <div class="w-12 h-12 mx-auto rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
-                  <ExamIcon class="w-6 h-6" />
+          <!-- TAB 1: QUESTÕES DO EXAME (Clean Cards with Modals) -->
+          <div v-if="activeTab === 'questions'" class="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1 custom-scrollbar">
+            <div v-if="!activeExam" class="p-12 bg-surface border border-border rounded-2xl text-center space-y-3">
+              <Sparkles class="w-8 h-8 mx-auto text-primary/60" />
+              <p class="text-sm font-bold text-text">Nenhum exame ativo para este aluno.</p>
+              <p class="text-xs text-text-muted max-w-md mx-auto">
+                Clique no botão "Gerar Exame IA" acima para sintetizar 10 questões personalizadas a partir das atividades concluídas.
+              </p>
+              <button
+                type="button"
+                @click="handleGenerateExam"
+                class="px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-hover shadow-xs cursor-pointer inline-flex items-center gap-2"
+              >
+                <Sparkles class="w-4 h-4" />
+                <span>Gerar Exame Agora</span>
+              </button>
+            </div>
+
+            <div v-else class="space-y-3">
+              <div
+                v-for="(q, idx) in activeExam.questions"
+                :key="q.id"
+                class="bg-surface border border-border rounded-2xl p-4 md:p-5 shadow-2xs space-y-3 transition-all hover:border-primary/30"
+              >
+                <!-- Question Top Row -->
+                <div class="flex items-center justify-between gap-2 border-b border-border/50 pb-2.5">
+                  <div class="flex items-center gap-2">
+                    <span class="w-6 h-6 rounded-lg bg-primary/10 text-primary text-xs font-black flex items-center justify-center">
+                      {{ idx + 1 }}
+                    </span>
+                    <span
+                      class="text-[0.65rem] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border flex items-center gap-1"
+                      :class="getModalityBadge(q.type).color"
+                    >
+                      <component :is="getModalityBadge(q.type).icon" class="w-3 h-3" />
+                      <span>{{ getModalityBadge(q.type).label }}</span>
+                    </span>
+                    <span class="text-[0.65rem] text-text-muted font-medium">
+                      {{ q.points || 10 }} pts
+                    </span>
+                  </div>
+
+                  <!-- Actions -->
+                  <div class="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      @click="openAiModal(q)"
+                      class="px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-[0.7rem] font-bold transition-colors inline-flex items-center gap-1 cursor-pointer"
+                      title="Solicitar alterações pontuais à IA para esta questão"
+                    >
+                      <Wand2 class="w-3 h-3" />
+                      <span>Ajustar com IA</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      @click="openManualModal(q)"
+                      class="px-2.5 py-1 rounded-lg bg-bg-secondary hover:bg-border text-text text-[0.7rem] font-bold transition-colors inline-flex items-center gap-1 cursor-pointer"
+                      title="Editar enunciado, opções ou gabarito manualmente"
+                    >
+                      <Edit3 class="w-3 h-3" />
+                      <span>Editar</span>
+                    </button>
+
+                    <!-- Approve Toggle -->
+                    <button
+                      type="button"
+                      @click="handleSetQuestionStatus(q, q.approval_status === 'approved' ? 'pending' : 'approved')"
+                      :disabled="statusLoadingByQuestion[q.id]"
+                      class="px-2.5 py-1 rounded-lg text-[0.7rem] font-bold transition-all inline-flex items-center gap-1 cursor-pointer border"
+                      :class="
+                        q.approval_status === 'approved'
+                          ? 'bg-success text-white border-success'
+                          : 'bg-surface border-border text-text-muted hover:border-success/50 hover:text-success'
+                      "
+                    >
+                      <Check class="w-3 h-3" />
+                      <span>{{ q.approval_status === 'approved' ? 'Aprovada' : 'Aprovar' }}</span>
+                    </button>
+                  </div>
                 </div>
-                <div class="space-y-1 max-w-md mx-auto">
-                  <h4 class="text-sm font-bold text-text">No Active Exam Generated Yet for {{ studentDetail.student.name }}</h4>
-                  <p class="text-xs text-text-muted leading-relaxed">
-                    Click <strong>Generate {{ studentDetail.student.level }} Exam</strong> above. The system will verify the student's completed Grammar, Vocabulary, Listening, and Reading activities with Playwright, save their questions and texts in the database, and create the exam for your approval.
-                  </p>
+
+                <!-- Stem Text -->
+                <p class="text-xs sm:text-sm font-semibold text-text leading-relaxed">
+                  {{ q.question }}
+                </p>
+
+                <!-- Reading passage snippet (if reading) -->
+                <div v-if="q.reading_text" class="p-3 bg-bg-secondary/40 rounded-xl border border-border text-xs text-text-muted leading-relaxed">
+                  <span class="font-bold text-primary text-[0.65rem] uppercase block mb-1">Texto de Leitura</span>
+                  <div class="line-clamp-3 text-text">{{ q.reading_text }}</div>
                 </div>
-                <div class="flex flex-wrap items-center justify-center gap-3 pt-1">
+
+                <!-- Listening Audio preview -->
+                <div v-if="q.audio_text" class="flex items-center justify-between gap-3 p-2.5 bg-cyan-500/5 border border-cyan-500/20 rounded-xl">
+                  <span class="text-xs text-text-muted truncate">
+                    🎧 Áudio / Script de Listening configurado
+                  </span>
                   <button
                     type="button"
-                    @click="handleGenerateExam"
-                    :disabled="isGeneratingExam"
-                    class="px-5 py-2.5 rounded-xl bg-primary text-white text-xs font-bold inline-flex items-center gap-2 shadow-glow cursor-pointer disabled:opacity-50"
+                    @click="handlePlayAudio(q.id, q.audio_text)"
+                    class="px-2.5 py-1 rounded-lg bg-cyan-500 text-white text-[0.7rem] font-bold hover:opacity-90 transition-opacity inline-flex items-center gap-1 cursor-pointer shrink-0"
                   >
-                    <Sparkles class="w-4 h-4" :class="isGeneratingExam ? 'animate-spin' : ''" />
-                    <span>{{ isGeneratingExam ? 'Generating Personalized Exam...' : `Generate ${studentDetail.student.level} Exam Now` }}</span>
+                    <Pause v-if="playingAudioQId === q.id" class="w-3 h-3" />
+                    <Play v-else class="w-3 h-3" />
+                    <span>{{ playingAudioQId === q.id ? 'Pausar' : 'Ouvir Áudio' }}</span>
                   </button>
+                </div>
+
+                <!-- Options / Answer preview -->
+                <div v-if="q.options && q.options.length" class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                  <div
+                    v-for="opt in q.options"
+                    :key="opt"
+                    class="p-2 rounded-xl text-xs border flex items-center justify-between"
+                    :class="
+                      String(opt).trim().toLowerCase() === String(q.correct_answer || '').trim().toLowerCase()
+                        ? 'bg-success/10 border-success/30 text-success font-bold'
+                        : 'bg-bg-secondary/30 border-border text-text-muted'
+                    "
+                  >
+                    <span>{{ opt }}</span>
+                    <span v-if="String(opt).trim().toLowerCase() === String(q.correct_answer || '').trim().toLowerCase()" class="text-[0.65rem]">
+                      ✓ Gabarito
+                    </span>
+                  </div>
+                </div>
+
+                <div v-else-if="q.correct_answer" class="text-xs text-text-muted pt-1">
+                  Gabarito esperado: <strong class="text-success">{{ q.correct_answer }}</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 2: RESPOSTAS DO ALUNO & AVALIAÇÃO DA TATIANA -->
+          <div v-else-if="activeTab === 'answers'" class="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1 custom-scrollbar">
+            <div v-if="!answerableExams.length" class="p-12 bg-surface border border-border rounded-2xl text-center text-xs text-text-muted">
+              Nenhuma resposta ou exame concluído para este aluno ainda.
+            </div>
+
+            <div v-else class="space-y-4">
+              <!-- Selector if multiple attempts -->
+              <div v-if="answerableExams.length > 1" class="flex items-center gap-2 overflow-x-auto pb-1">
+                <button
+                  v-for="(ae, aIdx) in answerableExams"
+                  :key="ae.id"
+                  type="button"
+                  @click="selectedCompletedExamIdx = aIdx"
+                  class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border"
+                  :class="selectedCompletedExamIdx === aIdx ? 'bg-primary text-white border-primary shadow-xs' : 'bg-surface border-border text-text-muted hover:text-text'"
+                >
+                  Tentativa #{{ aIdx + 1 }} • {{ ae.score }}% ({{ formatDate(ae.completed_at || ae.started_at) }})
+                </button>
+              </div>
+
+              <!-- ⭐ PAINEL DE AVALIAÇÃO DA PROFESSORA (TATIANA) ⭐ -->
+              <div class="bg-surface border-2 border-primary/30 rounded-2xl p-5 shadow-sm space-y-4">
+                <div class="flex items-center justify-between gap-2 border-b border-border/80 pb-3">
+                  <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
+                      <GraduationCap class="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 class="text-sm font-black text-text">Avaliação da Professora Tatiana</h4>
+                      <p class="text-[0.68rem] text-text-muted">
+                        Altere ou atribua a nota final e escreva seu parecer pedagógico para o aluno.
+                      </p>
+                    </div>
+                  </div>
+
+                  <span
+                    v-if="selectedAnsweredExam?.is_teacher_graded"
+                    class="text-[0.65rem] font-bold px-2.5 py-0.5 rounded-full bg-success/15 text-success border border-success/30 flex items-center gap-1"
+                  >
+                    <Check class="w-3 h-3" />
+                    <span>Validado por {{ selectedAnsweredExam.teacher_graded_by || 'Tatiana' }}</span>
+                  </span>
+                </div>
+
+                <!-- Comparison Row -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <!-- AI Score Block -->
+                  <div class="p-3.5 bg-bg-secondary/40 border border-border rounded-xl space-y-1">
+                    <span class="text-[0.65rem] font-bold text-text-muted uppercase tracking-wider block">Nota Calculada pela IA</span>
+                    <div class="flex items-baseline gap-2">
+                      <span class="text-2xl font-black text-text">{{ selectedAnsweredExam?.ai_score ?? selectedAnsweredExam?.score ?? 0 }}%</span>
+                      <span class="text-[0.65rem] text-text-muted">Baseada em múltipla escolha e análise oral</span>
+                    </div>
+                  </div>
+
+                  <!-- Teacher Score Input Block -->
+                  <div class="p-3.5 bg-primary/5 border border-primary/20 rounded-xl space-y-2">
+                    <div class="flex items-center justify-between">
+                      <span class="text-[0.65rem] font-bold text-primary uppercase tracking-wider block">Nota Oficial da Tatiana</span>
+                      <span class="text-xs font-black text-primary">{{ teacherGradeForm.score }}%</span>
+                    </div>
+
+                    <div class="flex items-center gap-3">
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="1"
+                        v-model.number="teacherGradeForm.score"
+                        class="flex-1 accent-primary cursor-pointer"
+                      />
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        v-model.number="teacherGradeForm.score"
+                        class="w-16 px-2 py-1 text-center bg-surface border border-border rounded-lg text-xs font-bold text-text outline-none focus:border-primary"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Teacher Feedback Textarea -->
+                <div class="space-y-1.5">
+                  <label class="text-xs font-bold text-text flex items-center justify-between">
+                    <span>Parecer &amp; Comentários da Professora para o Aluno</span>
+                    <span class="text-[0.65rem] text-text-muted font-normal">Visível no histórico de exames do aluno</span>
+                  </label>
+                  <textarea
+                    rows="3"
+                    v-model="teacherGradeForm.feedback"
+                    placeholder="Ex: Excelente evolução na fala e vocabulário! Continuar praticando as preposições de tempo..."
+                    class="w-full px-3.5 py-2.5 bg-bg border border-border rounded-xl text-xs text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all resize-y"
+                  ></textarea>
+                </div>
+
+                <div class="flex items-center justify-between pt-1">
+                  <label class="flex items-center gap-2 cursor-pointer text-xs font-semibold text-text">
+                    <input
+                      type="checkbox"
+                      v-model="teacherGradeForm.passed"
+                      class="rounded text-primary focus:ring-primary"
+                    />
+                    <span>Considerar aluno aprovado no nível {{ selectedAnsweredExam?.level }}</span>
+                  </label>
 
                   <button
-                    v-if="answerableExams.length > 0"
                     type="button"
-                    @click="activeTab = 'answers'"
-                    class="px-5 py-2.5 rounded-xl bg-surface border border-primary/30 text-primary text-xs font-bold inline-flex items-center gap-2 hover:bg-primary/10 cursor-pointer"
+                    @click="handleSaveTeacherGrade"
+                    :disabled="isSavingTeacherGrade"
+                    class="px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-hover shadow-xs transition-all inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                   >
-                    <Eye class="w-4 h-4" />
-                    <span>View {{ answerableExams.length }} Submitted Exam(s)</span>
+                    <Save class="w-3.5 h-3.5" :class="isSavingTeacherGrade ? 'animate-spin' : ''" />
+                    <span>{{ isSavingTeacherGrade ? 'Salvando...' : 'Salvar Avaliação da Professora' }}</span>
                   </button>
                 </div>
               </div>
 
-              <template v-else>
-                <!-- Sticky Approval Progress Bar -->
-                <div class="sticky top-0 z-10 bg-surface/95 backdrop-blur-sm border border-border rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
-                  <div class="flex flex-wrap items-center gap-2 text-xs">
-                    <span class="font-bold text-text">
-                      Exam Level {{ activeExam.level }} ({{ activeExam.status === 'in_progress' ? 'In Progress by Student' : 'Ready for Student' }})
-                    </span>
-                    <span class="px-2.5 py-0.5 rounded-full bg-success/10 text-success font-bold border border-success/25">
-                      {{ activeExam.approval_summary.approved }} Approved
-                    </span>
-                    <span
-                      v-if="activeExam.approval_summary.rejected > 0"
-                      class="px-2.5 py-0.5 rounded-full bg-danger/10 text-danger font-bold border border-danger/25"
-                    >
-                      {{ activeExam.approval_summary.rejected }} Rejected
-                    </span>
-                    <span
-                      v-if="activeExam.approval_summary.pending > 0"
-                      class="px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-500 font-bold border border-amber-500/25"
-                    >
-                      {{ activeExam.approval_summary.pending }} Pending
-                    </span>
-                  </div>
+              <!-- List of Student Answers -->
+              <div class="space-y-3">
+                <h5 class="text-xs font-bold uppercase tracking-wider text-text-muted px-1">
+                  Detalhamento das Questões &amp; Respostas do Aluno
+                </h5>
 
-                  <button
-                    type="button"
-                    @click="handleApproveAll"
-                    :disabled="isBulkApproving || activeExam.approval_summary.approved === activeExam.approval_summary.total"
-                    class="px-4 py-2 rounded-xl bg-success text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-90 transition-all cursor-pointer disabled:opacity-50"
-                  >
-                    <Check class="w-4 h-4" />
-                    <span>{{ isBulkApproving ? 'Approving...' : 'Approve All Questions' }}</span>
-                  </button>
-                </div>
-
-                <!-- Question Cards -->
                 <div
-                  v-for="(q, idx) in activeExam.questions"
-                  :key="q.id"
-                  class="bg-surface border rounded-2xl p-5 space-y-4 transition-all shadow-xs"
-                  :class="
-                    recentlyUpdatedByQuestion[q.id]
-                      ? 'border-primary ring-2 ring-primary/30'
-                      : q.approval_status === 'approved'
-                      ? 'border-success/40'
-                      : q.approval_status === 'rejected'
-                      ? 'border-danger/40'
-                      : 'border-border'
-                  "
+                  v-for="(corr, cIdx) in (selectedAnsweredExam?.corrections || [])"
+                  :key="corr.question_id || cIdx"
+                  class="bg-surface border border-border rounded-2xl p-4 md:p-5 shadow-2xs space-y-3"
                 >
-                  <!-- Header Row -->
-                  <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-border/60">
-                    <div class="flex flex-wrap items-center gap-2">
-                      <span class="w-7 h-7 rounded-lg bg-primary/10 text-primary text-xs font-black flex items-center justify-center">
-                        {{ idx + 1 }}
+                  <div class="flex items-center justify-between gap-2 border-b border-border/50 pb-2">
+                    <div class="flex items-center gap-2">
+                      <span class="w-6 h-6 rounded-lg bg-primary/10 text-primary text-xs font-black flex items-center justify-center">
+                        {{ cIdx + 1 }}
                       </span>
-                      <span
-                        class="text-[0.68rem] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border"
-                        :class="getModalityBadgeClass(q.type)"
-                      >
-                        {{ q.type }}
-                      </span>
-                      <span class="text-xs text-text-muted font-semibold">{{ q.points || 10 }} pts</span>
-                      <span
-                        v-if="q.ai_updated"
-                        class="text-[0.65rem] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/25 inline-flex items-center gap-1"
-                      >
-                        <Sparkles class="w-3 h-3" /> Updated by AI
+                      <span class="text-xs font-bold uppercase tracking-wider text-text-muted">
+                        {{ corr.type }}
                       </span>
                     </div>
 
                     <span
-                      class="text-[0.68rem] font-bold uppercase px-2.5 py-1 rounded-full border"
-                      :class="getApprovalBadgeClass(q.approval_status)"
+                      class="text-xs font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 border"
+                      :class="corr.is_correct ? 'bg-success/10 text-success border-success/20' : 'bg-destructive/10 text-destructive border-destructive/20'"
                     >
-                      {{ q.approval_status || 'pending' }}
+                      <CheckCircle2 v-if="corr.is_correct" class="w-3 h-3" />
+                      <XCircle v-else class="w-3 h-3" />
+                      <span>{{ corr.is_correct ? `Correto (+${corr.points_earned || 10} pts)` : `Incorreto (+${corr.points_earned || 0} pts)` }}</span>
                     </span>
-                  </div>
-
-                  <!-- Reading Text -->
-                  <div v-if="q.reading_text" class="p-4 rounded-xl bg-bg border border-border/80 space-y-1.5">
-                    <div class="flex items-center justify-between text-[0.68rem] font-bold uppercase tracking-wider text-primary">
-                      <span class="flex items-center gap-1.5"><BookOpen class="w-3.5 h-3.5" /> Reading Passage</span>
-                      <span class="text-text-muted">{{ countWords(q.reading_text) }} words</span>
-                    </div>
-                    <p class="text-xs sm:text-sm text-text leading-relaxed whitespace-pre-wrap">{{ q.reading_text }}</p>
-                  </div>
-
-                  <!-- Listening Script + Audio Preview -->
-                  <div v-if="q.audio_text" class="p-4 rounded-xl bg-primary/5 border border-primary/20 space-y-2">
-                    <div class="flex flex-wrap items-center justify-between gap-2">
-                      <span class="text-[0.68rem] font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
-                        <Volume2 class="w-3.5 h-3.5" /> Listening Script ({{ countWords(q.audio_text) }} words)
-                      </span>
-                      <button
-                        type="button"
-                        @click="handlePlayListeningPreview(q.id, q.audio_text)"
-                        class="px-3 py-1 rounded-lg bg-primary text-white text-[0.7rem] font-bold inline-flex items-center gap-1.5 cursor-pointer hover:opacity-90"
-                      >
-                        <Pause v-if="playingAudioQId === q.id" class="w-3 h-3" />
-                        <Play v-else class="w-3 h-3" />
-                        <span>{{ playingAudioQId === q.id ? 'Pause TTS' : 'Listen Preview' }}</span>
-                      </button>
-                    </div>
-                    <p class="text-xs sm:text-sm text-text italic leading-relaxed whitespace-pre-wrap">{{ q.audio_text }}</p>
                   </div>
 
                   <!-- Question Text -->
-                  <div class="space-y-1">
-                    <p class="text-sm font-bold text-text leading-snug">{{ q.question }}</p>
-                    <p v-if="q.type === 'writing' && q.min_words && q.max_words" class="text-[0.7rem] text-text-muted">
-                      Expected word count: <strong>{{ q.min_words }}–{{ q.max_words }} words</strong> (punctuation excluded from score deductions)
-                    </p>
-                    <p v-if="q.type === 'speaking' && q.min_seconds && q.max_seconds" class="text-[0.7rem] text-text-muted">
-                      Expected speaking duration: <strong>{{ q.min_seconds }}–{{ q.max_seconds }} seconds</strong>
-                    </p>
-                  </div>
-
-                  <!-- Multiple-Choice Options with Correct Answer Highlighted -->
-                  <div v-if="q.options && q.options.length > 0 && q.type !== 'speaking'" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    <div
-                      v-for="(opt, oIdx) in q.options"
-                      :key="oIdx"
-                      class="p-3 rounded-xl border text-xs flex items-center justify-between gap-2"
-                      :class="
-                        opt === q.correct_answer
-                          ? 'bg-success/10 border-success/40 text-success font-bold'
-                          : 'bg-bg border-border text-text'
-                      "
-                    >
-                      <span><strong>{{ ['A', 'B', 'C', 'D'][oIdx] || '•' }}.</strong> {{ opt }}</span>
-                      <span v-if="opt === q.correct_answer" class="text-[0.65rem] font-black uppercase px-2 py-0.5 rounded bg-success text-white shrink-0">
-                        Correct
-                      </span>
-                    </div>
-                  </div>
-
-                  <!-- Explanation -->
-                  <div v-if="q.explanation" class="p-3 rounded-xl bg-bg-secondary/60 border border-border text-xs text-text-muted flex items-start gap-2">
-                    <Lightbulb class="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                    <div>
-                      <strong class="text-text">Rule / Explanation:</strong> {{ q.explanation }}
-                    </div>
-                  </div>
-
-                  <!-- Previous Admin AI Note -->
-                  <div v-if="q.admin_notes" class="text-[0.7rem] text-primary bg-primary/5 border border-primary/15 px-3 py-2 rounded-lg">
-                    <strong>Last Admin Instruction:</strong> "{{ q.admin_notes }}"
-                  </div>
-
-                  <!-- Action Bar: Approve / Reject / AI Adjust / Manual Edit -->
-                  <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border/60">
-                    <div class="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        @click="handleSetQuestionStatus(q, 'approved')"
-                        :disabled="statusLoadingByQuestion[q.id]"
-                        class="px-3.5 py-1.5 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all cursor-pointer border"
-                        :class="
-                          q.approval_status === 'approved'
-                            ? 'bg-success text-white border-success'
-                            : 'bg-success/10 text-success border-success/30 hover:bg-success hover:text-white'
-                        "
-                      >
-                        <CheckCircle2 class="w-3.5 h-3.5" />
-                        <span>Approve</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        @click="handleSetQuestionStatus(q, 'rejected')"
-                        :disabled="statusLoadingByQuestion[q.id]"
-                        class="px-3.5 py-1.5 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all cursor-pointer border"
-                        :class="
-                          q.approval_status === 'rejected'
-                            ? 'bg-danger text-white border-danger'
-                            : 'bg-danger/10 text-danger border-danger/30 hover:bg-danger hover:text-white'
-                        "
-                      >
-                        <XCircle class="w-3.5 h-3.5" />
-                        <span>Disapprove</span>
-                      </button>
-                    </div>
-
-                    <div class="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        @click="toggleAiBox(q.id)"
-                        class="px-3.5 py-1.5 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all cursor-pointer border"
-                        :class="
-                          openAiBoxByQuestion[q.id]
-                            ? 'bg-primary text-white border-primary'
-                            : 'bg-primary/10 text-primary border-primary/30 hover:bg-primary hover:text-white'
-                        "
-                      >
-                        <Wand2 class="w-3.5 h-3.5" />
-                        <span>Suggest Improvement (AI)</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        @click="toggleManualEdit(q)"
-                        class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-bg border border-border text-text-muted hover:text-text inline-flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <Edit3 class="w-3.5 h-3.5" />
-                        <span>Manual Edit</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <!-- INLINE AI IMPROVEMENT PANEL -->
-                  <div
-                    v-if="openAiBoxByQuestion[q.id]"
-                    class="p-4 rounded-2xl bg-primary/5 border border-primary/25 space-y-3 animate-fade-in"
-                  >
-                    <div class="flex items-center justify-between gap-2">
-                      <span class="text-xs font-bold text-primary flex items-center gap-1.5">
-                        <Sparkles class="w-4 h-4" />
-                        What should the AI improve or change in Question {{ idx + 1 }}?
-                      </span>
-                      <span class="text-[0.68rem] text-text-muted">Updates immediately in English</span>
-                    </div>
-
-                    <!-- Quick Chips -->
-                    <div class="flex flex-wrap gap-1.5">
-                      <button
-                        v-for="chip in QUICK_AI_SUGGESTIONS"
-                        :key="chip"
-                        type="button"
-                        @click="aiSuggestionByQuestion[q.id] = chip"
-                        class="text-[0.68rem] px-2.5 py-1 rounded-lg bg-surface border border-border hover:border-primary/50 text-text-muted hover:text-primary transition-colors cursor-pointer"
-                      >
-                        + {{ chip }}
-                      </button>
-                    </div>
-
-                    <textarea
-                      v-model="aiSuggestionByQuestion[q.id]"
-                      rows="2"
-                      placeholder="Ex: Deixe o vocabulário mais simples para A1 e troque o tema para rotina da manhã / Make option B less ambiguous..."
-                      class="w-full px-3.5 py-2.5 rounded-xl bg-surface border border-border text-xs text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 resize-y"
-                    ></textarea>
-
-                    <div class="flex items-center justify-end gap-2">
-                      <button
-                        type="button"
-                        @click="openAiBoxByQuestion[q.id] = false"
-                        :disabled="aiLoadingByQuestion[q.id]"
-                        class="px-3 py-1.5 rounded-xl text-xs font-semibold text-text-muted hover:text-text cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        @click="handleApplyAiImprovement(q)"
-                        :disabled="aiLoadingByQuestion[q.id]"
-                        class="px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold inline-flex items-center gap-1.5 shadow-glow hover:opacity-90 cursor-pointer disabled:opacity-50"
-                      >
-                        <RefreshCw v-if="aiLoadingByQuestion[q.id]" class="w-3.5 h-3.5 animate-spin" />
-                        <Sparkles v-else class="w-3.5 h-3.5" />
-                        <span>{{ aiLoadingByQuestion[q.id] ? 'AI Updating Question...' : 'Update Question Now with AI' }}</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <!-- INLINE MANUAL EDIT PANEL -->
-                  <div
-                    v-if="openManualEditByQuestion[q.id] && manualDraftByQuestion[q.id]"
-                    class="p-4 rounded-2xl bg-bg-secondary/60 border border-border space-y-3 animate-fade-in"
-                  >
-                    <p class="text-xs font-bold text-text">Direct Question Editor</p>
-
-                    <div v-if="q.type === 'reading'" class="space-y-1">
-                      <label class="text-[0.68rem] font-bold text-text-muted uppercase">Reading Passage</label>
-                      <textarea
-                        v-model="manualDraftByQuestion[q.id].reading_text"
-                        rows="3"
-                        class="w-full px-3 py-2 rounded-xl bg-surface border border-border text-xs text-text outline-none focus:border-primary"
-                      ></textarea>
-                    </div>
-
-                    <div v-if="q.type === 'listening'" class="space-y-1">
-                      <label class="text-[0.68rem] font-bold text-text-muted uppercase">Listening Script</label>
-                      <textarea
-                        v-model="manualDraftByQuestion[q.id].audio_text"
-                        rows="3"
-                        class="w-full px-3 py-2 rounded-xl bg-surface border border-border text-xs text-text outline-none focus:border-primary"
-                      ></textarea>
-                    </div>
-
-                    <div class="space-y-1">
-                      <label class="text-[0.68rem] font-bold text-text-muted uppercase">Question Prompt</label>
-                      <textarea
-                        v-model="manualDraftByQuestion[q.id].question"
-                        rows="2"
-                        class="w-full px-3 py-2 rounded-xl bg-surface border border-border text-xs text-text outline-none focus:border-primary"
-                      ></textarea>
-                    </div>
-
-                    <div v-if="manualDraftByQuestion[q.id].options?.length" class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <div v-for="(_, oIdx) in manualDraftByQuestion[q.id].options" :key="oIdx" class="space-y-1">
-                        <label class="text-[0.65rem] font-bold text-text-muted uppercase">Option {{ ['A', 'B', 'C', 'D'][oIdx] || oIdx + 1 }}</label>
-                        <input
-                          v-model="manualDraftByQuestion[q.id].options[oIdx]"
-                          type="text"
-                          class="w-full px-3 py-1.5 rounded-lg bg-surface border border-border text-xs text-text outline-none focus:border-primary"
-                        />
-                      </div>
-                    </div>
-
-                    <div v-if="q.type !== 'writing' && q.type !== 'speaking'" class="space-y-1">
-                      <label class="text-[0.68rem] font-bold text-text-muted uppercase">Correct Answer (must match one option)</label>
-                      <input
-                        v-model="manualDraftByQuestion[q.id].correct_answer"
-                        type="text"
-                        class="w-full px-3 py-1.5 rounded-lg bg-surface border border-border text-xs text-text outline-none focus:border-primary"
-                      />
-                    </div>
-
-                    <div class="space-y-1">
-                      <label class="text-[0.68rem] font-bold text-text-muted uppercase">Explanation</label>
-                      <input
-                        v-model="manualDraftByQuestion[q.id].explanation"
-                        type="text"
-                        class="w-full px-3 py-1.5 rounded-lg bg-surface border border-border text-xs text-text outline-none focus:border-primary"
-                      />
-                    </div>
-
-                    <div class="flex justify-end gap-2 pt-1">
-                      <button
-                        type="button"
-                        @click="openManualEditByQuestion[q.id] = false"
-                        class="px-3 py-1.5 rounded-xl text-xs font-semibold text-text-muted hover:text-text cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        @click="handleSaveManualEdit(q)"
-                        :disabled="manualSavingByQuestion[q.id]"
-                        class="px-4 py-1.5 rounded-xl bg-primary text-white text-xs font-bold cursor-pointer disabled:opacity-50"
-                      >
-                        {{ manualSavingByQuestion[q.id] ? 'Saving...' : 'Save Question' }}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </template>
-            </div>
-
-            <!-- TAB 2: STUDENT ANSWERS & LEVEL DIAGNOSTIC -->
-            <div v-else-if="activeTab === 'answers'" class="space-y-4 pb-2">
-              <div v-if="answerableExams.length === 0" class="bg-surface border border-border rounded-2xl p-10 text-center space-y-2">
-                <Award class="w-10 h-10 text-text-subtle mx-auto" />
-                <h4 class="text-sm font-bold text-text">No Exam Answers Recorded Yet</h4>
-                <p class="text-xs text-text-muted max-w-md mx-auto">
-                  Once {{ studentDetail.student.name }} answers an exam, all selected multiple-choice alternatives, written paragraphs, oral speaking transcriptions, and CEFR skill breakdown will appear here.
-                </p>
-              </div>
-
-              <template v-else-if="selectedAnsweredExam">
-                <!-- Attempt Selector if multiple exams -->
-                <div v-if="answerableExams.length > 1" class="flex flex-wrap items-center gap-2">
-                  <button
-                    v-for="(ce, cIdx) in answerableExams"
-                    :key="ce.id"
-                    type="button"
-                    @click="selectedCompletedExamIdx = cIdx"
-                    class="px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer"
-                    :class="
-                      selectedCompletedExamIdx === cIdx
-                        ? 'bg-primary text-white border-primary shadow-xs'
-                        : 'bg-surface border-border text-text-muted hover:text-text'
-                    "
-                  >
-                    <template v-if="ce.is_in_progress_preview">
-                      {{ ce.level }} • In Progress ({{ ce.answered_count }}/{{ ce.total_questions }} answered)
-                    </template>
-                    <template v-else>
-                      {{ ce.level }} • {{ ce.score }}% ({{ formatDate(ce.completed_at) }})
-                    </template>
-                  </button>
-                </div>
-
-                <!-- Overall Proficiency Diagnostic Card -->
-                <div class="bg-surface border border-border rounded-2xl p-6 space-y-5 shadow-xs">
-                  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/60 pb-4">
-                    <div class="space-y-1">
-                      <div class="flex flex-wrap items-center gap-2">
-                        <template v-if="selectedAnsweredExam.is_in_progress_preview">
-                          <span class="text-sm font-black px-3 py-1 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/30">
-                            In Progress ({{ selectedAnsweredExam.answered_count }}/{{ selectedAnsweredExam.total_questions }} answered)
-                          </span>
-                        </template>
-                        <template v-else>
-                          <span class="text-2xl font-black text-text">{{ selectedAnsweredExam.score }}%</span>
-                          <span
-                            class="text-xs font-bold px-2.5 py-0.5 rounded-full border"
-                            :class="selectedAnsweredExam.passed ? 'bg-success/10 text-success border-success/30' : 'bg-amber-500/10 text-amber-500 border-amber-500/30'"
-                          >
-                            {{ selectedAnsweredExam.passed ? 'Passed Level Assessment' : 'Needs Reinforcement' }}
-                          </span>
-                        </template>
-
-                        <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-primary/10 text-primary">
-                          Exam Level: {{ selectedAnsweredExam.level }}
-                        </span>
-                        <span
-                          v-if="selectedAnsweredExam.recommended_level"
-                          class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/25"
-                        >
-                          Recommended Next: {{ selectedAnsweredExam.recommended_level }}
-                        </span>
-                      </div>
-                      <p class="text-xs text-text-muted">
-                        {{
-                          selectedAnsweredExam.is_in_progress_preview
-                            ? `Started on ${formatDate(selectedAnsweredExam.started_at)}`
-                            : `Completed on ${formatDate(selectedAnsweredExam.completed_at)}`
-                        }}
-                      </p>
-                    </div>
-
-                    <!-- Per-Attempt Reset / Delete Actions -->
-                    <div class="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        @click="handleResetExam('reopen', selectedAnsweredExam.id)"
-                        :disabled="isResettingExam"
-                        class="px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500 hover:text-white text-xs font-bold text-amber-500 inline-flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
-                        title="Clear answers and reopen this exam so the student can retake it immediately"
-                      >
-                        <RotateCcw class="w-3.5 h-3.5" />
-                        <span>Allow Retake</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        @click="handleResetExam('delete_one', selectedAnsweredExam.id)"
-                        :disabled="isResettingExam"
-                        class="px-3 py-1.5 rounded-xl bg-danger/10 border border-danger/30 hover:bg-danger hover:text-white text-xs font-bold text-danger inline-flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
-                        title="Delete this exam attempt"
-                      >
-                        <Trash2 class="w-3.5 h-3.5" />
-                        <span>Delete Attempt</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <p v-if="selectedAnsweredExam.summary_feedback" class="text-xs sm:text-sm text-text leading-relaxed bg-bg p-4 rounded-xl border border-border">
-                    {{ selectedAnsweredExam.summary_feedback }}
+                  <p class="text-xs sm:text-sm font-semibold text-text leading-relaxed">
+                    {{ corr.question }}
                   </p>
 
-                  <!-- Skills Breakdown Bars -->
-                  <div v-if="selectedAnsweredExam.skills_breakdown && Object.keys(selectedAnsweredExam.skills_breakdown).length" class="space-y-3">
-                    <h4 class="text-xs font-bold uppercase tracking-wider text-text-subtle">
-                      Proficiency Breakdown by Modality
-                    </h4>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div
-                        v-for="(sInfo, sKey) in selectedAnsweredExam.skills_breakdown"
-                        :key="sKey"
-                        class="p-3 rounded-xl bg-bg border border-border space-y-1.5"
+                  <!-- Answers Comparison -->
+                  <div class="p-3 bg-bg-secondary/40 rounded-xl border border-border space-y-1.5 text-xs">
+                    <div>
+                      <span class="text-text-muted">Resposta do aluno: </span>
+                      <strong :class="corr.is_correct ? 'text-success' : 'text-destructive'">
+                        {{ corr.student_answer || corr.raw_student_answer || '(não respondida)' }}
+                      </strong>
+                    </div>
+
+                    <div v-if="corr.correct_answer && !corr.is_correct">
+                      <span class="text-text-muted">Gabarito esperado: </span>
+                      <strong class="text-success">{{ corr.correct_answer }}</strong>
+                    </div>
+
+                    <!-- Audio Player if speaking / listening submission -->
+                    <div v-if="corr.student_audio_data" class="pt-2 flex items-center gap-2">
+                      <button
+                        type="button"
+                        @click="handlePlayAudio(`corr_${cIdx}`, null, corr.student_audio_data)"
+                        class="px-3 py-1.5 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-hover shadow-2xs inline-flex items-center gap-1.5 cursor-pointer"
                       >
-                        <div class="flex items-center justify-between text-xs">
-                          <span class="font-bold text-text capitalize">{{ sInfo.label || sKey }}</span>
-                          <span class="font-black" :class="sInfo.percentage >= 65 ? 'text-success' : 'text-amber-500'">
-                            {{ sInfo.correct }}/{{ sInfo.total }} ({{ sInfo.percentage }}%)
-                          </span>
-                        </div>
-                        <div class="w-full h-2 rounded-full bg-border/50 overflow-hidden">
-                          <div
-                            class="h-full rounded-full transition-all"
-                            :class="sInfo.percentage >= 65 ? 'bg-success' : 'bg-amber-500'"
-                            :style="{ width: `${sInfo.percentage}%` }"
-                          />
-                        </div>
-                      </div>
+                        <Pause v-if="playingAudioQId === `corr_${cIdx}`" class="w-3 h-3" />
+                        <Play v-else class="w-3 h-3" />
+                        <span>{{ playingAudioQId === `corr_${cIdx}` ? 'Pausar Áudio' : 'Ouvir Áudio Gravado pelo Aluno' }}</span>
+                      </button>
                     </div>
                   </div>
 
-                  <!-- Improvements Needed -->
-                  <div v-if="selectedAnsweredExam.points_to_improve?.length" class="space-y-2">
-                    <h4 class="text-xs font-bold uppercase tracking-wider text-amber-500 flex items-center gap-1.5">
-                      <AlertCircle class="w-3.5 h-3.5" /> Areas the Student Needs to Improve
-                    </h4>
-                    <div class="grid grid-cols-1 gap-2">
-                      <div
-                        v-for="(pt, pIdx) in selectedAnsweredExam.points_to_improve"
-                        :key="pIdx"
-                        class="px-3.5 py-2.5 rounded-xl bg-amber-500/5 border border-amber-500/20 text-xs text-text"
-                      >
-                        • {{ pt }}
-                      </div>
-                    </div>
+                  <!-- Pedagogical Feedback from AI -->
+                  <div v-if="corr.explanation" class="text-xs text-text-muted leading-relaxed bg-bg p-3 rounded-xl border border-border/80">
+                    <span class="font-bold text-text block mb-0.5">Explicação pedagógica:</span>
+                    <span>{{ corr.explanation }}</span>
                   </div>
                 </div>
-
-                <!-- Detailed Student Answers Question-by-Question -->
-                <div class="bg-surface border border-border rounded-2xl p-6 space-y-4 shadow-xs">
-                  <h4 class="text-sm font-bold text-text flex items-center gap-2">
-                    <FileText class="w-4 h-4 text-primary" />
-                    <span>Student Answers Question by Question ({{ selectedAnsweredExam.corrections?.length || 0 }})</span>
-                  </h4>
-
-                  <div class="space-y-4">
-                    <div
-                      v-for="(corr, cIdx) in selectedAnsweredExam.corrections"
-                      :key="cIdx"
-                      class="p-5 rounded-2xl border space-y-3 bg-surface shadow-xs"
-                      :class="corr.is_correct ? 'border-success/35' : 'border-danger/35'"
-                    >
-                      <div class="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-border/60">
-                        <div class="flex items-center gap-2">
-                          <span class="w-7 h-7 rounded-lg bg-primary/10 text-primary text-xs font-black flex items-center justify-center">
-                            {{ Number(cIdx) + 1 }}
-                          </span>
-                          <span
-                            class="text-[0.65rem] font-bold uppercase px-2.5 py-0.5 rounded-full border"
-                            :class="getModalityBadgeClass(corr.type)"
-                          >
-                            {{ corr.type }}
-                          </span>
-                        </div>
-                        <span
-                          class="text-xs font-bold px-2.5 py-0.5 rounded-full"
-                          :class="corr.is_correct ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'"
-                        >
-                          {{ corr.is_correct ? `Correct (+${corr.points_earned} pts)` : `Needs Work (+${corr.points_earned || 0} pts)` }}
-                        </span>
-                      </div>
-
-                      <!-- Context Passage or Listening Script -->
-                      <div v-if="corr.reading_text" class="p-3.5 rounded-xl bg-bg border border-border text-xs space-y-1">
-                        <span class="text-[0.65rem] font-bold uppercase tracking-wider text-primary flex items-center gap-1">
-                          <BookOpen class="w-3 h-3" /> Reading Text
-                        </span>
-                        <p class="text-text leading-relaxed whitespace-pre-wrap">{{ corr.reading_text }}</p>
-                      </div>
-
-                      <div v-if="corr.audio_text" class="p-3.5 rounded-xl bg-primary/5 border border-primary/20 text-xs space-y-1.5">
-                        <div class="flex items-center justify-between gap-2">
-                          <span class="text-[0.65rem] font-bold uppercase tracking-wider text-primary flex items-center gap-1">
-                            <Volume2 class="w-3 h-3" /> Listening Script
-                          </span>
-                          <button
-                            type="button"
-                            @click="handlePlayListeningPreview(`ans_${selectedAnsweredExam.id}_${corr.question_id}`, corr.audio_text)"
-                            class="px-2.5 py-1 rounded-lg bg-primary text-white text-[0.68rem] font-bold inline-flex items-center gap-1 cursor-pointer"
-                          >
-                            <Pause v-if="playingAudioQId === `ans_${selectedAnsweredExam.id}_${corr.question_id}`" class="w-3 h-3" />
-                            <Play v-else class="w-3 h-3" />
-                            <span>Listen</span>
-                          </button>
-                        </div>
-                        <p class="text-text italic leading-relaxed whitespace-pre-wrap">{{ corr.audio_text }}</p>
-                      </div>
-
-                      <!-- Question Prompt -->
-                      <p class="text-xs sm:text-sm font-bold text-text leading-snug">{{ corr.question }}</p>
-
-                      <!-- All 4 Multiple-Choice Options showing Student Selection vs Correct Answer -->
-                      <div
-                        v-if="corr.options && corr.options.length > 0 && corr.type !== 'speaking' && corr.type !== 'writing'"
-                        class="grid grid-cols-1 sm:grid-cols-2 gap-2"
-                      >
-                        <div
-                          v-for="(opt, oIdx) in corr.options"
-                          :key="oIdx"
-                          class="p-3 rounded-xl border text-xs flex items-center justify-between gap-2"
-                          :class="
-                            isOptionSelectedByStudent(opt, corr) && isOptionCorrect(opt, corr)
-                              ? 'bg-success/15 border-success text-success font-bold'
-                              : isOptionSelectedByStudent(opt, corr) && !isOptionCorrect(opt, corr)
-                              ? 'bg-danger/15 border-danger text-danger font-bold'
-                              : isOptionCorrect(opt, corr)
-                              ? 'bg-success/10 border-success/40 text-success font-bold'
-                              : 'bg-bg border-border text-text'
-                          "
-                        >
-                          <span><strong>{{ ['A', 'B', 'C', 'D'][oIdx] || '•' }}.</strong> {{ opt }}</span>
-                          <div class="flex items-center gap-1 shrink-0">
-                            <span
-                              v-if="isOptionSelectedByStudent(opt, corr)"
-                              class="text-[0.6rem] font-black uppercase px-1.5 py-0.5 rounded"
-                              :class="isOptionCorrect(opt, corr) ? 'bg-success text-white' : 'bg-danger text-white'"
-                            >
-                              Student's Choice
-                            </span>
-                            <span
-                              v-else-if="isOptionCorrect(opt, corr)"
-                              class="text-[0.6rem] font-black uppercase px-1.5 py-0.5 rounded bg-success text-white"
-                            >
-                              Correct
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <!-- Student Written / Spoken / Direct Answer Box -->
-                      <div class="p-3.5 rounded-xl bg-bg border border-border text-xs space-y-2">
-                        <div>
-                          <span class="text-text-muted font-semibold">
-                            {{
-                              corr.type === 'writing'
-                                ? `Student's Written Text (${countWords(corr.raw_student_answer || corr.student_answer)} words): `
-                                : corr.type === 'speaking'
-                                ? "Student's Spoken Response & Transcription: "
-                                : "Student's Answer: "
-                            }}
-                          </span>
-                          <p
-                            class="mt-1 font-semibold whitespace-pre-wrap leading-relaxed"
-                            :class="corr.is_correct ? 'text-success' : 'text-danger'"
-                          >
-                            {{ corr.student_answer || '(not answered)' }}
-                          </p>
-                        </div>
-
-                        <!-- Recorded Voice Playback if audio was saved -->
-                        <div v-if="corr.student_audio_data" class="pt-1">
-                          <p class="text-[0.68rem] font-bold text-text-muted flex items-center gap-1 mb-1">
-                            <Mic class="w-3 h-3 text-primary" /> Recorded Student Audio:
-                          </p>
-                          <audio :src="corr.student_audio_data" controls class="w-full h-9" />
-                        </div>
-
-                        <div v-if="corr.correct_answer && corr.type !== 'speaking'" class="pt-1 border-t border-border/60">
-                          <span class="text-text-muted font-semibold">
-                            {{ corr.type === 'writing' ? 'AI Polished Reference Version: ' : 'Expected Correct Answer: ' }}
-                          </span>
-                          <p class="mt-0.5 font-bold text-success whitespace-pre-wrap leading-relaxed">{{ corr.correct_answer }}</p>
-                        </div>
-                      </div>
-
-                      <!-- AI Feedback & Specific Improvements -->
-                      <div v-if="corr.explanation" class="text-xs text-text-muted bg-bg-secondary/50 p-3.5 rounded-xl border border-border space-y-1.5">
-                        <div>
-                          <strong class="text-text">AI Feedback &amp; Evaluation:</strong> {{ corr.explanation }}
-                        </div>
-                        <ul v-if="corr.improvements?.length" class="list-disc pl-4 space-y-0.5 text-text pt-1">
-                          <li v-for="(imp, iIdx) in corr.improvements" :key="iIdx">{{ imp }}</li>
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </template>
+              </div>
             </div>
+          </div>
 
-            <!-- TAB 3: PLAYWRIGHT VERIFIED ACTIVITIES IN DATABASE -->
-            <div v-else-if="activeTab === 'activities'" class="space-y-4 pb-2">
-              <div v-if="completedActivities.length === 0" class="bg-surface border border-border rounded-2xl p-10 text-center space-y-2">
-                <Layers class="w-10 h-10 text-text-subtle mx-auto" />
-                <h4 class="text-sm font-bold text-text">
-                  No Completed Grammar–Reading Activities Found at Level {{ studentDetail.student.level }}
-                </h4>
-                <p class="text-xs text-text-muted max-w-md mx-auto">
-                  {{ studentDetail.student.name }} has not yet completed Grammar, Vocabulary, Listening, or Reading exercises at level {{ studentDetail.student.level }}. (Music, Flashcards, Simulations, Games, and News are excluded from exams.)
+          <!-- TAB 3: BASE DE ATIVIDADES PLAYWRIGHT -->
+          <div v-else-if="activeTab === 'activities'" class="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1 custom-scrollbar">
+            <div class="bg-surface border border-border rounded-2xl p-4 shadow-2xs flex items-center justify-between gap-4">
+              <div>
+                <h4 class="text-xs font-bold uppercase tracking-wider text-text">Atividades Concluídas no Nível {{ studentDetail.student.level }}</h4>
+                <p class="text-[0.68rem] text-text-muted">
+                  Base estruturada pelo Playwright estritamente para Grammar, Vocabulary, Listening e Reading.
                 </p>
               </div>
+              <button
+                type="button"
+                @click="handleSyncPlaywright(true)"
+                :disabled="isSyncingPlaywright"
+                class="px-3 py-1.5 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-hover transition-all flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+              >
+                <RefreshCw class="w-3.5 h-3.5" :class="isSyncingPlaywright ? 'animate-spin' : ''" />
+                <span>Forçar Re-extração</span>
+              </button>
+            </div>
 
-              <div v-else class="space-y-3">
-                <div
-                  v-for="(act, aIdx) in completedActivities"
-                  :key="act.submission_id || aIdx"
-                  class="bg-surface border border-border rounded-2xl p-4 space-y-3 shadow-xs"
-                >
-                  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div class="space-y-1 min-w-0">
-                      <div class="flex flex-wrap items-center gap-2">
-                        <span
-                          class="text-[0.65rem] font-bold uppercase px-2 py-0.5 rounded-full border"
-                          :class="getModalityBadgeClass(act.category)"
-                        >
-                          {{ act.category }}
-                        </span>
-                        <span class="text-xs sm:text-sm font-bold text-text truncate">{{ act.title }}</span>
-                        <span
-                          class="text-[0.65rem] font-bold px-2 py-0.5 rounded-full border"
-                          :class="act.scraped ? 'bg-success/10 text-success border-success/30' : 'bg-amber-500/10 text-amber-500 border-amber-500/30'"
-                        >
-                          {{ act.scraped ? `Saved in DB (${act.questions_count} Qs)` : 'Pending Playwright Sync' }}
-                        </span>
-                      </div>
-                      <div class="flex flex-wrap items-center gap-3 text-[0.7rem] text-text-muted">
-                        <span>Completed: {{ formatDate(act.completed_at) }}</span>
-                        <a
-                          v-if="act.url"
-                          :href="act.url"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          class="text-primary hover:underline inline-flex items-center gap-1 font-semibold"
-                        >
-                          <span>Source Activity</span>
-                          <ExternalLink class="w-3 h-3" />
-                        </a>
-                      </div>
-                    </div>
+            <div v-if="!completedActivities.length" class="p-12 bg-surface border border-border rounded-2xl text-center text-xs text-text-muted">
+              Nenhuma atividade de Grammar até Reading concluída neste nível pelo aluno.
+            </div>
 
-                    <button
-                      v-if="act.scraped"
-                      type="button"
-                      @click="toggleActivityExpand(act.url || String(aIdx))"
-                      class="px-3 py-1.5 rounded-xl bg-bg border border-border text-xs font-bold text-text-muted hover:text-text inline-flex items-center gap-1.5 cursor-pointer shrink-0"
-                    >
-                      <span>{{ expandedActivities[act.url || String(aIdx)] ? 'Hide Extracted Data' : 'View Extracted Questions' }}</span>
-                      <ChevronUp v-if="expandedActivities[act.url || String(aIdx)]" class="w-3.5 h-3.5" />
-                      <ChevronDown v-else class="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-
-                  <!-- Expanded Scraped Questions & Passages from DB -->
-                  <div
-                    v-if="act.scraped && expandedActivities[act.url || String(aIdx)]"
-                    class="pt-3 border-t border-border/60 space-y-3 animate-fade-in"
+            <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div
+                v-for="act in completedActivities"
+                :key="act.url || act.title"
+                class="bg-surface border border-border rounded-2xl p-4 shadow-2xs space-y-2 hover:border-primary/30 transition-all"
+              >
+                <div class="flex items-center justify-between gap-2">
+                  <span
+                    class="text-[0.62rem] font-bold uppercase px-2 py-0.5 rounded-md border"
+                    :class="getModalityBadge(act.category).color"
                   >
-                    <div v-if="act.reading_text" class="p-3 rounded-xl bg-bg border border-border text-xs space-y-1">
-                      <p class="font-bold text-primary uppercase text-[0.65rem]">Extracted Reading Text (Saved in DB):</p>
-                      <p class="text-text whitespace-pre-wrap leading-relaxed">{{ act.reading_text }}</p>
-                    </div>
-
-                    <div v-if="act.audio_text" class="p-3 rounded-xl bg-primary/5 border border-primary/20 text-xs space-y-1">
-                      <p class="font-bold text-primary uppercase text-[0.65rem]">Extracted Listening Context &amp; Details (Saved in DB):</p>
-                      <p class="text-text whitespace-pre-wrap leading-relaxed">{{ act.audio_text }}</p>
-                    </div>
-
-                    <div v-if="act.questions && act.questions.length" class="space-y-2">
-                      <p class="text-[0.68rem] font-bold uppercase tracking-wider text-text-subtle">
-                        Extracted Questions &amp; Correct Answers ({{ act.questions.length }}):
-                      </p>
-                      <div
-                        v-for="(sq, sqIdx) in act.questions"
-                        :key="sqIdx"
-                        class="p-3 rounded-xl bg-bg border border-border text-xs space-y-1"
-                      >
-                        <p class="font-bold text-text">{{ sq.number || Number(sqIdx) + 1 }}. {{ sq.question }}</p>
-                        <p v-if="sq.options?.length" class="text-text-muted">
-                          Options: {{ sq.options.join(' | ') }}
-                        </p>
-                        <p class="text-success font-bold">Correct Answer: {{ sq.correct_answer || '—' }}</p>
-                        <p v-if="sq.explanation" class="text-text-muted italic">{{ sq.explanation }}</p>
-                      </div>
-                    </div>
-                  </div>
+                    {{ act.category }}
+                  </span>
+                  <span
+                    class="text-[0.62rem] font-bold px-2 py-0.5 rounded-md border"
+                    :class="act.scraped ? 'bg-success/10 text-success border-success/20' : 'bg-amber-500/10 text-amber-500 border-amber-500/20'"
+                  >
+                    {{ act.scraped ? '✓ Salvo no Banco' : 'Pendente Playwright' }}
+                  </span>
                 </div>
+
+                <h5 class="text-xs font-bold text-text truncate">
+                  {{ act.title || act.slug }}
+                </h5>
+
+                <div class="text-[0.65rem] text-text-muted flex items-center gap-2">
+                  <span>{{ act.questions?.length || 0 }} questões extraídas</span>
+                  <span v-if="act.reading_text">• Texto de Reading</span>
+                  <span v-if="act.audio_text">• Áudio de Listening</span>
+                </div>
+
+                <a
+                  v-if="act.url"
+                  :href="act.url"
+                  target="_blank"
+                  class="text-[0.65rem] text-primary hover:underline inline-flex items-center gap-1 font-medium pt-1"
+                >
+                  <span>Abrir atividade original</span>
+                  <ExternalLink class="w-2.5 h-2.5" />
+                </a>
               </div>
             </div>
           </div>
@@ -1648,77 +1259,231 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <!-- RESET EXAM MODAL -->
-    <div
-      v-if="isResetModalOpen && studentDetail"
-      class="fixed inset-0 z-[90] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in"
-      @click.self="isResetModalOpen = false"
-    >
-      <div class="bg-surface border border-border rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl">
-        <div class="flex items-start justify-between gap-3">
-          <div class="flex items-center gap-2.5">
-            <div class="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center shrink-0">
-              <RotateCcw class="w-4 h-4" />
+    <!-- MODAL: AJUSTE PONTUAL COM IA -->
+    <Teleport to="body">
+      <div
+        v-if="aiModalQuestion"
+        class="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+      >
+        <div class="w-full max-w-lg bg-surface border border-border rounded-3xl shadow-2xl p-6 space-y-4 animate-in zoom-in-95 duration-200">
+          <div class="flex items-center justify-between border-b border-border/80 pb-3">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                <Sparkles class="w-4 h-4" />
+              </div>
+              <div>
+                <h4 class="text-sm font-black text-text">Ajustar Questão {{ aiModalQuestion.id.toUpperCase() }} com IA</h4>
+                <p class="text-[0.68rem] text-text-muted">A IA reescreverá a questão em tempo real mantendo o nível CEFR.</p>
+              </div>
             </div>
-            <div>
-              <h3 class="text-sm sm:text-base font-bold text-text">Reset Exam — {{ studentDetail.student.name }}</h3>
-              <p class="text-xs text-text-muted">Choose how you would like to reset this student's exam:</p>
+            <button
+              type="button"
+              @click="aiModalQuestion = null"
+              class="p-1 rounded-lg text-text-muted hover:text-text cursor-pointer"
+            >
+              <X class="w-4 h-4" />
+            </button>
+          </div>
+
+          <div class="p-3 bg-bg-secondary/40 rounded-xl border border-border text-xs text-text">
+            <span class="text-text-muted font-bold block mb-0.5">Enunciado Atual:</span>
+            <span>{{ aiModalQuestion.question }}</span>
+          </div>
+
+          <!-- Quick suggestions -->
+          <div class="space-y-1.5">
+            <span class="text-[0.68rem] font-bold uppercase tracking-wider text-text-muted block">Sugestões Rápidas:</span>
+            <div class="flex flex-wrap gap-1.5">
+              <button
+                v-for="sug in QUICK_AI_SUGGESTIONS"
+                :key="sug"
+                type="button"
+                @click="aiModalSuggestion = sug"
+                class="text-[0.65rem] px-2.5 py-1 rounded-lg bg-surface border border-border hover:border-primary/40 text-text-muted hover:text-primary transition-colors cursor-pointer text-left"
+              >
+                {{ sug }}
+              </button>
             </div>
           </div>
-          <button
-            type="button"
-            @click="isResetModalOpen = false"
-            class="p-1.5 rounded-lg text-text-muted hover:text-text cursor-pointer"
-          >
-            <X class="w-4 h-4" />
-          </button>
-        </div>
 
-        <div class="space-y-3">
-          <button
-            type="button"
-            @click="handleResetExam('reopen')"
-            :disabled="isResettingExam"
-            class="w-full p-4 rounded-xl bg-bg hover:bg-primary/5 border border-border hover:border-primary/40 text-left space-y-1 transition-all cursor-pointer disabled:opacity-50"
-          >
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-bold text-primary flex items-center gap-1.5">
-                <RotateCcw class="w-3.5 h-3.5" /> Allow Retake (Keep Approved Questions)
-              </span>
-            </div>
-            <p class="text-[0.72rem] text-text-muted leading-relaxed">
-              Clears previous answers and unlocks the 90-day cooldown immediately so the student can retake the current exam with its existing questions.
-            </p>
-          </button>
+          <!-- Prompt input -->
+          <div class="space-y-1.5">
+            <label class="text-xs font-bold text-text">Instrução para a IA:</label>
+            <textarea
+              rows="3"
+              v-model="aiModalSuggestion"
+              placeholder="Ex: Troque as opções para focar no Simple Past irregular e use o vocabulário de viagens..."
+              class="w-full px-3 py-2 bg-bg border border-border rounded-xl text-xs text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all resize-y"
+            ></textarea>
+          </div>
 
-          <button
-            type="button"
-            @click="handleResetExam('clear_all')"
-            :disabled="isResettingExam"
-            class="w-full p-4 rounded-xl bg-bg hover:bg-danger/5 border border-border hover:border-danger/40 text-left space-y-1 transition-all cursor-pointer disabled:opacity-50"
-          >
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-bold text-danger flex items-center gap-1.5">
-                <Trash2 class="w-3.5 h-3.5" /> Full Reset (Clear All Exams &amp; Cooldown)
-              </span>
-            </div>
-            <p class="text-[0.72rem] text-text-muted leading-relaxed">
-              Deletes all exam records for this student and completely resets their quarterly exam cycle so a brand-new exam can be generated.
-            </p>
-          </button>
-        </div>
-
-        <div class="flex justify-end pt-1">
-          <button
-            type="button"
-            @click="isResetModalOpen = false"
-            :disabled="isResettingExam"
-            class="px-4 py-2 rounded-xl text-xs font-semibold text-text-muted hover:text-text cursor-pointer"
-          >
-            Cancel
-          </button>
+          <div class="flex items-center justify-end gap-2.5 pt-2 border-t border-border">
+            <button
+              type="button"
+              @click="aiModalQuestion = null"
+              class="px-4 py-2 rounded-xl bg-surface border border-border text-xs font-bold text-text-muted hover:text-text cursor-pointer"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              @click="handleExecuteAiImprovement"
+              :disabled="isAiImproving || !aiModalSuggestion.trim()"
+              class="px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-hover shadow-xs transition-all inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              <Sparkles class="w-3.5 h-3.5" :class="isAiImproving ? 'animate-spin' : ''" />
+              <span>{{ isAiImproving ? 'Ajustando...' : 'Aplicar Ajuste' }}</span>
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </Teleport>
+
+    <!-- MODAL: EDIÇÃO MANUAL DE QUESTÃO -->
+    <Teleport to="body">
+      <div
+        v-if="manualModalQuestion"
+        class="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+      >
+        <div class="w-full max-w-xl bg-surface border border-border rounded-3xl shadow-2xl p-6 space-y-4 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto custom-scrollbar">
+          <div class="flex items-center justify-between border-b border-border/80 pb-3">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
+                <Edit3 class="w-4 h-4" />
+              </div>
+              <div>
+                <h4 class="text-sm font-black text-text">Editar Questão {{ manualModalQuestion.id.toUpperCase() }}</h4>
+                <p class="text-[0.68rem] text-text-muted">Ajuste diretamente enunciado, opções e gabarito.</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              @click="manualModalQuestion = null"
+              class="p-1 rounded-lg text-text-muted hover:text-text cursor-pointer"
+            >
+              <X class="w-4 h-4" />
+            </button>
+          </div>
+
+          <!-- Form Fields -->
+          <div class="space-y-3 text-xs">
+            <div class="space-y-1">
+              <label class="font-bold text-text">Enunciado da Questão:</label>
+              <textarea
+                rows="2"
+                v-model="manualDraft.question"
+                class="w-full px-3 py-2 bg-bg border border-border rounded-xl text-text outline-none focus:border-primary"
+              ></textarea>
+            </div>
+
+            <div v-if="manualModalQuestion.type === 'reading'" class="space-y-1">
+              <label class="font-bold text-text">Texto de Leitura (Reading Passage):</label>
+              <textarea
+                rows="4"
+                v-model="manualDraft.reading_text"
+                class="w-full px-3 py-2 bg-bg border border-border rounded-xl text-text outline-none focus:border-primary"
+              ></textarea>
+            </div>
+
+            <div v-if="manualModalQuestion.type === 'listening'" class="space-y-1">
+              <label class="font-bold text-text">Script de Áudio (Listening Script):</label>
+              <textarea
+                rows="3"
+                v-model="manualDraft.audio_text"
+                class="w-full px-3 py-2 bg-bg border border-border rounded-xl text-text outline-none focus:border-primary"
+              ></textarea>
+            </div>
+
+            <div v-if="manualDraft.options && manualDraft.options.length" class="space-y-1.5">
+              <label class="font-bold text-text">Alternativas:</label>
+              <div v-for="(_, oIdx) in manualDraft.options" :key="oIdx" class="flex items-center gap-2">
+                <span class="w-5 text-center font-bold text-text-muted">{{ String.fromCharCode(65 + oIdx) }}</span>
+                <input
+                  type="text"
+                  v-model="manualDraft.options[oIdx]"
+                  class="flex-1 px-3 py-1.5 bg-bg border border-border rounded-lg text-text outline-none focus:border-primary"
+                />
+              </div>
+            </div>
+
+            <div class="space-y-1">
+              <label class="font-bold text-text">Resposta Correta (Gabarito):</label>
+              <input
+                type="text"
+                v-model="manualDraft.correct_answer"
+                class="w-full px-3 py-1.5 bg-bg border border-border rounded-lg text-text outline-none focus:border-primary"
+              />
+            </div>
+
+            <div class="space-y-1">
+              <label class="font-bold text-text">Explicação Pedagógica:</label>
+              <textarea
+                rows="2"
+                v-model="manualDraft.explanation"
+                class="w-full px-3 py-2 bg-bg border border-border rounded-xl text-text outline-none focus:border-primary"
+              ></textarea>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-end gap-2.5 pt-2 border-t border-border">
+            <button
+              type="button"
+              @click="manualModalQuestion = null"
+              class="px-4 py-2 rounded-xl bg-surface border border-border text-xs font-bold text-text-muted hover:text-text cursor-pointer"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              @click="handleExecuteManualSave"
+              :disabled="isSavingManual"
+              class="px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-hover shadow-xs transition-all inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              <Save class="w-3.5 h-3.5" :class="isSavingManual ? 'animate-spin' : ''" />
+              <span>{{ isSavingManual ? 'Salvando...' : 'Salvar Questão' }}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- MODAL: RESET DE EXAME -->
+    <Teleport to="body">
+      <div
+        v-if="isResetModalOpen"
+        class="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+      >
+        <div class="w-full max-w-md bg-surface border border-border rounded-3xl shadow-2xl p-6 space-y-4 animate-in zoom-in-95 duration-200">
+          <div class="flex items-center justify-between border-b border-border/80 pb-3">
+            <h4 class="text-sm font-black text-text">Opções de Reset de Exame</h4>
+            <button type="button" @click="isResetModalOpen = false" class="p-1 rounded-lg text-text-muted hover:text-text cursor-pointer">
+              <X class="w-4 h-4" />
+            </button>
+          </div>
+
+          <div class="space-y-2.5 text-xs">
+            <button
+              type="button"
+              @click="handleResetExam('reopen')"
+              :disabled="isResettingExam"
+              class="w-full p-3 rounded-2xl bg-bg hover:bg-bg-secondary border border-border text-left transition-colors cursor-pointer space-y-0.5"
+            >
+              <span class="font-bold text-text block">Reabrir Exame Atual</span>
+              <span class="text-text-muted">Mantém as 10 questões aprovadas e permite ao aluno refazer a prova agora.</span>
+            </button>
+
+            <button
+              type="button"
+              @click="handleResetExam('clear_all')"
+              :disabled="isResettingExam"
+              class="w-full p-3 rounded-2xl bg-destructive/5 hover:bg-destructive/10 border border-destructive/20 text-left transition-colors cursor-pointer space-y-0.5"
+            >
+              <span class="font-bold text-destructive block">Zerar Ciclo Trimestral</span>
+              <span class="text-text-muted">Apaga tentativas em andamento e permite gerar um novo exame do zero.</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>

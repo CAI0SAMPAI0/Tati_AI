@@ -107,6 +107,7 @@ export const ENDPOINTS = {
   DASHBOARD_EXAMS_APPROVE_ALL: (examId: string) => `/dashboard/exams/${examId}/approve-all`,
   DASHBOARD_EXAMS_AI_IMPROVE: (examId: string, questionId: string) => `/dashboard/exams/${examId}/questions/${questionId}/ai-improve`,
   DASHBOARD_EXAMS_QUESTION_EDIT: (examId: string, questionId: string) => `/dashboard/exams/${examId}/questions/${questionId}`,
+  DASHBOARD_EXAMS_GRADE: (examId: string) => `/dashboard/exams/${examId}/grade`,
   ADMIN_PREMIUM: '/admin/premium',
   ADMIN_PREMIUM_UPLOAD: '/admin/premium/upload',
 

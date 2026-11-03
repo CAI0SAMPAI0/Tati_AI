@@ -4,7 +4,7 @@ from typing import List, Optional, Any, Dict
 from ninja import Router, File, UploadedFile
 from django.http import HttpRequest as DjangoHttpRequest
 from ninja.errors import HttpError
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from apps.authentication.models import User
 from apps.authentication.security import auth_required
@@ -758,6 +758,12 @@ class QuestionManualUpdateInput(BaseModel):
     options: Optional[List[str]] = None
     correct_answer: Optional[str] = None
     explanation: Optional[str] = None
+
+
+class ExamTeacherGradeInput(BaseModel):
+    teacher_score: float = Field(..., ge=0, le=100)
+    teacher_feedback: Optional[str] = ""
+    passed: Optional[bool] = None
     approval_status: Optional[str] = None
     admin_notes: Optional[str] = None
 
@@ -943,6 +949,30 @@ def manual_edit_exam_question(
             question_id=question_id,
             updates=payload.dict(exclude_unset=True),
             reviewer=staff.username,
+        )
+    except ValueError as e:
+        raise HttpError(400, str(e))
+
+
+@dashboard_router.post("/exams/{exam_id}/grade", auth=auth_required)
+def grade_exam_by_teacher(
+    request: HttpRequest,
+    exam_id: str,
+    payload: ExamTeacherGradeInput,
+):
+    """
+    Permite à professora Tatiana lançar ou alterar a nota manual e o feedback do exame,
+    mantendo a nota original calculada pela IA para comparação e transparência pedagógica.
+    """
+    staff = require_staff_user(request)
+    from apps.activities.admin_exam_review import AdminExamReviewService
+    try:
+        return AdminExamReviewService.teacher_grade_exam(
+            exam_id=exam_id,
+            teacher_score=payload.teacher_score,
+            teacher_feedback=payload.teacher_feedback or "",
+            teacher_username=staff.username,
+            passed=payload.passed,
         )
     except ValueError as e:
         raise HttpError(400, str(e))

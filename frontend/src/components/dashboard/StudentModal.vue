@@ -704,7 +704,9 @@ const progressTabs = [
                   >
                     <div class="flex items-start justify-between gap-2">
                       <div class="min-w-0">
-                        <span class="font-bold text-text truncate block max-w-[280px]">{{ p.target_phrase || p.spoken_phrase || 'Prática Livre' }}</span>
+                        <span class="font-bold text-text truncate block max-w-[280px]">
+                          {{ p.target_phrase || p.spoken_phrase || (p.mode === 'preset' ? 'Áudio sem fala detectada' : (p.mode === 'write' ? 'Frase Escrita' : 'Fala Livre')) }}
+                        </span>
                         <span class="text-[0.62rem] text-text-muted flex items-center gap-1.5 mt-0.5">
                           <Clock class="w-3 h-3" /> Practiced on {{ formatDateTime(p.created_at) }}
                         </span>

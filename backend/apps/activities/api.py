@@ -572,9 +572,16 @@ async def verify_pronunciation(request: HttpRequest, payload: PronunciationVerif
                 target = payload.target_phrase or payload.reference_text or ""
                 spoken = res.transcription or payload.spoken_phrase or ""
                 resolved_mode = payload.mode or ("preset" if target else "free")
+                display_target = target or spoken
+                if not display_target:
+                    display_target = (
+                        "Áudio sem fala detectada"
+                        if resolved_mode == "preset"
+                        else ("Frase Escrita" if resolved_mode == "write" else "Fala Livre")
+                    )
                 await sync_to_async(PronunciationHistory.objects.create)(
                     username=user.username,
-                    target_phrase=target or spoken,
+                    target_phrase=display_target,
                     spoken_phrase=spoken,
                     score=res.score,
                     accuracy_score=res.metadata.get("accuracy_score", res.score) if res.metadata else res.score,

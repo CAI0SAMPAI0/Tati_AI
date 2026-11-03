@@ -197,6 +197,12 @@ class AdminExamReviewService:
             "points_to_improve": fb.get("points_to_improve", []),
             "can_do_statements": fb.get("can_do_statements", []),
             "corrections": enriched_corrections,
+            "ai_score": fb.get("ai_score") if fb.get("ai_score") is not None else exam.score,
+            "teacher_score": fb.get("teacher_score"),
+            "teacher_feedback": fb.get("teacher_feedback") or "",
+            "teacher_graded_at": fb.get("teacher_graded_at"),
+            "teacher_graded_by": fb.get("teacher_graded_by"),
+            "is_teacher_graded": fb.get("teacher_score") is not None,
             "review_meta": fb.get("review_meta", {}),
             "started_at": exam.started_at.isoformat() if exam.started_at else None,
             "completed_at": exam.completed_at.isoformat() if exam.completed_at else None,
@@ -670,6 +676,54 @@ class AdminExamReviewService:
         return {
             "exam": cls.format_admin_exam(exam),
             "updated_question": updated_q,
+        }
+
+    @classmethod
+    def teacher_grade_exam(
+        cls,
+        exam_id: str,
+        teacher_score: float,
+        teacher_feedback: str = "",
+        teacher_username: str = "tatiana",
+        passed: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        """
+        Permite à professora Tatiana lançar ou alterar a nota manual e o feedback do exame,
+        mantendo a nota original calculada pela IA intacta para fins comparativos e de auditoria.
+        """
+        exam = TrimestralExam.objects.filter(id=exam_id).first()
+        if not exam:
+            raise ValueError("Exame não encontrado.")
+
+        fb = dict(exam.feedback) if isinstance(exam.feedback, dict) else {}
+        if "ai_score" not in fb:
+            fb["ai_score"] = exam.score
+
+        clamped_score = max(0, min(100, int(round(teacher_score))))
+        fb["teacher_score"] = clamped_score
+        fb["teacher_feedback"] = (teacher_feedback or "").strip()
+        fb["teacher_graded_at"] = django_timezone.now().isoformat()
+        fb["teacher_graded_by"] = teacher_username
+
+        exam.score = clamped_score
+        exam.passed = (clamped_score >= 70) if passed is None else bool(passed)
+        exam.feedback = fb
+        exam.save(update_fields=["score", "passed", "feedback", "updated_at"])
+
+        # Sincroniza com ActivitySubmission para refletir no histórico e analytics
+        try:
+            ActivitySubmission.objects.filter(
+                username=exam.username,
+                activity_type="trimestral_exam",
+            ).update(score=clamped_score)
+        except Exception as e:
+            logger.warning(f"Erro ao sincronizar submissão do exame com nota da professora: {e}")
+
+        return {
+            "success": True,
+            "exam": cls.format_admin_exam(exam),
+            "teacher_score": clamped_score,
+            "teacher_feedback": fb["teacher_feedback"],
         }
 
     @classmethod

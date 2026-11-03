@@ -361,6 +361,22 @@ onUnmounted(() => {
           {{ examResult.score }}% <span class="text-xl md:text-2xl font-normal text-text-muted">Overall Score</span>
         </h1>
 
+        <!-- Teacher Tatiana Evaluation Card -->
+        <div v-if="examResult.teacher_score !== undefined && examResult.teacher_score !== null" class="my-5 p-4 rounded-2xl bg-primary/10 border border-primary/30 max-w-lg mx-auto text-left space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-primary flex items-center gap-1.5 uppercase tracking-wider">
+              <GraduationCap class="w-4 h-4" /> Avaliação Oficial da Professora Tatiana
+            </span>
+            <span class="text-sm font-black text-primary">{{ examResult.teacher_score }}%</span>
+          </div>
+          <p v-if="examResult.teacher_feedback" class="text-xs text-text italic">
+            "{{ examResult.teacher_feedback }}"
+          </p>
+          <div v-if="examResult.ai_score !== undefined && examResult.ai_score !== examResult.teacher_score" class="text-[0.68rem] text-text-muted">
+            Nota original preliminar da IA: {{ examResult.ai_score }}%
+          </div>
+        </div>
+
         <p class="text-sm md:text-base text-text-muted max-w-xl mx-auto mb-6 leading-relaxed">
           {{ examResult.summary_feedback || examResult.summary || 'Exam successfully evaluated by Teacher Tatiana.' }}
         </p>
