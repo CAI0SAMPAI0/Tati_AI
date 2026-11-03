@@ -214,14 +214,17 @@ class BackgroundNotificationRunner:
             res = NotificationSchedulerService.send_daily_streak_reminders_to_all_active_students()
             logger.info(f"[Scheduler] Streak concluído: {res}")
 
-            # Desliga a sessão do WAHA para permitir que o container entre em sleep na Railway
-            try:
-                from apps.notifications.waha_service import WahaService
-                logger.info("[Scheduler] Finalizando sessão WAHA para liberar o container ao modo sleep na Railway...")
-                stop_res = WahaService.stop_session("default")
-                logger.info(f"[Scheduler] Sessão WAHA parada: {stop_res}")
-            except Exception as waha_err:
-                logger.warning(f"[Scheduler] Falha ao parar sessão WAHA pós-streak: {waha_err}")
+            # Desliga a sessão do WAHA apenas em ambiente SERVERLESS (Railway) para permitir sleep
+            if os.getenv("SERVERLESS", "false").lower() in ("true", "1", "yes"):
+                try:
+                    from apps.notifications.waha_service import WahaService
+                    logger.info("[Scheduler] Finalizando sessão WAHA para liberar o container ao modo sleep na Railway...")
+                    stop_res = WahaService.stop_session("default")
+                    logger.info(f"[Scheduler] Sessão WAHA parada: {stop_res}")
+                except Exception as waha_err:
+                    logger.warning(f"[Scheduler] Falha ao parar sessão WAHA pós-streak: {waha_err}")
+            else:
+                logger.info("[Scheduler] Ambiente VPS dedicado (SERVERLESS=false): mantendo sessão do WAHA permanentemente ativa.")
         except Exception as e:
             logger.error(f"[Scheduler] Erro ao enviar lembretes de streak: {e}")
         finally:
