@@ -569,17 +569,20 @@ async def verify_pronunciation(request: HttpRequest, payload: PronunciationVerif
         if user and hasattr(user, "username"):
             try:
                 from apps.activities.models import PronunciationHistory
+                target = payload.target_phrase or payload.reference_text or ""
+                spoken = res.transcription or payload.spoken_phrase or ""
+                resolved_mode = payload.mode or ("preset" if target else "free")
                 await sync_to_async(PronunciationHistory.objects.create)(
                     username=user.username,
-                    target_phrase=payload.target_phrase or payload.reference_text or "",
-                    spoken_phrase=res.transcription or payload.spoken_phrase or "",
+                    target_phrase=target or spoken,
+                    spoken_phrase=spoken,
                     score=res.score,
                     accuracy_score=res.metadata.get("accuracy_score", res.score) if res.metadata else res.score,
                     fluency_score=res.metadata.get("fluency_score", 0.0) if res.metadata else 0.0,
                     words_result=[w.dict() if hasattr(w, "dict") else dict(w) for w in (res.words or [])],
                     feedback=res.feedback or "",
                     accent=user_accent,
-                    mode=payload.mode or "preset",
+                    mode=resolved_mode,
                     user_audio_b64=payload.audio or "",
                 )
             except Exception as save_err:

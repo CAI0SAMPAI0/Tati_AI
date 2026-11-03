@@ -1244,6 +1244,7 @@ class DashboardService:
             "simulations": 0,
             "games": 0,
             "news": 0,
+            "pronunciation": 0,
         }
 
         # Pré-carrega cenários de simulação em lote para eliminar consultas N+1
@@ -1394,6 +1395,41 @@ class DashboardService:
             )
         except Exception:
             pass
+
+        # Incorpora histórico de pronúncias (frases prontas, escritas e livres) nas atividades
+        from apps.activities.models import PronunciationHistory
+        try:
+            prons = list(
+                PronunciationHistory.objects.filter(
+                    Q(username__in=usernames) | Q(username__iexact=username)
+                )
+                .defer("user_audio_b64")
+                .order_by("-created_at")[:100]
+            )
+            counts["pronunciation"] = len(prons)
+            for p in prons:
+                mode_desc = (
+                    "Frase Escrita"
+                    if p.mode == "write"
+                    else ("Fala Livre" if p.mode == "free" else "Frase Pronta")
+                )
+                display_phrase = p.target_phrase or p.spoken_phrase or mode_desc
+                mapped_submissions.append(
+                    {
+                        "id": f"pron_{p.id}",
+                        "category": "pronunciation",
+                        "activity_type": f"Pronúncia ({mode_desc})",
+                        "title": f"🗣️ {display_phrase}",
+                        "url": "",
+                        "score": round(p.score, 1) if p.score is not None else 85,
+                        "status": "completed" if (p.score and p.score >= 70) else "practiced",
+                        "created_at": p.created_at.isoformat() if p.created_at else "",
+                        "mode": p.mode or "preset",
+                        "spoken_phrase": p.spoken_phrase or "",
+                    }
+                )
+        except Exception as e:
+            logger.warning(f"Erro ao incluir pronúncias em activity_progress: {e}")
 
         mapped_submissions.sort(
             key=lambda x: x.get("created_at") or "", reverse=True

@@ -54,8 +54,36 @@ const pronunciationData = ref<any>(null);
 const isFetchingPronunciation = ref(false);
 
 // Submissions filter in Progress tab
-const progressFilter = ref<'all' | 'grammar' | 'vocabulary' | 'listening' | 'reading' | 'simulations' | 'games' | 'news'>('all');
+const progressFilter = ref<'all' | 'pronunciation' | 'grammar' | 'vocabulary' | 'listening' | 'reading' | 'simulations' | 'games' | 'news'>('all');
 const visibleSubmissionsCount = ref(20);
+
+const pronunciationFilter = ref<'all' | 'preset' | 'write' | 'free'>('all');
+
+const filteredPronunciations = computed(() => {
+  const list = pronunciationData.value?.pronunciation_list || [];
+  if (pronunciationFilter.value === 'all') return list;
+  return list.filter((p: any) => {
+    const m = (p.mode || 'preset').toLowerCase();
+    if (pronunciationFilter.value === 'preset') return m === 'preset';
+    if (pronunciationFilter.value === 'write') return m === 'write' || m === 'custom';
+    if (pronunciationFilter.value === 'free') return m === 'free';
+    return true;
+  });
+});
+
+const pronunciationCounts = computed(() => {
+  const list = pronunciationData.value?.pronunciation_list || [];
+  let preset = 0;
+  let write = 0;
+  let free = 0;
+  for (const p of list) {
+    const m = (p.mode || 'preset').toLowerCase();
+    if (m === 'write' || m === 'custom') write++;
+    else if (m === 'free') free++;
+    else preset++;
+  }
+  return { all: list.length, preset, write, free };
+});
 
 watch(
   () => props.student,
@@ -289,6 +317,9 @@ const filteredSubmissions = computed(() => {
     if (progressFilter.value === 'grammar') {
       return cat === 'grammar' || cat.includes('gramm') || title.includes('grammar') || url.includes('grammar');
     }
+    if (progressFilter.value === 'pronunciation') {
+      return cat === 'pronunciation' || cat.includes('pronunc') || title.includes('pronúnc') || title.includes('🗣️');
+    }
     if (progressFilter.value === 'reading') {
       return cat === 'reading' || cat.includes('read') || title.includes('reading') || url.includes('reading');
     }
@@ -302,6 +333,7 @@ const displayedSubmissions = computed(() => {
 
 const progressTabs = [
   { id: 'all', label: 'All' },
+  { id: 'pronunciation', label: 'Pronunciation' },
   { id: 'grammar', label: 'Grammar' },
   { id: 'vocabulary', label: 'Vocab' },
   { id: 'listening', label: 'Listening' },
@@ -488,8 +520,13 @@ const progressTabs = [
             </div>
 
             <div v-else class="space-y-5">
-              <!-- Summary 8 Cards Grid -->
-              <div class="grid grid-cols-4 gap-2">
+              <!-- Summary Cards Grid -->
+              <div class="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                <div class="p-2.5 bg-surface border border-border rounded-xl">
+                  <span
+                    class="text-[0.6rem] font-bold text-text-subtle uppercase tracking-wider block truncate">Pronúncia</span>
+                  <p class="text-base font-black text-text mt-0.5">{{ activityProgress.summary?.pronunciation || 0 }}</p>
+                </div>
                 <div class="p-2.5 bg-surface border border-border rounded-xl">
                   <span
                     class="text-[0.6rem] font-bold text-text-subtle uppercase tracking-wider block truncate">Grammar</span>
@@ -618,13 +655,37 @@ const progressTabs = [
                   </div>
                 </div>
 
+                <!-- Sub-filtros para frases prontas, escritas e fala livre -->
+                <div class="flex bg-bg-secondary p-1 rounded-xl overflow-x-auto no-scrollbar gap-1 mb-2">
+                  <button type="button" @click="pronunciationFilter = 'all'"
+                    class="px-2.5 py-1 rounded-lg text-[0.65rem] font-bold transition-all whitespace-nowrap cursor-pointer"
+                    :class="pronunciationFilter === 'all' ? 'bg-surface text-primary shadow-xs' : 'text-text-muted hover:text-text'">
+                    Todas ({{ pronunciationCounts.all }})
+                  </button>
+                  <button type="button" @click="pronunciationFilter = 'preset'"
+                    class="px-2.5 py-1 rounded-lg text-[0.65rem] font-bold transition-all whitespace-nowrap cursor-pointer"
+                    :class="pronunciationFilter === 'preset' ? 'bg-surface text-primary shadow-xs' : 'text-text-muted hover:text-text'">
+                    Frases Prontas ({{ pronunciationCounts.preset }})
+                  </button>
+                  <button type="button" @click="pronunciationFilter = 'write'"
+                    class="px-2.5 py-1 rounded-lg text-[0.65rem] font-bold transition-all whitespace-nowrap cursor-pointer"
+                    :class="pronunciationFilter === 'write' ? 'bg-surface text-primary shadow-xs' : 'text-text-muted hover:text-text'">
+                    Frases Escritas ({{ pronunciationCounts.write }})
+                  </button>
+                  <button type="button" @click="pronunciationFilter = 'free'"
+                    class="px-2.5 py-1 rounded-lg text-[0.65rem] font-bold transition-all whitespace-nowrap cursor-pointer"
+                    :class="pronunciationFilter === 'free' ? 'bg-surface text-primary shadow-xs' : 'text-text-muted hover:text-text'">
+                    Fala Livre ({{ pronunciationCounts.free }})
+                  </button>
+                </div>
+
                 <div v-if="isFetchingPronunciation" class="py-4 text-center text-xs text-text-muted">
                   <RefreshCw class="w-4 h-4 animate-spin inline-block mr-1 text-primary" />
                   Loading pronunciation history...
                 </div>
 
                 <div
-                  v-else-if="!pronunciationData?.pronunciation_list?.length"
+                  v-else-if="!filteredPronunciations.length"
                   class="p-4 rounded-xl border border-dashed border-border text-center text-xs text-text-muted"
                 >
                   No pronunciation practice recorded yet.
@@ -632,7 +693,7 @@ const progressTabs = [
 
                 <div v-else class="space-y-2 max-h-[380px] overflow-y-auto pr-1 custom-scrollbar">
                   <div
-                    v-for="p in pronunciationData.pronunciation_list"
+                    v-for="p in filteredPronunciations"
                     :key="p.id"
                     class="p-3 bg-bg-secondary/40 border border-border rounded-xl space-y-1.5 text-xs"
                   >
