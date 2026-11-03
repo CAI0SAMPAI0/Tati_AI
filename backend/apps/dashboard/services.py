@@ -1103,6 +1103,8 @@ class DashboardService:
         seven_days_ago = today - timedelta(days=6)
         day_names_en = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
+        from apps.activities.models import PronunciationHistory
+
         daily_msgs = (
             Message.objects.filter(
                 username=username, role="user", created_at__date__gte=seven_days_ago
@@ -1123,6 +1125,17 @@ class DashboardService:
         )
         sub_counts_by_day = {item["day"]: item["count"] for item in daily_subs}
 
+        daily_prons = (
+            PronunciationHistory.objects.filter(
+                Q(username__iexact=username) | Q(username=username),
+                created_at__date__gte=seven_days_ago,
+            )
+            .annotate(day=TruncDate("created_at"))
+            .values("day")
+            .annotate(count=Count("id"))
+        )
+        pron_counts_by_day = {item["day"]: item["count"] for item in daily_prons}
+
         study_time_chart = []
         total_study_minutes_weekly = 0
         total_messages_weekly = 0
@@ -1132,9 +1145,11 @@ class DashboardService:
             d = today - timedelta(days=i)
             day_msgs = msg_counts_by_day.get(d, 0)
             day_acts = sub_counts_by_day.get(d, 0)
+            day_prons = pron_counts_by_day.get(d, 0)
 
-            day_study_min = (day_msgs * 2) + (day_acts * 6)
-            if day_study_min == 0 and (day_msgs > 0 or day_acts > 0):
+            # Estudo: 2min por mensagem de chat, 6min por lição/exercício, 3min por gravação/análise de pronúncia
+            day_study_min = (day_msgs * 2) + (day_acts * 6) + (day_prons * 3)
+            if day_study_min == 0 and (day_msgs > 0 or day_acts > 0 or day_prons > 0):
                 day_study_min = 5
 
             study_time_chart.append(
@@ -1143,21 +1158,29 @@ class DashboardService:
                     "date": d.isoformat(),
                     "study_minutes": day_study_min,
                     "messages_sent": day_msgs,
-                    "activities_done": day_acts,
+                    "activities_done": day_acts + day_prons,
+                    "pronunciations_done": day_prons,
                 }
             )
 
             total_study_minutes_weekly += day_study_min
             total_messages_weekly += day_msgs
-            total_activities_weekly += day_acts
+            total_activities_weekly += (day_acts + day_prons)
 
         avg_daily = round(total_study_minutes_weekly / 7.0, 1)
+
+        total_prons_all = PronunciationHistory.objects.filter(
+            Q(username__iexact=username) | Q(username=username)
+        ).count()
+        total_prons_weekly = sum(pron_counts_by_day.values())
 
         summary = {
             "total_study_minutes_weekly": total_study_minutes_weekly,
             "avg_study_minutes_daily": avg_daily,
             "total_messages_weekly": total_messages_weekly,
             "total_activities_weekly": total_activities_weekly,
+            "total_pronunciations_weekly": total_prons_weekly,
+            "total_pronunciations": total_prons_all,
         }
 
         total_msgs = Message.objects.filter(username=username, role="user").count()
@@ -1178,7 +1201,7 @@ class DashboardService:
             "streak_freeze_count": freeze_count,
             "current_level": u.level or "A1",
             "messages_count": total_msgs,
-            "exercises_completed": total_exercises,
+            "exercises_completed": total_exercises + total_prons_all,
         }
 
     @staticmethod
@@ -1472,15 +1495,31 @@ class DashboardService:
     def get_student_pronunciation_practice(username: str) -> dict:
         u = User.objects.filter(username=username).first()
         if not u:
+            u = User.objects.filter(username__iexact=username).first()
+        if not u:
             raise HttpError(404, "Estudante não encontrado.")
-        
+
         from apps.activities.models import PronunciationHistory
-        
-        pronunciations = PronunciationHistory.objects.filter(username=username).defer("user_audio_b64").order_by("-created_at")
+
+        usernames = [u.username, username, username.strip().lower()]
+        if u.email:
+            same_email = list(
+                User.objects.filter(email__iexact=u.email).values_list("username", flat=True)
+            )
+            usernames.extend(same_email)
+        usernames = list(set(usernames))
+
+        pronunciations = (
+            PronunciationHistory.objects.filter(
+                Q(username__in=usernames) | Q(username__iexact=username)
+            )
+            .defer("user_audio_b64")
+            .order_by("-created_at")
+        )
         pronunciation_list = [
             {
                 "id": str(p.id),
-                "target_phrase": p.target_phrase,
+                "target_phrase": p.target_phrase or p.spoken_phrase or "(Fala Livre)",
                 "spoken_phrase": p.spoken_phrase,
                 "score": p.score,
                 "accuracy_score": p.accuracy_score,
@@ -1490,11 +1529,13 @@ class DashboardService:
                 "mode": p.mode,
                 "created_at": p.created_at.isoformat() if p.created_at else None,
             }
-            for p in pronunciations[:20]
+            for p in pronunciations[:100]
         ]
-        
+
         last_item = pronunciations.first()
-        last_practice_date = last_item.created_at.isoformat() if last_item and last_item.created_at else None
+        last_practice_date = (
+            last_item.created_at.isoformat() if last_item and last_item.created_at else None
+        )
 
         return {
             "pronunciation_list": pronunciation_list,
@@ -1502,8 +1543,8 @@ class DashboardService:
             "pronunciation_completed": pronunciations.filter(score__gte=70).count(),
             "last_practice_date": last_practice_date,
             "current_level": u.level or "A1",
-            "messages_count": Message.objects.filter(username=username, role="user").count(),
-            "exercises_completed": ActivitySubmission.objects.filter(username=username).count(),
+            "messages_count": Message.objects.filter(username__in=usernames, role="user").count(),
+            "exercises_completed": ActivitySubmission.objects.filter(username__in=usernames).count(),
         }
     
     @staticmethod
@@ -1620,7 +1661,6 @@ class DashboardService:
             pronunciations = (
                 PronunciationHistory.objects.filter(
                     created_at__range=(start_week, end_week),
-                    score__gte=70,
                 )
                 .defer("user_audio_b64")
                 .order_by("created_at")

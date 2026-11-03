@@ -242,6 +242,7 @@ let animFrame = 0;
 let mediaStream: MediaStream | null = null;
 let recordingStart = 0;
 let isOperating = false;
+let isRecordingCancelled = false;
 
 function setUserAudioBlobUrl(url: string | null) {
   if (userAudioUrl.value) {
@@ -442,6 +443,8 @@ function cleanupAudioResources() {
 async function startRecording() {
   if (isOperating || isRecording.value) return;
   isOperating = true;
+  isRecordingCancelled = false;
+  recordingError.value = null;
 
   result.value = null;
   selectedWord.value = null;
@@ -511,6 +514,14 @@ async function startRecording() {
           audioContext = null;
         }
         cancelAnimationFrame(animFrame);
+
+        if (isRecordingCancelled) {
+          isRecordingCancelled = false;
+          audioChunks = [];
+          isRecording.value = false;
+          isOperating = false;
+          return;
+        }
 
         const elapsed = Date.now() - recordingStart;
         if (elapsed < 1200) {
@@ -594,12 +605,44 @@ function stopRecording() {
   }
 }
 
+function cancelRecording() {
+  if (!isRecording.value && !mediaRecorder) return;
+  isRecordingCancelled = true;
+  cancelAnimationFrame(animFrame);
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    try {
+      mediaRecorder.stop();
+    } catch (e) {
+      console.error('Error stopping recorder on cancel:', e);
+    }
+  } else {
+    isRecording.value = false;
+    isOperating = false;
+    if (mediaStream) {
+      mediaStream.getTracks().forEach((t) => t.stop());
+      mediaStream = null;
+    }
+  }
+  audioChunks = [];
+  recordingError.value = 'Gravação cancelada. Pode começar de novo quando quiser!';
+  setTimeout(() => {
+    if (recordingError.value === 'Gravação cancelada. Pode começar de novo quando quiser!') {
+      recordingError.value = null;
+    }
+  }, 3000);
+}
+
 async function evaluatePronunciation(audioBase64: string, referenceText: string) {
   isEvaluating.value = true;
   try {
-    const body: Record<string, any> = { audio: audioBase64, accent: selectedAccent.value };
+    const body: Record<string, any> = {
+      audio: audioBase64,
+      accent: selectedAccent.value,
+      mode: inputMode.value,
+    };
     if (referenceText) {
       body.reference_text = referenceText;
+      body.target_phrase = referenceText;
     }
     if (inputMode.value === 'custom') {
       body.mode = 'write';
@@ -1093,9 +1136,9 @@ onUnmounted(() => {
           </div>
 
           <!-- Controles principais -->
-          <div class="w-full flex items-center justify-center gap-4 mb-6">
-            <button v-if="inputMode === 'preset'" type="button" @click="goPrev"
-              class="p-3 rounded-full bg-surface border border-border hover:bg-surface-hover transition-colors text-text">
+          <div class="w-full flex items-center justify-center gap-3 md:gap-4 mb-4">
+            <button v-if="inputMode === 'preset'" type="button" @click="goPrev" :disabled="isRecording || isEvaluating"
+              class="p-3 rounded-full bg-surface border border-border hover:bg-surface-hover transition-colors text-text disabled:opacity-40 disabled:cursor-not-allowed">
               <ChevronLeft :size="20" />
             </button>
 
@@ -1103,7 +1146,8 @@ onUnmounted(() => {
               :class="[
                 'p-4 rounded-full bg-surface border border-border hover:bg-surface-hover transition-colors text-primary',
                 (!getActiveText() || isRecording || isEvaluating) && 'opacity-40 cursor-not-allowed',
-              ]">
+              ]"
+              title="Ouvir áudio de referência">
               <Volume2 :size="24" />
             </button>
 
@@ -1114,20 +1158,29 @@ onUnmounted(() => {
                   ? 'bg-red-500 shadow-red-500/30 animate-pulse scale-110'
                   : 'bg-primary shadow-primary/20 hover:scale-105 active:scale-95',
                 isEvaluating && 'opacity-50 cursor-not-allowed',
-              ]">
+              ]"
+              :title="isRecording ? 'Concluir gravação e analisar' : 'Começar a gravar'">
               <Square v-if="isRecording" :size="28" class="text-white" />
               <Mic v-else :size="28" class="text-white" />
             </button>
 
-            <button type="button" @click="
+            <!-- Botão Cancelar durante a gravação -->
+            <button v-if="isRecording" type="button" @click="cancelRecording"
+              class="p-4 rounded-full bg-red-500/15 border border-red-500/40 hover:bg-red-500/30 text-red-400 transition-all shadow-md active:scale-95 animate-fade-in flex items-center justify-center"
+              title="Cancelar e descartar gravação (sem enviar para análise)">
+              <X :size="24" />
+            </button>
+
+            <button v-if="!isRecording" type="button" @click="
               result = null;
-            recordingError = null;
-            " class="p-3 rounded-full bg-surface border border-border hover:bg-surface-hover transition-colors text-text">
+              recordingError = null;
+            " class="p-3 rounded-full bg-surface border border-border hover:bg-surface-hover transition-colors text-text"
+              title="Limpar resultado">
               <RotateCcw :size="20" />
             </button>
 
-            <button v-if="inputMode === 'preset'" type="button" @click="goNext"
-              class="p-3 rounded-full bg-surface border border-border hover:bg-surface-hover transition-colors text-text">
+            <button v-if="inputMode === 'preset'" type="button" @click="goNext" :disabled="isRecording || isEvaluating"
+              class="p-3 rounded-full bg-surface border border-border hover:bg-surface-hover transition-colors text-text disabled:opacity-40 disabled:cursor-not-allowed">
               <ChevronRight :size="20" />
             </button>
           </div>
@@ -1139,6 +1192,10 @@ onUnmounted(() => {
               Recording — speak now...
             </div>
             <canvas ref="canvasRef" width="300" height="60" class="mt-2 rounded-lg" />
+            <button type="button" @click="cancelRecording"
+              class="mt-2 text-xs text-text-muted hover:text-red-400 transition-colors flex items-center gap-1.5 underline underline-offset-4 cursor-pointer font-medium">
+              <X :size="13" /> Errou o início? Clique aqui para cancelar e recomeçar
+            </button>
           </div>
 
           <!-- Erro de gravação -->

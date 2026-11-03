@@ -608,7 +608,7 @@ const progressTabs = [
                       Pronunciation Practice
                     </h4>
                     <p class="text-[0.65rem] text-text-muted mt-0.5">
-                      Total: {{ pronunciationData?.total_pronunciations || 0 }} sessions <span class="mx-1.5 opacity-50">|</span> {{ pronunciationData?.pronunciation_completed || 0 }} proficient (&gt;=70%)
+                      Total: {{ pronunciationData?.total_pronunciations || 0 }} frases praticadas <span class="mx-1.5 opacity-50">|</span> {{ pronunciationData?.pronunciation_completed || 0 }} proficientes (&gt;=70%)
                     </p>
                   </div>
                   <div v-if="pronunciationData?.last_practice_date" class="text-right">
@@ -630,7 +630,7 @@ const progressTabs = [
                   No pronunciation practice recorded yet.
                 </div>
 
-                <div v-else class="space-y-2 max-h-[250px] overflow-y-auto pr-1 custom-scrollbar">
+                <div v-else class="space-y-2 max-h-[380px] overflow-y-auto pr-1 custom-scrollbar">
                   <div
                     v-for="p in pronunciationData.pronunciation_list"
                     :key="p.id"
@@ -638,7 +638,7 @@ const progressTabs = [
                   >
                     <div class="flex items-start justify-between gap-2">
                       <div class="min-w-0">
-                        <span class="font-bold text-text truncate block max-w-[280px]">{{ p.target_phrase }}</span>
+                        <span class="font-bold text-text truncate block max-w-[280px]">{{ p.target_phrase || p.spoken_phrase || 'Prática Livre' }}</span>
                         <span class="text-[0.62rem] text-text-muted flex items-center gap-1.5 mt-0.5">
                           <Clock class="w-3 h-3" /> Practiced on {{ formatDateTime(p.created_at) }}
                         </span>
@@ -672,7 +672,7 @@ const progressTabs = [
                     </div>
 
                     <div class="text-[0.6rem] text-text-muted flex justify-between pt-1 border-t border-border/40">
-                      <span>Mode: {{ p.mode || 'preset' }} ({{ p.accent || 'en-US' }})</span>
+                      <span>Modo: {{ p.mode === 'free' ? 'Fala Livre' : p.mode === 'write' ? 'Personalizada' : 'Frase Pronta' }} ({{ p.accent || 'en-US' }})</span>
                       <span>{{ formatDateTime(p.created_at) }}</span>
                     </div>
                   </div>
@@ -710,33 +710,37 @@ const progressTabs = [
             </div>
 
             <div v-else class="space-y-6">
-              <!-- 3 Summary Cards -->
-              <div class="grid grid-cols-3 gap-3">
+              <!-- 4 Summary Cards -->
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div class="p-3.5 bg-surface border border-border rounded-xl">
-                  <span class="text-[0.65rem] font-bold text-text-subtle uppercase tracking-wider block">Weekly
-                    Study</span>
+                  <span class="text-[0.65rem] font-bold text-text-subtle uppercase tracking-wider block">Weekly Study</span>
                   <p class="text-base font-bold text-text mt-0.5">
                     {{ analytics.summary?.total_study_minutes_weekly || 0 }} min
                   </p>
                   <span class="text-[0.6rem] text-text-muted">
-                    Avg {{ analytics.summary?.avg_study_minutes_daily || 0 }}m/day
+                    Avg {{ analytics.summary?.avg_study_minutes_daily || 0 }}m/dia
                   </span>
                 </div>
                 <div class="p-3.5 bg-surface border border-border rounded-xl">
-                  <span
-                    class="text-[0.65rem] font-bold text-text-subtle uppercase tracking-wider block">Interactions</span>
+                  <span class="text-[0.65rem] font-bold text-text-subtle uppercase tracking-wider block">Interactions</span>
                   <p class="text-base font-bold text-text mt-0.5">
                     {{ analytics.summary?.total_messages_weekly || 0 }} msgs
                   </p>
-                  <span class="text-[0.6rem] text-text-muted">This week</span>
+                  <span class="text-[0.6rem] text-text-muted">Chat esta semana</span>
                 </div>
                 <div class="p-3.5 bg-surface border border-border rounded-xl">
-                  <span
-                    class="text-[0.65rem] font-bold text-text-subtle uppercase tracking-wider block">Activities</span>
+                  <span class="text-[0.65rem] font-bold text-text-subtle uppercase tracking-wider block">Activities</span>
                   <p class="text-base font-bold text-text mt-0.5">
-                    {{ analytics.summary?.total_activities_weekly || 0 }} done
+                    {{ analytics.summary?.total_activities_weekly || 0 }} feitas
                   </p>
-                  <span class="text-[0.6rem] text-text-muted">Quizzes & Decks</span>
+                  <span class="text-[0.6rem] text-text-muted">Lições & Práticas</span>
+                </div>
+                <div class="p-3.5 bg-surface border border-border rounded-xl">
+                  <span class="text-[0.65rem] font-bold text-text-subtle uppercase tracking-wider block">Pronunciation</span>
+                  <p class="text-base font-bold text-text mt-0.5">
+                    {{ analytics.summary?.total_pronunciations_weekly || 0 }} frases
+                  </p>
+                  <span class="text-[0.6rem] text-text-muted">{{ analytics.summary?.total_pronunciations || 0 }} no total</span>
                 </div>
               </div>
 

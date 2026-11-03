@@ -352,10 +352,10 @@ onUnmounted(() => {
               type="button"
               @click="handleRestartSession"
               :disabled="isStartingOrStopping"
-              class="px-4 py-2.5 rounded-xl border border-border hover:bg-surface-hover text-text text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+              class="px-5 py-2.5 rounded-xl border border-primary/30 bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
             >
               <RotateCw class="w-4 h-4" :class="isStartingOrStopping ? 'animate-spin' : ''" />
-              <span>Refresh QR Code</span>
+              <span>Gerar Novo QR Code</span>
             </button>
 
             <button
@@ -366,18 +366,18 @@ onUnmounted(() => {
               class="px-5 py-2.5 rounded-xl bg-danger text-white text-xs font-bold hover:bg-danger/90 shadow-xs flex items-center gap-1.5 cursor-pointer"
             >
               <Power class="w-4 h-4" />
-              <span>Disconnect Session</span>
+              <span>Desconectar Sessão</span>
             </button>
 
             <button
-              v-if="sessionStatus === 'DISCONNECTED' || sessionStatus === 'STOPPED'"
+              v-if="sessionStatus !== 'WORKING' && sessionStatus !== 'SCAN_QR_CODE'"
               type="button"
-              @click="handleStartSession"
+              @click="handleRestartSession"
               :disabled="isStartingOrStopping"
-              class="px-6 py-2.5 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-hover shadow-xs flex items-center gap-1.5 cursor-pointer"
+              class="px-6 py-2.5 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-hover shadow-xs flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
             >
-              <Power class="w-4 h-4" />
-              <span>Start Session</span>
+              <Power class="w-4 h-4" :class="isStartingOrStopping ? 'animate-spin' : ''" />
+              <span>Conectar WhatsApp / Escanear QR</span>
             </button>
           </div>
         </div>
@@ -390,27 +390,37 @@ onUnmounted(() => {
           <div class="space-y-1.5 max-w-sm">
             <h3 class="text-base font-black text-text flex items-center justify-center gap-2">
               <QrCode class="w-5 h-5 text-primary" />
-              <span>Scan WhatsApp QR Code</span>
+              <span>Escanear QR Code do WhatsApp</span>
             </h3>
             <p class="text-xs text-text-muted">
-              Open WhatsApp on your phone, go to <strong>Linked Devices</strong> &gt; <strong>Link a device</strong>, and scan the QR code below.
+              Abra o WhatsApp no celular da Teacher Tatiana, vá em <strong>Aparelhos conectados</strong> &gt; <strong>Conectar um aparelho</strong>, e aponte a câmera para o QR Code abaixo.
             </p>
           </div>
 
-          <div class="relative w-60 h-60 bg-white p-4 border border-border rounded-2xl flex items-center justify-center shadow-md">
+          <div class="relative w-64 h-64 bg-white p-4 border border-border rounded-2xl flex items-center justify-center shadow-md">
             <Loader2 v-if="loadingQr && !qrBlobUrl" class="w-8 h-8 text-primary animate-spin" />
             <img v-else-if="qrBlobUrl" :src="qrBlobUrl" alt="WhatsApp QR Code" class="w-full h-full object-contain" />
             <div v-else class="text-xs text-text-muted space-y-2">
-              <p>{{ qrError || 'Generating QR code...' }}</p>
+              <p>{{ qrError || 'Gerando QR code...' }}</p>
               <button
                 type="button"
                 @click="loadQrCode()"
                 class="px-3 py-1.5 rounded-lg border border-border text-xs font-bold text-primary hover:underline cursor-pointer"
               >
-                Try Again
+                Tentar novamente
               </button>
             </div>
           </div>
+
+          <button
+            type="button"
+            @click="handleRestartSession"
+            :disabled="isStartingOrStopping"
+            class="text-xs text-text-muted hover:text-primary transition-colors flex items-center gap-1.5 underline underline-offset-4 cursor-pointer"
+          >
+            <RotateCw class="w-3.5 h-3.5" :class="isStartingOrStopping ? 'animate-spin' : ''" />
+            QR Code expirou ou não carrega? Clique aqui para renovar
+          </button>
         </div>
       </div>
     </div>
