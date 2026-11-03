@@ -1202,12 +1202,14 @@ class DashboardService:
             Q(username__iexact=username) | Q(username=username)
         ).count()
         total_prons_weekly = sum(pron_counts_by_day.values())
+        total_acts_all = len(submissions) + total_prons_all
 
         summary = {
             "total_study_minutes_weekly": total_study_minutes_weekly,
             "avg_study_minutes_daily": avg_daily,
             "total_messages_weekly": total_messages_weekly,
             "total_activities_weekly": total_activities_weekly,
+            "total_activities": total_acts_all,
             "total_pronunciations_weekly": total_prons_weekly,
             "total_pronunciations": total_prons_all,
         }
@@ -1261,7 +1263,7 @@ class DashboardService:
         subs = list(
             ActivitySubmission.objects.filter(username__in=usernames)
             .defer("student_answer", "teacher_feedback", "ai_feedback")
-            .order_by("-created_at")[:200]
+            .order_by("-created_at")[:500]
         )
 
         counts = {
@@ -1428,14 +1430,13 @@ class DashboardService:
         # Incorpora histórico de pronúncias (frases prontas, escritas e livres) nas atividades
         from apps.activities.models import PronunciationHistory
         try:
-            prons = list(
-                PronunciationHistory.objects.filter(
-                    Q(username__in=usernames) | Q(username__iexact=username)
-                )
-                .defer("user_audio_b64")
-                .order_by("-created_at")[:100]
+            pron_qs = PronunciationHistory.objects.filter(
+                Q(username__in=usernames) | Q(username__iexact=username)
             )
-            counts["pronunciation"] = len(prons)
+            counts["pronunciation"] = pron_qs.count()
+            prons = list(
+                pron_qs.defer("user_audio_b64").order_by("-created_at")[:500]
+            )
             for p in prons:
                 mode_desc = (
                     "Frase Escrita"
@@ -1594,7 +1595,7 @@ class DashboardService:
                 "mode": p.mode,
                 "created_at": p.created_at.isoformat() if p.created_at else None,
             }
-            for p in pronunciations[:100]
+            for p in pronunciations[:500]
         ]
 
         last_item = pronunciations.first()

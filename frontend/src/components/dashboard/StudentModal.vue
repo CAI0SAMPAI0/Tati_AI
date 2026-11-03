@@ -797,16 +797,16 @@ const progressTabs = [
                 <div class="p-3.5 bg-surface border border-border rounded-xl">
                   <span class="text-[0.65rem] font-bold text-text-subtle uppercase tracking-wider block">Activities</span>
                   <p class="text-base font-bold text-text mt-0.5">
-                    {{ analytics.summary?.total_activities_weekly || 0 }} feitas
+                    {{ analytics.summary?.total_activities ?? analytics.summary?.total_activities_weekly ?? 0 }} feitas
                   </p>
-                  <span class="text-[0.6rem] text-text-muted">Lições & Práticas</span>
+                  <span class="text-[0.6rem] text-text-muted">{{ analytics.summary?.total_activities_weekly || 0 }} esta semana</span>
                 </div>
                 <div class="p-3.5 bg-surface border border-border rounded-xl">
                   <span class="text-[0.65rem] font-bold text-text-subtle uppercase tracking-wider block">Pronunciation</span>
                   <p class="text-base font-bold text-text mt-0.5">
-                    {{ analytics.summary?.total_pronunciations_weekly || 0 }} frases
+                    {{ analytics.summary?.total_pronunciations ?? analytics.summary?.total_pronunciations_weekly ?? 0 }} frases
                   </p>
-                  <span class="text-[0.6rem] text-text-muted">{{ analytics.summary?.total_pronunciations || 0 }} no total</span>
+                  <span class="text-[0.6rem] text-text-muted">{{ analytics.summary?.total_pronunciations_weekly || 0 }} esta semana</span>
                 </div>
               </div>
 

@@ -27,6 +27,7 @@ import {
   setActivityCache,
   TTL_30_DAYS_MS,
 } from '@/utils/activityCache';
+import { getSemanticDistractors } from '@/utils/flashcardDistractors';
 
 interface Flashcard {
   id?: string;
@@ -187,29 +188,21 @@ function normalizeCard(raw: any, allRawCards: any[] = []): Flashcard {
     options.unshift(front);
   }
 
-  if (options.length < 4 && allRawCards.length > 0) {
-    for (const other of allRawCards) {
-      const otherFrontRaw = String(other?.front ?? other?.word ?? other?.term ?? '').trim();
-      const otherFront = capitalize(otherFrontRaw);
-      if (
-        otherFront &&
-        otherFront.toLowerCase() !== front.toLowerCase() &&
-        !options.some((o) => o.toLowerCase() === otherFront.toLowerCase())
-      ) {
-        options.push(otherFront);
+  if (options.length < 4) {
+    // Coleta todas as palavras dos outros cards do deck para estritamente exclui-las
+    // evitando que as respostas dos outros cards fiquem se repetindo e entregando o gabarito
+    const otherDeckWords = allRawCards
+      .map((c: any) => String(c?.front ?? c?.word ?? c?.term ?? '').trim())
+      .filter((w: string) => Boolean(w) && w.toLowerCase() !== front.toLowerCase());
+
+    const deckTopic = deck.value?.title || deck.value?.description || '';
+    const distractors = getSemanticDistractors(front, deckTopic, otherDeckWords);
+
+    for (const d of distractors) {
+      if (!options.some((o) => o.toLowerCase() === d.toLowerCase())) {
+        options.push(d);
       }
       if (options.length >= 4) break;
-    }
-  }
-
-  const fallbackWords = ['Vocabulary', 'Expression', 'Grammar', 'Meaning', 'Concept', 'Practice'];
-  for (const w of fallbackWords) {
-    if (options.length >= 4) break;
-    if (
-      !options.some((o) => o.toLowerCase() === w.toLowerCase()) &&
-      w.toLowerCase() !== front.toLowerCase()
-    ) {
-      options.push(w);
     }
   }
 
@@ -299,7 +292,23 @@ async function loadDeck() {
 function setupCurrentCard() {
   if (!currentCard.value) return;
   imageError.value = false;
-  const opts = [...(currentCard.value.options || [currentCard.value.front])].map((o) => capitalize(o));
+  let opts = [...(currentCard.value.options || [currentCard.value.front])].map((o) => capitalize(o));
+
+  if (opts.length < 4) {
+    const otherDeckWords = initialCards.value
+      .map((c) => c.front)
+      .filter((w) => w.toLowerCase() !== currentCard.value!.front.toLowerCase());
+    const deckTopic = deck.value?.title || deck.value?.description || '';
+    const distractors = getSemanticDistractors(currentCard.value.front, deckTopic, otherDeckWords);
+
+    for (const d of distractors) {
+      if (!opts.some((o) => o.toLowerCase() === d.toLowerCase())) {
+        opts.push(d);
+      }
+      if (opts.length >= 4) break;
+    }
+  }
+
   for (let i = opts.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [opts[i], opts[j]] = [opts[j], opts[i]];
