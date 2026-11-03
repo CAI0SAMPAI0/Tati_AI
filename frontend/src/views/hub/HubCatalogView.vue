@@ -13,6 +13,13 @@ import {
   filterMaterials,
   searchMaterials,
 } from '@/types/catalog';
+import {
+  peekActivityCache,
+  setActivityCache,
+  TTL_30_DAYS_MS,
+} from '@/utils/activityCache';
+
+const CACHE_KEY_CATALOG = 'hub:catalog:all';
 
 const { user } = useAuth();
 const materials = ref<CatalogMaterial[]>([]);
@@ -24,8 +31,15 @@ const activeFilter = ref<FilterId>('all');
 const searchQuery = ref('');
 
 async function loadCatalog() {
-  isLoading.value = true;
+  const cached = peekActivityCache<CatalogMaterial[]>(CACHE_KEY_CATALOG);
+  if (cached && cached.length > 0) {
+    materials.value = cached;
+    isLoading.value = false;
+  } else {
+    isLoading.value = true;
+  }
   isError.value = false;
+
   try {
     const [catRes, userRes] = await Promise.all([
       apiGet<CatalogMaterial[]>('/catalog').catch(() => []),
@@ -40,13 +54,20 @@ async function loadCatalog() {
     }
     userAccesses.value = accessMap;
 
-    materials.value = (catRes || []).map((m) => ({
+    const merged = (catRes || []).map((m) => ({
       ...m,
       has_access: accessMap.get(m.id) ?? m.has_access ?? false,
     }));
+
+    if (merged.length > 0) {
+      materials.value = merged;
+      setActivityCache(CACHE_KEY_CATALOG, merged, TTL_30_DAYS_MS);
+    }
   } catch (err) {
     console.error('Error loading hub catalog:', err);
-    isError.value = true;
+    if (!materials.value.length) {
+      isError.value = true;
+    }
   } finally {
     isLoading.value = false;
   }

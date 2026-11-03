@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import {
   ArrowLeft,
@@ -43,6 +43,29 @@ const showSubmitModal = ref(false);
 const answers = ref<Record<string, string>>({});
 const recordedAudios = ref<Record<string, string>>({});
 const showTranscript = ref<Record<string, boolean>>({});
+
+const examStorageKey = computed(() => {
+  const id = activeExam.value?.exam_id;
+  return id ? `tati_exam_in_progress_${id}` : null;
+});
+
+watch(
+  [answers, recordedAudios],
+  () => {
+    if (!examStorageKey.value || isFinished.value) return;
+    try {
+      localStorage.setItem(
+        examStorageKey.value,
+        JSON.stringify({
+          answers: answers.value,
+          recordedAudios: recordedAudios.value,
+          savedAt: Date.now(),
+        })
+      );
+    } catch {}
+  },
+  { deep: true }
+);
 
 // Audio playback states
 const playingAudioId = ref<string | null>(null);
@@ -120,6 +143,17 @@ async function loadExam() {
     }
     if (exam && exam.questions && exam.questions.length > 0) {
       activeExam.value = exam;
+      if (examStorageKey.value) {
+        try {
+          const saved = localStorage.getItem(examStorageKey.value);
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            if (parsed?.answers) answers.value = parsed.answers;
+            if (parsed?.recordedAudios) recordedAudios.value = parsed.recordedAudios;
+            toast.info('Respostas anteriores em andamento restauradas.');
+          }
+        } catch {}
+      }
     } else {
       toast.error('No exam available at this time.');
       router.push('/exams');
@@ -259,6 +293,11 @@ async function handleExecuteSubmit() {
 
     examResult.value = result;
     isFinished.value = true;
+    if (examStorageKey.value) {
+      try {
+        localStorage.removeItem(examStorageKey.value);
+      } catch {}
+    }
     toast.success(`Exam submitted successfully! Score: ${result.score}% 🎉`);
   } catch (err: any) {
     console.error('Error submitting exam:', err);

@@ -19,6 +19,11 @@ import { ENDPOINTS } from '@/api/endpoints';
 import { useAuth } from '@/composables/useAuth';
 import { useToast } from '@/composables/useToast';
 import Button from '@/components/ui/Button.vue';
+import {
+  peekActivityCache,
+  setActivityCache,
+  TTL_1_DAY_MS,
+} from '@/utils/activityCache';
 import ActivityBarChart from '@/components/charts/ActivityBarChart.vue';
 
 interface XpData {
@@ -178,7 +183,19 @@ const myLeaguePosition = computed(() => {
 });
 
 async function loadData() {
-  isLoading.value = true;
+  const CACHE_KEY = 'student:progress:summary';
+  const cached = peekActivityCache<any>(CACHE_KEY);
+  if (cached) {
+    if (cached.xpData) xpData.value = cached.xpData;
+    if (cached.streakData) streakData.value = cached.streakData;
+    if (cached.weeklyReport) weeklyReport.value = cached.weeklyReport;
+    if (cached.monthlyReport) monthlyReport.value = cached.monthlyReport;
+    if (cached.levelRankings) levelRankings.value = cached.levelRankings;
+    isLoading.value = false;
+  } else {
+    isLoading.value = true;
+  }
+
   try {
     const [xpRes, strkRes, weekRes, monthRes, rankRes] = await Promise.all([
       apiGet<XpData>('/dashboard/stats/my').catch(() => null),
@@ -188,11 +205,23 @@ async function loadData() {
       apiGet<Record<string, any[]>>('/users/progress/ranking/by-level').catch(() => ({})),
     ]);
 
-    xpData.value = xpRes;
-    streakData.value = strkRes;
-    weeklyReport.value = weekRes;
-    monthlyReport.value = monthRes;
-    levelRankings.value = rankRes || {};
+    if (xpRes) xpData.value = xpRes;
+    if (strkRes) streakData.value = strkRes;
+    if (weekRes) weeklyReport.value = weekRes;
+    if (monthRes) monthlyReport.value = monthRes;
+    if (rankRes) levelRankings.value = rankRes;
+
+    setActivityCache(
+      CACHE_KEY,
+      {
+        xpData: xpRes || xpData.value,
+        streakData: strkRes || streakData.value,
+        weeklyReport: weekRes || weeklyReport.value,
+        monthlyReport: monthRes || monthlyReport.value,
+        levelRankings: rankRes || levelRankings.value,
+      },
+      TTL_1_DAY_MS
+    );
   } catch (err) {
     console.error('Failed to load progress data:', err);
   } finally {

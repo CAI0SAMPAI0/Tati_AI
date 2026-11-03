@@ -22,6 +22,11 @@ import { ACCENTS, getStoredAccent } from '@/constants/accents';
 import { useAuth } from '@/composables/useAuth';
 import { useToast } from '@/composables/useToast';
 import Button from '@/components/ui/Button.vue';
+import {
+  peekActivityCache,
+  setActivityCache,
+  TTL_30_DAYS_MS,
+} from '@/utils/activityCache';
 
 interface Flashcard {
   id?: string;
@@ -50,6 +55,62 @@ const toast = useToast();
 const { accent, setAccent, updateUserData } = useAuth();
 
 const deckId = computed(() => route.params.id as string);
+const progressKey = computed(() => `tati_flashcard_progress_${deckId.value}`);
+const deckCacheKey = computed(() => `tati_flashcard_deck_${deckId.value}`);
+
+function saveProgress() {
+  if (!deckId.value || typeof window === 'undefined' || finished.value) return;
+  try {
+    const state = {
+      currentIndex: currentIndex.value,
+      queue: queue.value,
+      initialCards: initialCards.value,
+      firstTryCorrect: Array.from(firstTryCorrect.value),
+      retriedCards: Array.from(retriedCards.value),
+      retrySessionCount: retrySessionCount.value,
+      savedAt: Date.now(),
+    };
+    window.localStorage.setItem(progressKey.value, JSON.stringify(state));
+  } catch {}
+}
+
+function clearSavedProgress() {
+  if (!deckId.value || typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(progressKey.value);
+  } catch {}
+}
+
+function restoreProgress(): boolean {
+  if (!deckId.value || typeof window === 'undefined') return false;
+  try {
+    const raw = window.localStorage.getItem(progressKey.value);
+    if (!raw) return false;
+    const state = JSON.parse(raw);
+    if (
+      state &&
+      Array.isArray(state.queue) &&
+      state.queue.length > 0 &&
+      typeof state.currentIndex === 'number' &&
+      state.currentIndex < state.queue.length
+    ) {
+      queue.value = state.queue;
+      if (Array.isArray(state.initialCards) && state.initialCards.length > 0) {
+        initialCards.value = state.initialCards;
+      }
+      currentIndex.value = state.currentIndex;
+      firstTryCorrect.value = new Set(Array.isArray(state.firstTryCorrect) ? state.firstTryCorrect : []);
+      retriedCards.value = new Set(Array.isArray(state.retriedCards) ? state.retriedCards : []);
+      retrySessionCount.value = state.retrySessionCount || 0;
+      setupCurrentCard();
+      if (state.currentIndex > 0) {
+        toast.info(`Continuando da carta ${state.currentIndex + 1} de ${state.queue.length}`);
+      }
+      return true;
+    }
+  } catch {}
+  return false;
+}
 
 const deck = ref<Deck | null>(null);
 const isLoading = ref(true);
@@ -184,7 +245,22 @@ function checkCompletionFromSubmissions(subs: any[]) {
 
 async function loadDeck() {
   if (!deckId.value) return;
-  isLoading.value = true;
+
+  // 1. Instant 0ms cache check for deck
+  const cachedDeck = peekActivityCache<Deck>(deckCacheKey.value);
+  if (cachedDeck) {
+    deck.value = cachedDeck;
+    const raw = Array.isArray(cachedDeck?.flashcards) ? cachedDeck.flashcards : [];
+    const normalized = raw.map((c, _, arr) => normalizeCard(c, arr)).filter((c) => c.front);
+    initialCards.value = normalized;
+    queue.value = [...normalized];
+    isLoading.value = false;
+    restoreProgress();
+    setupCurrentCard();
+  } else {
+    isLoading.value = true;
+  }
+
   try {
     const [deckData, subs] = await Promise.all([
       apiGet<Deck>(`/activities/modules/${deckId.value}`),
@@ -192,21 +268,29 @@ async function loadDeck() {
     ]);
 
     deck.value = deckData;
+    setActivityCache(deckCacheKey.value, deckData, TTL_30_DAYS_MS);
+
     const raw = Array.isArray(deckData?.flashcards) ? deckData.flashcards : [];
     const normalized = raw.map((c, _, arr) => normalizeCard(c, arr)).filter((c) => c.front);
 
     initialCards.value = normalized;
-    queue.value = [...normalized];
-    currentIndex.value = 0;
+
+    // Retoma progresso se já havia uma rodada salva
+    const hasProgress = restoreProgress();
+    if (!hasProgress) {
+      queue.value = [...normalized];
+      currentIndex.value = 0;
+      setupCurrentCard();
+    }
 
     if (Array.isArray(subs)) {
       checkCompletionFromSubmissions(subs);
     }
-
-    setupCurrentCard();
   } catch (err) {
     console.error('Error loading deck:', err);
-    toast.error('Deck not found or failed to load.');
+    if (!deck.value) {
+      toast.error('Deck not found or failed to load.');
+    }
   } finally {
     isLoading.value = false;
   }
@@ -303,6 +387,7 @@ function handleSelectOption(chosen: string) {
       status: 'wrong',
     }).catch(() => {});
   }
+  saveProgress();
 }
 
 function handleSkip() {
@@ -322,12 +407,14 @@ function handleSkip() {
     card_front: currentCard.value.front,
     status: 'skipped',
   }).catch(() => {});
+  saveProgress();
 }
 
 function handleNext() {
   if (currentIndex.value + 1 < queue.value.length) {
     currentIndex.value++;
     setupCurrentCard();
+    saveProgress();
   } else {
     finishDeck();
   }
@@ -335,6 +422,7 @@ function handleNext() {
 
 async function finishDeck() {
   finished.value = true;
+  clearSavedProgress();
   const total = initialCards.value.length;
   const wasAlreadyCompleted = isCompleted.value;
   const finalScore = total > 0 ? Math.round((firstTryCorrect.value.size / total) * 100) : 100;
@@ -405,6 +493,7 @@ async function handleRevertToPending() {
 
     isCompleted.value = false;
     lastXpEarned.value = 0;
+    clearSavedProgress();
 
     if (res?.new_total_xp !== undefined) {
       updateUserData({
@@ -423,6 +512,7 @@ async function handleRevertToPending() {
 }
 
 function handleRestart() {
+  clearSavedProgress();
   queue.value = [...initialCards.value];
   firstTryCorrect.value.clear();
   retriedCards.value.clear();

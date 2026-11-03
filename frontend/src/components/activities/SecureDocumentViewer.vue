@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { Shield, Maximize, Minimize, Loader2, RefreshCw } from 'lucide-vue-next';
+import { getCachedMediaUrl } from '@/utils/mediaCache';
 
 export type SecureViewerAccess = {
   type: string;
@@ -18,18 +19,28 @@ export type SecureViewerAccess = {
   }[];
 };
 
-const props = defineProps<{
-  access: SecureViewerAccess;
-  watermarkText: string;
-}>();
+const props = withDefaults(
+  defineProps<{
+    access: SecureViewerAccess;
+    watermarkText: string;
+    contentId?: string;
+  }>(),
+  {
+    contentId: '',
+  }
+);
 
 const isFullscreen = ref(false);
 const viewerRef = ref<HTMLDivElement | null>(null);
 const loadedPages = ref<Record<number, boolean>>({});
 const pageErrors = ref<Record<number, boolean>>({});
 const retryAttempts = ref<Record<number, number>>({});
+const cachedUrls = ref<Record<number, string>>({});
 
 const watermarkTiles = computed(() => Array.from({ length: 24 }));
+const lastPageStorageKey = computed(() => (props.contentId ? `tati_reader_last_page_${props.contentId}` : null));
+
+let pageObserver: IntersectionObserver | null = null;
 
 function blockEvent(e: Event) {
   e.preventDefault();
@@ -37,26 +48,6 @@ function blockEvent(e: Event) {
 
 function handleFullscreenChange() {
   isFullscreen.value = !!document.fullscreenElement;
-}
-
-onMounted(() => {
-  document.addEventListener('contextmenu', blockEvent);
-  document.addEventListener('fullscreenchange', handleFullscreenChange);
-});
-
-onUnmounted(() => {
-  document.removeEventListener('contextmenu', blockEvent);
-  document.removeEventListener('fullscreenchange', handleFullscreenChange);
-});
-
-function toggleFullscreen() {
-  if (!document.fullscreenElement) {
-    viewerRef.value?.requestFullscreen().catch((err) => {
-      console.error('Fullscreen error:', err);
-    });
-  } else {
-    document.exitFullscreen().catch(() => {});
-  }
 }
 
 function getSafePageUrl(url: string, index: number) {
@@ -67,6 +58,21 @@ function getSafePageUrl(url: string, index: number) {
   if (attempt === 0) return base;
   const sep = base.includes('?') ? '&' : '?';
   return `${base}${sep}retry=${attempt}`;
+}
+
+async function preloadAndCachePage(url: string, index: number) {
+  const directUrl = getSafePageUrl(url, index);
+  if (!cachedUrls.value[index]) {
+    cachedUrls.value[index] = directUrl;
+  }
+  try {
+    const cached = await getCachedMediaUrl(directUrl);
+    if (cached) {
+      cachedUrls.value[index] = cached;
+    }
+  } catch {
+    // Mantém directUrl caso falhe
+  }
 }
 
 function handleImageLoad(index: number) {
@@ -83,7 +89,94 @@ function retryPage(index: number) {
   retryAttempts.value[index] = (retryAttempts.value[index] || 0) + 1;
   pageErrors.value[index] = false;
   loadedPages.value[index] = false;
+  if (props.access?.pages?.[index]) {
+    preloadAndCachePage(props.access.pages[index], index);
+  }
 }
+
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    viewerRef.value?.requestFullscreen().catch((err) => {
+      console.error('Fullscreen error:', err);
+    });
+  } else {
+    document.exitFullscreen().catch(() => {});
+  }
+}
+
+function restoreLastReadPage() {
+  if (!lastPageStorageKey.value || typeof window === 'undefined') return;
+  try {
+    const saved = window.localStorage.getItem(lastPageStorageKey.value);
+    if (saved) {
+      const pageNum = parseInt(saved, 10);
+      if (!isNaN(pageNum) && pageNum > 1 && pageNum <= (props.access?.total_pages || 999)) {
+        setTimeout(() => {
+          const targetEl = viewerRef.value?.querySelector(`figure[data-page="${pageNum}"]`);
+          if (targetEl) {
+            targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 400);
+      }
+    }
+  } catch {}
+}
+
+function setupPageObserver() {
+  if (typeof IntersectionObserver === 'undefined' || !lastPageStorageKey.value) return;
+  if (pageObserver) {
+    pageObserver.disconnect();
+  }
+
+  pageObserver = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting && entry.intersectionRatio >= 0.4) {
+          const p = entry.target.getAttribute('data-page');
+          if (p && lastPageStorageKey.value) {
+            try {
+              window.localStorage.setItem(lastPageStorageKey.value, p);
+            } catch {}
+          }
+        }
+      }
+    },
+    { threshold: [0.4] }
+  );
+
+  setTimeout(() => {
+    const figures = viewerRef.value?.querySelectorAll('figure[data-page]');
+    figures?.forEach((fig) => pageObserver?.observe(fig));
+  }, 400);
+}
+
+watch(
+  () => props.access?.pages,
+  (pages) => {
+    if (Array.isArray(pages)) {
+      pages.forEach((pUrl, idx) => preloadAndCachePage(pUrl, idx));
+      setupPageObserver();
+      restoreLastReadPage();
+    }
+  },
+  { immediate: true }
+);
+
+onMounted(() => {
+  document.addEventListener('contextmenu', blockEvent);
+  document.addEventListener('fullscreenchange', handleFullscreenChange);
+  setupPageObserver();
+  restoreLastReadPage();
+});
+
+onUnmounted(() => {
+  document.removeEventListener('contextmenu', blockEvent);
+  document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  if (pageObserver) {
+    pageObserver.disconnect();
+    pageObserver = null;
+  }
+});
 </script>
 
 <template>
@@ -120,6 +213,7 @@ function retryPage(index: number) {
       <figure
         v-for="(url, index) in access.pages"
         :key="`${url}-${index}`"
+        :data-page="index + 1"
         :class="[
           'relative overflow-hidden rounded-2xl border border-border bg-white shadow-xs mx-auto',
           isFullscreen ? 'max-w-5xl my-4 shadow-lg' : 'w-full'
@@ -129,9 +223,9 @@ function retryPage(index: number) {
           class="relative w-full mx-auto min-h-[500px] flex items-center justify-center bg-white"
           :style="{ maxWidth: isFullscreen ? '1024px' : '768px' }"
         >
-          <!-- Page Image -->
+          <!-- Page Image (Using cached Object URL when available) -->
           <img
-            :src="getSafePageUrl(url, index)"
+            :src="cachedUrls[index] || getSafePageUrl(url, index)"
             :alt="`Página ${index + 1}`"
             :class="[
               'w-full h-auto object-contain transition-opacity duration-300',

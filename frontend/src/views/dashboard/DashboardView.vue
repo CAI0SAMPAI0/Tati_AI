@@ -29,6 +29,11 @@ import CefrSection from '@/components/dashboard/CefrSection.vue';
 import ExamSection from '@/components/dashboard/ExamSection.vue';
 import PremiumSection from '@/components/dashboard/PremiumSection.vue';
 import { useToast } from '@/composables/useToast';
+import {
+  peekActivityCache,
+  setActivityCache,
+  TTL_1_DAY_MS,
+} from '@/utils/activityCache';
 
 const route = useRoute();
 const router = useRouter();
@@ -115,9 +120,21 @@ function handleRevalidate() {
 }
 
 async function loadDashboardData(isSilent = false) {
+  const CACHE_STATS_KEY = 'dashboard:stats';
+  const CACHE_STUDENTS_KEY = 'dashboard:students';
+
   if (!isSilent) {
-    isLoadingData.value = true;
+    const cachedStats = peekActivityCache<any>(CACHE_STATS_KEY);
+    const cachedStudents = peekActivityCache<any[]>(CACHE_STUDENTS_KEY);
+    if (cachedStats || (cachedStudents && cachedStudents.length > 0)) {
+      if (cachedStats) stats.value = cachedStats;
+      if (cachedStudents) students.value = cachedStudents;
+      isLoadingData.value = false;
+    } else {
+      isLoadingData.value = true;
+    }
   }
+
   try {
     const cacheBuster = `_t=${Date.now()}`;
     const statsUrl = ENDPOINTS.DASHBOARD_STATS.includes('?') ? `${ENDPOINTS.DASHBOARD_STATS}&${cacheBuster}` : `${ENDPOINTS.DASHBOARD_STATS}?${cacheBuster}`;
@@ -127,9 +144,13 @@ async function loadDashboardData(isSilent = false) {
       apiGet<any>(statsUrl).catch(() => null),
       apiGet<any[]>(studentsUrl).catch(() => []),
     ]);
-    if (statsRes) stats.value = statsRes;
-    if (studentsRes) {
+    if (statsRes) {
+      stats.value = statsRes;
+      setActivityCache(CACHE_STATS_KEY, statsRes, TTL_1_DAY_MS);
+    }
+    if (studentsRes && studentsRes.length > 0) {
       students.value = studentsRes;
+      setActivityCache(CACHE_STUDENTS_KEY, studentsRes, TTL_1_DAY_MS);
       if (selectedStudent.value) {
         const freshSelected = studentsRes.find((s: any) => s.username === selectedStudent.value.username);
         if (freshSelected) {

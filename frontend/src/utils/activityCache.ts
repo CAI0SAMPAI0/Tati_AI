@@ -2,6 +2,7 @@ const CACHE_PREFIX = 'tati_act_cache_v1:';
 
 export const TTL_1_DAY_MS = 24 * 60 * 60 * 1000;
 export const TTL_7_DAYS_MS = 7 * TTL_1_DAY_MS;
+export const TTL_30_DAYS_MS = 30 * TTL_1_DAY_MS;
 
 interface CacheEntry<T> {
   data: T;
@@ -107,6 +108,29 @@ export async function cachedActivityFetch<T>(
     setActivityCache(key, fresh, ttlMs);
   }
   return fresh;
+}
+
+export async function cachedFetchSWR<T>(
+  key: string,
+  fetcher: () => Promise<T>,
+  onUpdate: (data: T) => void,
+  ttlMs: number = TTL_30_DAYS_MS
+): Promise<T | null> {
+  const cached = peekActivityCache<T>(key);
+  if (cached !== null) {
+    onUpdate(cached);
+  }
+  try {
+    const fresh = await fetcher();
+    if (fresh !== undefined && fresh !== null) {
+      setActivityCache(key, fresh, ttlMs);
+      onUpdate(fresh);
+      return fresh;
+    }
+  } catch (err) {
+    console.warn(`[activityCache] SWR revalidation failed for ${key}:`, err);
+  }
+  return cached;
 }
 
 export function invalidateActivityCache(prefix = ''): void {

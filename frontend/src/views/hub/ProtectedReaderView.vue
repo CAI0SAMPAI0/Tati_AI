@@ -8,6 +8,11 @@ import HubShell from '@/components/catalog/HubShell.vue';
 import SecureDocumentViewer, {
   type SecureViewerAccess,
 } from '@/components/activities/SecureDocumentViewer.vue';
+import {
+  peekActivityCache,
+  setActivityCache,
+  TTL_30_DAYS_MS,
+} from '@/utils/activityCache';
 
 const route = useRoute();
 const router = useRouter();
@@ -26,8 +31,24 @@ const watermarkText = computed(() => {
     : "Taty's Materials · Exclusive use";
 });
 
-async function fetchAccess() {
+function getCacheKey() {
+  return `hub:material_access:${contentId.value}`;
+}
+
+async function fetchAccess(silent = false) {
   if (!contentId.value) return;
+
+  // Check 30-day cache first
+  const cacheKey = getCacheKey();
+  const cached = peekActivityCache<SecureViewerAccess & { url?: string; processing_status?: string }>(cacheKey);
+
+  if (cached && cached.pages && cached.pages.length > 0) {
+    access.value = cached;
+    isLoading.value = false;
+  } else if (!silent) {
+    isLoading.value = true;
+  }
+
   try {
     const data = await apiGet<SecureViewerAccess & { url?: string; processing_status?: string }>(
       `/activities/hub/${contentId.value}/access`
@@ -41,13 +62,18 @@ async function fetchAccess() {
     access.value = data;
     error.value = '';
 
+    // Cache successful access payload for 30 days
+    if (data.is_secure_viewer && data.pages && data.pages.length > 0) {
+      setActivityCache(cacheKey, data, TTL_30_DAYS_MS);
+    }
+
     // If still processing, poll every 2.5s
     if (
       data.is_secure_viewer &&
       (!data.pages || data.pages.length === 0 || data.processing_status === 'processing')
     ) {
       if (!pollTimer) {
-        pollTimer = setInterval(fetchAccess, 2500);
+        pollTimer = setInterval(() => fetchAccess(true), 2500);
       }
     } else {
       if (pollTimer) {
@@ -57,7 +83,9 @@ async function fetchAccess() {
     }
   } catch (err: any) {
     console.error('Error opening protected material:', err);
-    error.value = err?.data?.detail || err?.message || 'Could not open the material.';
+    if (!access.value) {
+      error.value = err?.data?.detail || err?.message || 'Could not open the material.';
+    }
     if (pollTimer) {
       clearInterval(pollTimer);
       pollTimer = null;
@@ -112,7 +140,11 @@ onUnmounted(() => {
         <h1 class="mb-6 text-2xl font-black text-text tracking-tight">
           {{ access.title || 'Protected Material' }}
         </h1>
-        <SecureDocumentViewer :access="access" :watermark-text="watermarkText" />
+        <SecureDocumentViewer
+          :access="access"
+          :watermark-text="watermarkText"
+          :content-id="contentId"
+        />
       </div>
     </div>
   </HubShell>
