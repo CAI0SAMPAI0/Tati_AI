@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import {
   Layers,
   Drama,
@@ -63,11 +63,26 @@ const MUSIC_GENRES = [
 ] as const;
 
 const router = useRouter();
+const route = useRoute();
+
+function resolveTabFromQuery(tabParam?: any): TabType | null {
+  if (!tabParam) return null;
+  const t = String(tabParam).toLowerCase().trim();
+  if (t === 'listening' || t === 'listenings' || t === 'podcast' || t === 'podcasts') return 'listenings';
+  if (t === 'music' || t === 'musics' || t === 'lingoclip') return 'musics';
+  if (t === 'game' || t === 'games') return 'games';
+  if (t === 'simulation' || t === 'simulations') return 'simulations';
+  if (t === 'flashcard' || t === 'flashcards') return 'flashcards';
+  if (['grammar', 'vocabulary', 'reading', 'news'].includes(t)) return t as TabType;
+  return null;
+}
+
+const initialTab = resolveTabFromQuery(route.query.tab);
 const toast = useToast();
 const { user } = useAuth();
 
-const activeTab = ref<TabType>('grammar');
-const searchQuery = ref('');
+const activeTab = ref<TabType>(initialTab || 'grammar');
+const searchQuery = ref(typeof route.query.search === 'string' ? route.query.search : '');
 const filterLevel = ref<string>('All');
 const statusFilter = ref<'all' | 'pending' | 'done'>('all');
 const musicGenre = ref<string>('All');
@@ -278,6 +293,22 @@ function prewarmStaticActivityCatalogs() {
     loadMusicsCatalog().then((d) => { musicsRaw.value = d; }).catch(() => {});
   }
 }
+
+watch(
+  () => [route.query.tab, route.query.search, route.query.level],
+  ([newTab, newSearch, newLvl]) => {
+    const resolved = resolveTabFromQuery(newTab);
+    if (resolved && resolved !== activeTab.value) {
+      activeTab.value = resolved;
+    }
+    if (typeof newSearch === 'string' && newSearch !== searchQuery.value) {
+      searchQuery.value = newSearch;
+    }
+    if (typeof newLvl === 'string' && newLvl !== filterLevel.value) {
+      filterLevel.value = newLvl;
+    }
+  }
+);
 
 watch(activeTab, () => {
   visibleCount.value = 12;

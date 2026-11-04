@@ -252,6 +252,77 @@ class TrailStepToggleInput(BaseModel):
 
 
 @dashboard_router.get("/trails/templates", auth=auth_required)
+@dashboard_router.get("/activities/catalog", auth=auth_required)
+def search_activities_catalog(request: HttpRequest, category: str = "grammar", query: str = "", level: str = "all"):
+    """
+    Busca atividades de uma categoria no catálogo pedagógico para seleção da professora.
+    """
+    require_staff_user(request)
+    from apps.activities.services import ExternalContentService
+    from apps.activities.models import Game
+    from apps.chat.models import CEFRSimulation
+    import urllib.parse
+
+    cat = (category or "grammar").lower().strip()
+    q = (query or "").lower().strip()
+    lvl = (level or "all").strip().upper()
+
+    results = []
+
+    if cat in ("grammar", "vocabulary", "reading", "listening"):
+        data = ExternalContentService.get_test_english_content("all" if lvl == "ALL" else lvl, cat)
+        items = data.get("items", []) if isinstance(data, dict) else []
+        for it in items:
+            title = it.get("title", "")
+            if not q or q in title.lower():
+                clean_route = f"/activities?tab={cat}&search={urllib.parse.quote(title)}"
+                results.append({
+                    "id": it.get("slug") or title,
+                    "title": title,
+                    "level": it.get("level", lvl),
+                    "category": cat,
+                    "route": clean_route,
+                })
+    elif cat in ("games", "game"):
+        games = Game.objects.all()
+        for g in games:
+            if not q or q in g.title.lower():
+                results.append({
+                    "id": str(g.id),
+                    "title": g.title,
+                    "level": getattr(g, "level", "All") or "All",
+                    "category": "games",
+                    "route": f"/activities?tab=games&search={urllib.parse.quote(g.title)}",
+                })
+    elif cat in ("simulations", "simulation"):
+        sims = CEFRSimulation.objects.all()
+        for s in sims:
+            topic = getattr(s, "topic", "") or getattr(s, "scenario", "") or "Simulation"
+            if not q or q in topic.lower():
+                results.append({
+                    "id": str(s.id),
+                    "title": topic,
+                    "level": getattr(s, "level", "All") or "All",
+                    "category": "simulations",
+                    "route": "/voice",
+                })
+    elif cat in ("music", "musics"):
+        data = ExternalContentService.get_test_english_content("all", "listening") # or music items
+        items = data.get("items", []) if isinstance(data, dict) else []
+        for it in items:
+            title = it.get("title", "")
+            if not q or q in title.lower():
+                results.append({
+                    "id": it.get("slug") or title,
+                    "title": title,
+                    "level": it.get("level", "All"),
+                    "category": "music",
+                    "route": f"/activities?tab=musics&search={urllib.parse.quote(title)}",
+                })
+
+    return {"success": True, "category": cat, "count": len(results), "items": results[:50]}
+
+
 def list_trail_templates(request: HttpRequest):
     """
     Retorna os templates prontos de trilha para cada nível CEFR.

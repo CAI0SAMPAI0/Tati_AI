@@ -1315,6 +1315,26 @@ class ExamGeneratorService:
         except Exception as scrape_err:
             logger.warning(f"[ExamGeneratorService] Aviso ao construir base Playwright para {username} ({lvl}): {scrape_err}")
 
+        # 1.5 Incorpora atividades específicas da Trilha de Aprendizado do aluno para este exame
+        if username:
+            try:
+                from apps.authentication.models import User
+                trail_user = User.objects.filter(username=username).first()
+                if trail_user and isinstance(trail_user.weekly_plan, dict):
+                    trail_info = trail_user.weekly_plan.get("learning_trail") or {}
+                    for ph in trail_info.get("phases", []):
+                        if ph.get("status") in ("active", "completed"):
+                            for st in ph.get("steps", []):
+                                cat_step = (st.get("category") or "").lower()
+                                title_step = st.get("title", "")
+                                if title_step and cat_step in student_titles_by_cat:
+                                    clean_t = cls._clean_activity_title(title_step) or title_step
+                                    if clean_t not in student_titles_by_cat[cat_step]:
+                                        student_titles_by_cat[cat_step].insert(0, clean_t)
+            except Exception as trail_err:
+                logger.warning(f"[ExamGeneratorService] Aviso ao incorporar trilha de {username}: {trail_err}")
+
+
         # 2. Complementa apenas com catálogo Grammar..Reading do nível se faltar alguma área
         all_activities = cls._fetch_level_activities(lvl)
         sampled_activities: Dict[str, List[str]] = {}

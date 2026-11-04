@@ -23,6 +23,8 @@ import {
   ExternalLink,
   Edit2,
   Check,
+  ChevronDown,
+  Loader2,
 } from 'lucide-vue-next';
 import { apiGet, apiPost } from '@/api/client';
 import { useToast } from '@/composables/useToast';
@@ -76,6 +78,14 @@ interface LearningTrail {
   updated_by?: string;
 }
 
+interface CatalogItem {
+  id: string;
+  title: string;
+  level: string;
+  category: string;
+  route: string;
+}
+
 const toast = useToast();
 
 const students = ref<any[]>([]);
@@ -88,35 +98,44 @@ const isApplyingTemplate = ref(false);
 
 const trail = ref<LearningTrail | null>(null);
 
-// Modal de adicionar etapa
-const isAddStepModalOpen = ref(false);
+// Modal de adicionar / editar etapa
+const isStepModalOpen = ref(false);
+const isEditingStep = ref(false);
+const editingStepId = ref<string | null>(null);
 const targetPhaseId = ref<string>('');
+
 const newStepCategory = ref<string>('grammar');
 const newStepTitle = ref<string>('');
 const newStepDescription = ref<string>('');
-const newStepRoute = ref<string>('/grammar');
+const newStepRoute = ref<string>('/activities?tab=grammar');
 
-// Categoria icons & cores
+// Autocomplete do Catálogo
+const catalogSuggestions = ref<CatalogItem[]>([]);
+const isSearchingCatalog = ref(false);
+const showSuggestions = ref(false);
+let searchDebounceTimer: any = null;
+
+// Categorias
 const CATEGORIES = [
-  { id: 'grammar', label: 'Grammar', icon: FileText, route: '/grammar', color: 'text-blue-500 bg-blue-500/10 border-blue-500/20' },
-  { id: 'vocabulary', label: 'Vocabulary', icon: BookOpen, route: '/vocabulary', color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' },
-  { id: 'reading', label: 'Reading', icon: BookOpen, route: '/reading', color: 'text-amber-500 bg-amber-500/10 border-amber-500/20' },
-  { id: 'listening', label: 'Listening / Podcast', icon: Headphones, route: '/listening', color: 'text-purple-500 bg-purple-500/10 border-purple-500/20' },
-  { id: 'simulations', label: 'Simulations / Voice', icon: Users, route: '/voice', color: 'text-rose-500 bg-rose-500/10 border-rose-500/20' },
-  { id: 'music', label: 'Music & Lyrics', icon: Music, route: '/music', color: 'text-pink-500 bg-pink-500/10 border-pink-500/20' },
-  { id: 'games', label: 'Games & Wordwall', icon: Gamepad2, route: '/games', color: 'text-indigo-500 bg-indigo-500/10 border-indigo-500/20' },
-  { id: 'flashcards', label: 'Flashcards (SRS)', icon: Sparkles, route: '/flashcards', color: 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20' },
-  { id: 'custom', label: 'Custom / PDF', icon: FileText, route: '', color: 'text-cyan-500 bg-cyan-500/10 border-cyan-500/20' },
+  { id: 'grammar', label: 'Grammar', icon: FileText, tab: 'grammar', color: 'text-blue-500 bg-blue-500/10 border-blue-500/20' },
+  { id: 'vocabulary', label: 'Vocabulary', icon: BookOpen, tab: 'vocabulary', color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' },
+  { id: 'reading', label: 'Reading', icon: BookOpen, tab: 'reading', color: 'text-amber-500 bg-amber-500/10 border-amber-500/20' },
+  { id: 'listening', label: 'Listening / Podcast', icon: Headphones, tab: 'listening', color: 'text-purple-500 bg-purple-500/10 border-purple-500/20' },
+  { id: 'simulations', label: 'Simulations / Voice', icon: Users, tab: 'simulations', color: 'text-rose-500 bg-rose-500/10 border-rose-500/20' },
+  { id: 'music', label: 'Music & Lyrics', icon: Music, tab: 'musics', color: 'text-pink-500 bg-pink-500/10 border-pink-500/20' },
+  { id: 'games', label: 'Games & Wordwall', icon: Gamepad2, tab: 'games', color: 'text-indigo-500 bg-indigo-500/10 border-indigo-500/20' },
+  { id: 'flashcards', label: 'Flashcards (SRS)', icon: Sparkles, tab: 'flashcards', color: 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20' },
+  { id: 'custom', label: 'Custom Quest', icon: FileText, tab: 'grammar', color: 'text-cyan-500 bg-cyan-500/10 border-cyan-500/20' },
 ];
 
 function getCategoryMeta(cat: string) {
-  const c = cat.toLowerCase();
+  const c = (cat || '').toLowerCase();
   return (
     CATEGORIES.find((item) => item.id === c) || {
       id: cat,
       label: cat.toUpperCase(),
       icon: Compass,
-      route: '',
+      tab: 'grammar',
       color: 'text-primary bg-primary/10 border-primary/20',
     }
   );
@@ -172,6 +191,124 @@ watch(selectedUsername, (newVal) => {
     loadTrail(newVal);
   }
 });
+
+// Autocomplete de atividades
+async function fetchCatalogSuggestions(queryText = '') {
+  isSearchingCatalog.value = true;
+  try {
+    const cat = newStepCategory.value;
+    const res = await apiGet<{ items: CatalogItem[] }>(
+      `/dashboard/activities/catalog?category=${cat}&query=${encodeURIComponent(queryText)}`
+    );
+    catalogSuggestions.value = res?.items || [];
+    showSuggestions.value = catalogSuggestions.value.length > 0;
+  } catch (err) {
+    catalogSuggestions.value = [];
+  } finally {
+    isSearchingCatalog.value = false;
+  }
+}
+
+function handleTitleInput() {
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(() => {
+    fetchCatalogSuggestions(newStepTitle.value);
+  }, 250);
+}
+
+function handleCategoryChange() {
+  const meta = getCategoryMeta(newStepCategory.value);
+  if (newStepCategory.value === 'simulations') {
+    newStepRoute.value = '/voice';
+  } else {
+    newStepRoute.value = `/activities?tab=${meta.tab}`;
+  }
+  fetchCatalogSuggestions(newStepTitle.value);
+}
+
+function handleSelectSuggestion(item: CatalogItem) {
+  newStepTitle.value = item.title;
+  newStepRoute.value = item.route;
+  showSuggestions.value = false;
+}
+
+// Abertura do modal para adicionar ou editar
+function openAddStepModal(phaseId: string) {
+  targetPhaseId.value = phaseId;
+  isEditingStep.value = false;
+  editingStepId.value = null;
+  newStepCategory.value = 'grammar';
+  newStepTitle.value = '';
+  newStepDescription.value = '';
+  newStepRoute.value = '/activities?tab=grammar';
+  catalogSuggestions.value = [];
+  showSuggestions.value = false;
+  isStepModalOpen.value = true;
+  fetchCatalogSuggestions('');
+}
+
+function openEditStepModal(phaseId: string, step: Step) {
+  targetPhaseId.value = phaseId;
+  isEditingStep.value = true;
+  editingStepId.value = step.id;
+  newStepCategory.value = step.category || 'grammar';
+  newStepTitle.value = step.title;
+  newStepDescription.value = step.description || '';
+  newStepRoute.value = step.route || `/activities?tab=${newStepCategory.value}`;
+  catalogSuggestions.value = [];
+  showSuggestions.value = false;
+  isStepModalOpen.value = true;
+}
+
+function handleSaveStep() {
+  if (!trail.value || !targetPhaseId.value) return;
+  if (!newStepTitle.value.trim()) {
+    toast.error('Informe o título da atividade.');
+    return;
+  }
+
+  const phase = trail.value.phases.find((p) => p.id === targetPhaseId.value);
+  if (!phase) return;
+
+  const meta = getCategoryMeta(newStepCategory.value);
+  let resolvedRoute = newStepRoute.value;
+  if (!resolvedRoute || resolvedRoute.startsWith('/grammar') || resolvedRoute.startsWith('/vocabulary')) {
+    if (newStepCategory.value === 'simulations') resolvedRoute = '/voice';
+    else resolvedRoute = `/activities?tab=${meta.tab}&search=${encodeURIComponent(newStepTitle.value.trim())}`;
+  }
+
+  if (isEditingStep.value && editingStepId.value) {
+    const existing = phase.steps.find((s) => s.id === editingStepId.value);
+    if (existing) {
+      existing.category = newStepCategory.value;
+      existing.title = newStepTitle.value.trim();
+      existing.description = newStepDescription.value.trim();
+      existing.route = resolvedRoute;
+      toast.success('Atividade atualizada! Lembre-se de salvar a trilha.');
+    }
+  } else {
+    const newStep: Step = {
+      id: `step-${Date.now().toString(36)}`,
+      category: newStepCategory.value,
+      title: newStepTitle.value.trim(),
+      description: newStepDescription.value.trim(),
+      route: resolvedRoute,
+      target_count: 1,
+      progress: 0,
+      is_completed: false,
+      completed_at: null,
+    };
+    phase.steps.push(newStep);
+    toast.success('Atividade adicionada à fase! Lembre-se de salvar a trilha.');
+  }
+
+  isStepModalOpen.value = false;
+}
+
+function handleDeleteStep(phase: Phase, stepIdx: number) {
+  phase.steps.splice(stepIdx, 1);
+  toast.success('Atividade removida.');
+}
 
 async function handleSaveTrail() {
   if (!trail.value || !selectedUsername.value) return;
@@ -239,7 +376,7 @@ async function handleToggleStep(phaseId: string, step: Step) {
 
 async function handleUnlockBoss(phaseId: string) {
   if (!selectedUsername.value) return;
-  if (!confirm('Liberar manualmente o Boss Fight (Exame Trimestral) para esta fase?')) return;
+  if (!confirm('Liberar manualmente o Boss Fight (Exame) para esta fase?')) return;
   try {
     const res = await apiPost<LearningTrail>(`/dashboard/students/${selectedUsername.value}/trail/unlock-boss`, {
       phase_id: phaseId,
@@ -264,15 +401,15 @@ function handleAddPhase() {
     steps: [],
     boss_fight: {
       id: `boss-p${num}`,
-      title: `👑 Boss Fight: Avaliação da Fase ${num}`,
-      description: 'Exame de verificação para desbloquear a próxima fase.',
+      title: `👑 Boss Fight: Phase ${num} Exam`,
+      description: 'Custom evaluation exam based on the activities completed in this phase.',
       min_score: 7.0,
       is_unlocked: false,
       is_completed: false,
       score: null,
       completed_at: null,
       teacher_feedback: null,
-      route: '/exams/trimestral',
+      route: '/exams',
     },
   };
   trail.value.phases.push(newPhase);
@@ -284,52 +421,6 @@ function handleDeletePhase(phaseIdx: number) {
   if (!confirm('Excluir esta fase da trilha?')) return;
   trail.value.phases.splice(phaseIdx, 1);
   toast.success('Fase removida.');
-}
-
-function openAddStepModal(phaseId: string) {
-  targetPhaseId.value = phaseId;
-  newStepCategory.value = 'grammar';
-  newStepTitle.value = '';
-  newStepDescription.value = '';
-  newStepRoute.value = '/grammar';
-  isAddStepModalOpen.value = true;
-}
-
-function handleCategoryChange() {
-  const meta = getCategoryMeta(newStepCategory.value);
-  newStepRoute.value = meta.route;
-}
-
-function handleSaveNewStep() {
-  if (!trail.value || !targetPhaseId.value) return;
-  if (!newStepTitle.value.trim()) {
-    toast.error('Informe o título da atividade.');
-    return;
-  }
-
-  const phase = trail.value.phases.find((p) => p.id === targetPhaseId.value);
-  if (!phase) return;
-
-  const newStep: Step = {
-    id: `step-${Date.now().toString(36)}`,
-    category: newStepCategory.value,
-    title: newStepTitle.value.trim(),
-    description: newStepDescription.value.trim(),
-    route: newStepRoute.value.trim() || undefined,
-    target_count: 1,
-    progress: 0,
-    is_completed: false,
-    completed_at: null,
-  };
-
-  phase.steps.push(newStep);
-  isAddStepModalOpen.value = false;
-  toast.success('Atividade adicionada! Clique em Salvar para persistir.');
-}
-
-function handleDeleteStep(phase: Phase, stepIdx: number) {
-  phase.steps.splice(stepIdx, 1);
-  toast.success('Atividade removida.');
 }
 
 onMounted(() => {
@@ -347,13 +438,13 @@ onMounted(() => {
         </div>
         <div>
           <div class="flex items-center gap-2">
-            <h2 class="text-xl font-display font-black text-text">Trilhas de Aprendizado & Metas</h2>
+            <h2 class="text-xl font-display font-black text-text">Learning Trails & Goals</h2>
             <span class="px-2 py-0.5 rounded-full text-[0.65rem] font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20">
-              Gamified Trails
+              Teacher Hub
             </span>
           </div>
           <p class="text-xs text-text-muted mt-0.5">
-            Crie planos personalizados com Fases, atividades obrigatórias e o Boss Fight (Exame Trimestral).
+            Monte a trilha estilo Duolingo com as atividades que você selecionar. O Exame do Boss avalia exatamente o que o aluno praticou!
           </p>
         </div>
       </div>
@@ -369,7 +460,7 @@ onMounted(() => {
             type="button"
             @click="handleApplyTemplate(lvl)"
             :disabled="isApplyingTemplate"
-            class="px-2.5 py-1 rounded-lg text-xs font-bold transition-all hover:bg-surface text-text hover:text-primary active:scale-95 disabled:opacity-50"
+            class="px-2.5 py-1 rounded-lg text-xs font-bold transition-all hover:bg-surface text-text hover:text-primary active:scale-95 disabled:opacity-50 cursor-pointer"
           >
             {{ lvl }}
           </button>
@@ -378,7 +469,7 @@ onMounted(() => {
         <button
           type="button"
           @click="handleAddPhase"
-          class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-surface hover:bg-surface-hover border border-border text-text transition-all active:scale-95"
+          class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-surface hover:bg-surface-hover border border-border text-text transition-all active:scale-95 cursor-pointer"
         >
           <Plus class="w-4 h-4 text-primary" />
           Nova Fase
@@ -387,7 +478,7 @@ onMounted(() => {
         <button
           type="button"
           @click="handleResetTrail"
-          class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-surface hover:bg-error/10 border border-border text-text-muted hover:text-error transition-all active:scale-95"
+          class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-surface hover:bg-error/10 border border-border text-text-muted hover:text-error transition-all active:scale-95 cursor-pointer"
           title="Resetar trilha do aluno para o padrão"
         >
           <RotateCcw class="w-3.5 h-3.5" />
@@ -397,7 +488,7 @@ onMounted(() => {
           type="button"
           @click="handleSaveTrail"
           :disabled="isSaving"
-          class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-primary text-white hover:bg-primary-hover shadow-xs transition-all active:scale-95 disabled:opacity-50"
+          class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-primary text-white hover:bg-primary-hover shadow-xs transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
         >
           <Save class="w-4 h-4" />
           {{ isSaving ? 'Salvando...' : 'Salvar Trilha' }}
@@ -555,7 +646,7 @@ onMounted(() => {
                 <button
                   type="button"
                   @click="openAddStepModal(phase.id)"
-                  class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-all active:scale-95"
+                  class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-all active:scale-95 cursor-pointer"
                 >
                   <Plus class="w-3.5 h-3.5" />
                   Atividade
@@ -563,7 +654,7 @@ onMounted(() => {
                 <button
                   type="button"
                   @click="handleDeletePhase(pIdx)"
-                  class="p-1.5 rounded-lg text-text-muted hover:text-error hover:bg-error/10 transition-colors"
+                  class="p-1.5 rounded-lg text-text-muted hover:text-error hover:bg-error/10 transition-colors cursor-pointer"
                   title="Excluir fase"
                 >
                   <Trash2 class="w-3.5 h-3.5" />
@@ -578,7 +669,7 @@ onMounted(() => {
                 <button
                   type="button"
                   @click="openAddStepModal(phase.id)"
-                  class="mt-2 text-xs font-bold text-primary hover:underline inline-flex items-center gap-1"
+                  class="mt-2 text-xs font-bold text-primary hover:underline inline-flex items-center gap-1 cursor-pointer"
                 >
                   <Plus class="w-3.5 h-3.5" /> Adicionar primeira atividade
                 </button>
@@ -621,7 +712,7 @@ onMounted(() => {
                   </div>
                 </div>
 
-                <!-- Ações do Step -->
+                <!-- Ações do Step: Editar / Excluir / Status -->
                 <div class="flex items-center gap-2 shrink-0">
                   <span
                     class="text-[0.65rem] font-black uppercase px-2 py-0.5 rounded-full"
@@ -632,15 +723,25 @@ onMounted(() => {
 
                   <button
                     type="button"
-                    @click="handleDeleteStep(phase, sIdx)"
-                    class="p-1 rounded-md text-text-muted hover:text-error hover:bg-error/10 transition-colors"
+                    @click="openEditStepModal(phase.id, step)"
+                    class="p-1 rounded-md text-text-muted hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer"
+                    title="Editar Atividade"
                   >
-                    <Trash2 class="w-3 h-3" />
+                    <Edit2 class="w-3.5 h-3.5" />
+                  </button>
+
+                  <button
+                    type="button"
+                    @click="handleDeleteStep(phase, sIdx)"
+                    class="p-1 rounded-md text-text-muted hover:text-error hover:bg-error/10 transition-colors cursor-pointer"
+                    title="Excluir"
+                  >
+                    <Trash2 class="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
 
-              <!-- Boss Fight Card (Exame Trimestral da Fase) -->
+              <!-- Boss Fight Card (Exame Trimestral Personalizado da Fase) -->
               <div
                 class="mt-4 p-4 rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/5 via-amber-500/10 to-amber-500/5 shadow-xs"
               >
@@ -652,7 +753,7 @@ onMounted(() => {
                     <div>
                       <div class="flex items-center gap-2">
                         <h4 class="text-xs font-extrabold text-text uppercase tracking-wider flex items-center gap-1.5">
-                          {{ phase.boss_fight?.title || '👑 Boss Fight: Exame Trimestral da Fase' }}
+                          👑 Boss Fight: Phase {{ phase.number }} Exam
                         </h4>
                         <span
                           class="px-2 py-0.2 rounded-full text-[0.6rem] font-black uppercase"
@@ -662,7 +763,7 @@ onMounted(() => {
                         </span>
                       </div>
                       <p class="text-[0.7rem] text-text-muted mt-0.5">
-                        {{ phase.boss_fight?.description || 'O aluno precisa completar todas as missões acima para liberar o teste com IA.' }}
+                        Exame gerado com base nas atividades configuradas acima para este aluno.
                       </p>
                     </div>
                   </div>
@@ -712,7 +813,7 @@ onMounted(() => {
               :key="lvl"
               type="button"
               @click="handleApplyTemplate(lvl)"
-              class="px-3 py-1.5 rounded-lg text-xs font-bold bg-primary text-white hover:bg-primary-hover transition-all"
+              class="px-3 py-1.5 rounded-lg text-xs font-bold bg-primary text-white hover:bg-primary-hover transition-all cursor-pointer"
             >
               Criar Trilha {{ lvl }}
             </button>
@@ -721,21 +822,24 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- Modal de Adicionar Atividade à Fase -->
+    <!-- Modal de Adicionar / Editar Atividade à Fase -->
     <div
-      v-if="isAddStepModalOpen"
+      v-if="isStepModalOpen"
       class="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in"
+      @click.self="showSuggestions = false"
     >
-      <div class="bg-surface border border-border rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
-        <h3 class="text-base font-bold text-text">Adicionar Atividade à Fase</h3>
+      <div class="bg-surface border border-border rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 relative">
+        <h3 class="text-base font-bold text-text">
+          {{ isEditingStep ? 'Editar Atividade da Fase' : 'Adicionar Atividade à Fase' }}
+        </h3>
 
         <!-- Categoria -->
         <div class="space-y-1.5">
-          <label class="text-xs font-bold text-text-subtle">Categoria</label>
+          <label class="text-xs font-bold text-text-subtle">Categoria Pedagógica</label>
           <select
             v-model="newStepCategory"
             @change="handleCategoryChange"
-            class="w-full px-3 py-2 bg-bg-secondary border border-border rounded-xl text-xs font-semibold text-text focus:outline-none focus:border-primary"
+            class="w-full px-3 py-2 bg-bg-secondary border border-border rounded-xl text-xs font-semibold text-text focus:outline-none focus:border-primary cursor-pointer"
           >
             <option v-for="c in CATEGORIES" :key="c.id" :value="c.id">
               {{ c.label }}
@@ -743,54 +847,83 @@ onMounted(() => {
           </select>
         </div>
 
-        <!-- Título -->
-        <div class="space-y-1.5">
-          <label class="text-xs font-bold text-text-subtle">Título da Atividade</label>
-          <input
-            v-model="newStepTitle"
-            type="text"
-            placeholder="ex: Present Perfect vs Simple Past"
-            class="w-full px-3 py-2 bg-bg-secondary border border-border rounded-xl text-xs font-semibold text-text focus:outline-none focus:border-primary"
-          />
+        <!-- Título com Busca / Autocomplete ao digitar -->
+        <div class="space-y-1.5 relative">
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-bold text-text-subtle">Título da Atividade</label>
+            <span v-if="isSearchingCatalog" class="text-[0.65rem] text-primary flex items-center gap-1">
+              <Loader2 class="w-3 h-3 animate-spin" /> Buscando catálogo...
+            </span>
+          </div>
+
+          <div class="relative">
+            <input
+              v-model="newStepTitle"
+              type="text"
+              @input="handleTitleInput"
+              @focus="fetchCatalogSuggestions(newStepTitle)"
+              placeholder="Digite o nome da atividade (ex: Adjectives: Old, new...)"
+              class="w-full px-3 py-2 bg-bg-secondary border border-border rounded-xl text-xs font-semibold text-text focus:outline-none focus:border-primary"
+            />
+            <button
+              v-if="catalogSuggestions.length > 0"
+              type="button"
+              @click="showSuggestions = !showSuggestions"
+              class="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text cursor-pointer"
+            >
+              <ChevronDown class="w-4 h-4" />
+            </button>
+          </div>
+
+          <!-- Dropdown Autocomplete de Sugestões Reais da Categoria -->
+          <div
+            v-if="showSuggestions && catalogSuggestions.length > 0"
+            class="absolute left-0 right-0 top-full mt-1 bg-surface border border-border rounded-xl shadow-xl max-h-52 overflow-y-auto z-[110] divide-y divide-border/50"
+          >
+            <button
+              v-for="sug in catalogSuggestions"
+              :key="sug.id || sug.title"
+              type="button"
+              @click="handleSelectSuggestion(sug)"
+              class="w-full px-3 py-2.5 text-left hover:bg-surface-hover flex items-center justify-between gap-3 text-xs transition-colors cursor-pointer"
+            >
+              <div class="min-w-0">
+                <span class="font-semibold text-text block truncate">{{ sug.title }}</span>
+                <span class="text-[0.65rem] text-text-muted uppercase">{{ sug.category }}</span>
+              </div>
+              <span class="px-1.5 py-0.5 rounded text-[0.6rem] font-bold bg-primary/10 text-primary shrink-0">
+                {{ sug.level }}
+              </span>
+            </button>
+          </div>
         </div>
 
-        <!-- Descrição / Instrução da Teacher -->
+        <!-- Instruções da Professora (Opcional) -->
         <div class="space-y-1.5">
           <label class="text-xs font-bold text-text-subtle">Instruções da Professora (Opcional)</label>
           <textarea
             v-model="newStepDescription"
             rows="2"
-            placeholder="ex: Faça os exercícios e grave a pronúncia das 3 frases finais..."
+            placeholder="ex: Faça os exercícios de fixação e grave a pronúncia das 3 frases finais..."
             class="w-full px-3 py-2 bg-bg-secondary border border-border rounded-xl text-xs text-text focus:outline-none focus:border-primary resize-none"
           ></textarea>
-        </div>
-
-        <!-- Rota / Link -->
-        <div class="space-y-1.5">
-          <label class="text-xs font-bold text-text-subtle">Rota do App ou Link Externo / PDF</label>
-          <input
-            v-model="newStepRoute"
-            type="text"
-            placeholder="/grammar ou link do drive/pdf"
-            class="w-full px-3 py-2 bg-bg-secondary border border-border rounded-xl text-xs text-text-muted focus:outline-none focus:border-primary"
-          />
         </div>
 
         <!-- Modal Actions -->
         <div class="flex items-center justify-end gap-2 pt-2 border-t border-border">
           <button
             type="button"
-            @click="isAddStepModalOpen = false"
-            class="px-3.5 py-2 rounded-xl text-xs font-bold text-text-muted hover:bg-surface-hover transition-colors"
+            @click="isStepModalOpen = false"
+            class="px-3.5 py-2 rounded-xl text-xs font-bold text-text-muted hover:bg-surface-hover transition-colors cursor-pointer"
           >
             Cancelar
           </button>
           <button
             type="button"
-            @click="handleSaveNewStep"
-            class="px-4 py-2 rounded-xl text-xs font-bold bg-primary text-white hover:bg-primary-hover shadow-xs transition-all"
+            @click="handleSaveStep"
+            class="px-4 py-2 rounded-xl text-xs font-bold bg-primary text-white hover:bg-primary-hover shadow-xs transition-all cursor-pointer"
           >
-            Adicionar Atividade
+            {{ isEditingStep ? 'Salvar Alterações' : 'Adicionar Atividade' }}
           </button>
         </div>
       </div>

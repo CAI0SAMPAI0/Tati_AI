@@ -17,25 +17,27 @@ import {
   Music,
   Gamepad2,
   Users,
-  MessageSquare,
   FileText,
   ArrowRight,
-  RotateCcw,
   ExternalLink,
   ChevronRight,
-  ShieldCheck,
-  AlertCircle,
+  X,
+  Play,
+  RotateCcw,
+  Check,
+  Star,
+  Award,
 } from 'lucide-vue-next';
-import { apiGet, apiPost } from '@/api/client';
+import { apiGet } from '@/api/client';
 import { useToast } from '@/composables/useToast';
 
 const router = useRouter();
 const toast = useToast();
 
-// Tab principal: Trilha Gamificada ou Metas Semanais
+// Main Tab: Duolingo Learning Trail or Weekly Goals
 const activeMainTab = ref<'trail' | 'weekly'>('trail');
 
-// --- TIPOS DA TRILHA GAMIFICADA ---
+// --- LEARNING TRAIL TYPES ---
 interface TrailStep {
   id: string;
   category: string;
@@ -83,7 +85,7 @@ interface LearningTrail {
   updated_at?: string;
 }
 
-// --- TIPOS DAS METAS SEMANAIS ---
+// --- WEEKLY GOALS TYPES ---
 interface Goal {
   id: string;
   type: string;
@@ -102,7 +104,7 @@ interface StreakData {
   trophies_earned?: number;
 }
 
-// Estados
+// State
 const trail = ref<LearningTrail | null>(null);
 const selectedPhaseIndex = ref<number>(0);
 const isLoadingTrail = ref(true);
@@ -112,55 +114,42 @@ const streakData = ref<StreakData | null>(null);
 const filterTab = ref<'todo' | 'completed' | 'all'>('todo');
 const isLoadingGoals = ref(true);
 
-// Categoria icons & cores
-const CATEGORY_ICONS: Record<string, any> = {
-  grammar: FileText,
-  vocabulary: BookOpen,
-  reading: BookOpen,
-  listening: Headphones,
-  simulations: Users,
-  music: Music,
-  games: Gamepad2,
-  flashcards: Sparkles,
-  custom: FileText,
+// Node Modal for Duolingo popup
+const selectedNode = ref<{ type: 'step' | 'boss'; step?: TrailStep; boss?: BossFight; index?: number } | null>(null);
+
+// Category Icons & Metadata (in English)
+const CATEGORY_META: Record<string, { label: string; icon: any; color: string; buttonBg: string; buttonBorder: string }> = {
+  grammar: { label: 'Grammar', icon: FileText, color: 'text-blue-500', buttonBg: 'bg-blue-500', buttonBorder: 'border-b-[#1d4ed8]' },
+  vocabulary: { label: 'Vocabulary', icon: BookOpen, color: 'text-emerald-500', buttonBg: 'bg-emerald-500', buttonBorder: 'border-b-[#047857]' },
+  reading: { label: 'Reading', icon: BookOpen, color: 'text-amber-500', buttonBg: 'bg-amber-500', buttonBorder: 'border-b-[#b45309]' },
+  listening: { label: 'Listening', icon: Headphones, color: 'text-purple-500', buttonBg: 'bg-purple-500', buttonBorder: 'border-b-[#6d28d9]' },
+  simulations: { label: 'Simulation', icon: Users, color: 'text-rose-500', buttonBg: 'bg-rose-500', buttonBorder: 'border-b-[#be123c]' },
+  music: { label: 'Music & Lyrics', icon: Music, color: 'text-pink-500', buttonBg: 'bg-pink-500', buttonBorder: 'border-b-[#be185d]' },
+  games: { label: 'Learning Game', icon: Gamepad2, color: 'text-indigo-500', buttonBg: 'bg-indigo-500', buttonBorder: 'border-b-[#4338ca]' },
+  flashcards: { label: 'Flashcards', icon: Sparkles, color: 'text-yellow-500', buttonBg: 'bg-yellow-500', buttonBorder: 'border-b-[#a16207]' },
+  custom: { label: 'Custom Quest', icon: Target, color: 'text-cyan-500', buttonBg: 'bg-cyan-500', buttonBorder: 'border-b-[#0e7490]' },
 };
 
-function getCategoryIcon(cat: string) {
+function getCategoryMeta(cat: string) {
   const c = (cat || '').toLowerCase();
-  return CATEGORY_ICONS[c] || Target;
+  return (
+    CATEGORY_META[c] || {
+      label: cat.toUpperCase(),
+      icon: Target,
+      color: 'text-primary',
+      buttonBg: 'bg-primary',
+      buttonBorder: 'border-b-[#3730a3]',
+    }
+  );
 }
 
-function getCategoryColor(cat: string) {
-  const c = (cat || '').toLowerCase();
-  switch (c) {
-    case 'grammar':
-      return 'text-blue-500 bg-blue-500/10 border-blue-500/20';
-    case 'vocabulary':
-      return 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20';
-    case 'reading':
-      return 'text-amber-500 bg-amber-500/10 border-amber-500/20';
-    case 'listening':
-      return 'text-purple-500 bg-purple-500/10 border-purple-500/20';
-    case 'simulations':
-      return 'text-rose-500 bg-rose-500/10 border-rose-500/20';
-    case 'music':
-      return 'text-pink-500 bg-pink-500/10 border-pink-500/20';
-    case 'games':
-      return 'text-indigo-500 bg-indigo-500/10 border-indigo-500/20';
-    case 'flashcards':
-      return 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20';
-    default:
-      return 'text-primary bg-primary/10 border-primary/20';
-  }
-}
-
-// Fase ativa selecionada
+// Active Phase
 const activePhase = computed<TrailPhase | null>(() => {
   if (!trail.value?.phases || trail.value.phases.length === 0) return null;
   return trail.value.phases[selectedPhaseIndex.value] || trail.value.phases[0];
 });
 
-// Progresso da fase ativa
+// Phase Progress
 const phaseProgress = computed(() => {
   if (!activePhase.value) return { completed: 0, total: 0, percent: 0, remaining: 0 };
   const steps = activePhase.value.steps || [];
@@ -171,7 +160,21 @@ const phaseProgress = computed(() => {
   return { completed, total, percent, remaining };
 });
 
-// Sumário das metas semanais
+// Identify the active step (first uncompleted step in the active phase)
+const activeStepId = computed(() => {
+  if (!activePhase.value?.steps) return null;
+  const firstPending = activePhase.value.steps.find((s) => !s.is_completed);
+  return firstPending ? firstPending.id : null;
+});
+
+// Duolingo S-curve horizontal offsets for winding path
+const S_CURVE_OFFSETS = [0, 48, 68, 32, -32, -68, -48];
+
+function getNodeOffset(index: number): number {
+  return S_CURVE_OFFSETS[index % S_CURVE_OFFSETS.length];
+}
+
+// Weekly Summary
 const summary = computed(() => {
   const active = goals.value.filter(
     (g) => !(g.is_completed ?? g.achieved ?? ((g.progress ?? g.current ?? 0) >= g.target))
@@ -198,7 +201,6 @@ async function loadTrail() {
   try {
     const res = await apiGet<LearningTrail>('/users/trail');
     trail.value = res;
-    // Seleciona a primeira fase ativa ou a atual
     if (res?.phases) {
       const activeIdx = res.phases.findIndex((p) => p.status === 'active');
       if (activeIdx !== -1) selectedPhaseIndex.value = activeIdx;
@@ -235,21 +237,38 @@ async function loadGoals() {
   }
 }
 
-function handleStartStep(step: TrailStep) {
-  if (step.route) {
-    if (step.route.startsWith('http')) {
-      window.open(step.route, '_blank');
+function handleNodeClick(step: TrailStep, index: number) {
+  selectedNode.value = { type: 'step', step, index };
+}
+
+function handleBossClick(boss: BossFight) {
+  selectedNode.value = { type: 'boss', boss };
+}
+
+function handleStartActivity(step: TrailStep) {
+  selectedNode.value = null;
+  const meta = getCategoryMeta(step.category);
+  let targetRoute = step.route;
+  if (!targetRoute || targetRoute.startsWith('/grammar') || targetRoute.startsWith('/vocabulary')) {
+    if (step.category === 'simulations') {
+      targetRoute = '/voice';
     } else {
-      router.push(step.route);
+      const tabName = (step.category === 'listening' ? 'listenings' : (step.category === 'music' ? 'musics' : step.category));
+      targetRoute = `/activities?tab=${tabName}&search=${encodeURIComponent(step.title)}`;
     }
+  }
+
+  if (targetRoute.startsWith('http')) {
+    window.open(targetRoute, '_blank');
   } else {
-    router.push('/chat');
+    router.push(targetRoute);
   }
 }
 
-function handleEnterBossFight(boss: BossFight) {
+function handleStartBoss(boss: BossFight) {
+  selectedNode.value = null;
   if (!boss.is_unlocked && !boss.is_completed) {
-    toast.error('Complete todas as etapas da Fase para desbloquear o Boss Fight!');
+    toast.error('Complete all quests in this phase to unlock the Boss Exam!');
     return;
   }
   router.push('/exams');
@@ -262,8 +281,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="p-4 md:p-8 max-w-5xl mx-auto space-y-8 animate-fade-in">
-    <!-- Top Header -->
+  <div class="p-4 md:p-8 max-w-4xl mx-auto space-y-8 animate-fade-in">
+    <!-- Top Header & Mode Switcher -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div class="flex items-center gap-3.5">
         <div class="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 text-primary">
@@ -271,15 +290,15 @@ onMounted(() => {
         </div>
         <div>
           <h1 class="text-2xl md:text-3xl font-display font-extrabold text-text">
-            Trilha de Aprendizado & Metas
+            Learning Trail & Quests
           </h1>
           <p class="text-text-muted text-xs md:text-sm mt-0.5">
-            Avance pelas fases, conquiste missões e derrote o Boss Fight no Exame Trimestral!
+            Advance along the path, complete your teacher's quests, and defeat the Boss Exam!
           </p>
         </div>
       </div>
 
-      <!-- Main Tab Switcher -->
+      <!-- Main Switcher -->
       <div class="flex bg-surface border border-border p-1 rounded-2xl shrink-0 shadow-xs">
         <button
           type="button"
@@ -288,7 +307,7 @@ onMounted(() => {
           :class="activeMainTab === 'trail' ? 'bg-primary text-white shadow-xs' : 'text-text-muted hover:text-text'"
         >
           <Swords class="w-3.5 h-3.5" />
-          Trilha de Fases
+          Learning Path
         </button>
         <button
           type="button"
@@ -297,249 +316,212 @@ onMounted(() => {
           :class="activeMainTab === 'weekly' ? 'bg-primary text-white shadow-xs' : 'text-text-muted hover:text-text'"
         >
           <Target class="w-3.5 h-3.5" />
-          Metas Semanais
+          Weekly Goals
         </button>
       </div>
     </div>
 
     <!-- =================================================================== -->
-    <!-- ABA 1: TRILHA GAMIFICADA (FASES & BOSS FIGHT)                       -->
+    <!-- TAB 1: DUOLINGO-STYLE LEARNING TRAIL (SNAKE PATH)                   -->
     <!-- =================================================================== -->
-    <div v-if="activeMainTab === 'trail'" class="space-y-6">
+    <div v-if="activeMainTab === 'trail'" class="space-y-8">
       <!-- Loading Trail -->
-      <div v-if="isLoadingTrail" class="py-20 text-center bg-surface border border-border rounded-3xl">
+      <div v-if="isLoadingTrail" class="py-24 text-center bg-surface border border-border rounded-3xl">
         <div class="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin mx-auto mb-3"></div>
-        <p class="text-xs font-bold text-text-muted">Carregando seu mapa de fases...</p>
+        <p class="text-xs font-bold text-text-muted">Loading your learning trail...</p>
       </div>
 
       <div v-else-if="trail && activePhase" class="space-y-6">
-        <!-- Hero Card da Fase Atual -->
-        <div class="relative overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-surface via-surface to-bg-secondary p-6 md:p-8 shadow-sm">
-          <!-- Background Decorator -->
-          <div class="absolute -right-12 -bottom-12 w-48 h-48 bg-primary/5 rounded-full blur-2xl pointer-events-none"></div>
-
-          <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div class="space-y-2 max-w-xl">
-              <div class="flex flex-wrap items-center gap-2.5">
-                <span class="px-2.5 py-1 rounded-lg text-[0.7rem] font-black uppercase tracking-wider bg-primary text-white shadow-xs">
-                  Fase {{ activePhase.number }}
-                </span>
-                <span class="px-2.5 py-1 rounded-lg text-[0.7rem] font-extrabold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20">
-                  Nível {{ trail.level || 'B1' }}
-                </span>
-                <span
-                  class="px-2.5 py-1 rounded-lg text-[0.7rem] font-bold uppercase tracking-wider"
-                  :class="{
-                    'bg-success/15 text-success border border-success/30': activePhase.status === 'completed',
-                    'bg-amber-500/15 text-amber-500 border border-amber-500/30': activePhase.status === 'active',
-                    'bg-muted/15 text-text-muted border border-border': activePhase.status === 'locked',
-                  }"
-                >
-                  {{ activePhase.status === 'completed' ? 'Concluída ✅' : (activePhase.status === 'active' ? 'Em Andamento ⚔️' : 'Bloqueada 🔒') }}
-                </span>
-              </div>
-
-              <h2 class="text-xl md:text-2xl font-display font-black text-text">
-                {{ activePhase.title }}
-              </h2>
-              <p class="text-xs md:text-sm text-text-muted leading-relaxed">
-                {{ activePhase.description }}
-              </p>
-
-              <!-- Recado da Professora Tatiana -->
-              <div v-if="trail.teacher_notes" class="mt-3 p-3 rounded-2xl bg-primary/5 border border-primary/15 flex items-start gap-2.5">
-                <span class="text-sm">👩‍🏫</span>
-                <p class="text-xs text-text-muted leading-relaxed">
-                  <strong class="text-primary font-bold">Teacher Tati:</strong> {{ trail.teacher_notes }}
-                </p>
-              </div>
+        <!-- Phase Banner Header -->
+        <div class="rounded-3xl border border-border bg-gradient-to-br from-surface via-surface to-bg-secondary p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div class="space-y-2 max-w-lg">
+            <div class="flex items-center gap-2.5">
+              <span class="px-2.5 py-1 rounded-lg text-[0.7rem] font-black uppercase tracking-wider bg-primary text-white shadow-xs">
+                Phase {{ activePhase.number }}
+              </span>
+              <span class="px-2.5 py-1 rounded-lg text-[0.7rem] font-extrabold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20">
+                Level {{ trail.level || 'B1' }}
+              </span>
+              <span
+                class="px-2.5 py-1 rounded-lg text-[0.7rem] font-bold uppercase tracking-wider"
+                :class="{
+                  'bg-success/15 text-success border border-success/30': activePhase.status === 'completed',
+                  'bg-amber-500/15 text-amber-500 border border-amber-500/30': activePhase.status === 'active',
+                  'bg-muted/15 text-text-muted border border-border': activePhase.status === 'locked',
+                }"
+              >
+                {{ activePhase.status === 'completed' ? 'COMPLETED' : (activePhase.status === 'active' ? 'IN PROGRESS' : 'LOCKED') }}
+              </span>
             </div>
 
-            <!-- Progresso Circular / Card -->
-            <div class="flex flex-col items-center justify-center p-5 rounded-2xl bg-surface border border-border shadow-xs shrink-0 min-w-[200px]">
-              <span class="text-[0.65rem] font-bold uppercase tracking-wider text-text-subtle">Progresso da Fase</span>
-              <div class="text-3xl font-black text-text my-1">
-                {{ phaseProgress.completed }} <span class="text-text-muted text-lg font-bold">/ {{ phaseProgress.total }}</span>
-              </div>
-              <div class="w-full bg-bg-secondary h-2.5 rounded-full overflow-hidden mt-1 border border-border">
-                <div
-                  class="h-full rounded-full transition-all duration-500"
-                  :class="phaseProgress.percent === 100 ? 'bg-success' : 'bg-primary'"
-                  :style="{ width: `${phaseProgress.percent}%` }"
-                ></div>
-              </div>
-              <span class="text-[0.65rem] font-bold text-text-muted mt-2">
-                {{ phaseProgress.percent === 100 ? 'Boss Desbloqueado! ⚔️' : `Faltam ${phaseProgress.remaining} missões para o Boss` }}
-              </span>
+            <h2 class="text-xl md:text-2xl font-display font-black text-text">
+              {{ activePhase.title }}
+            </h2>
+            <p class="text-xs md:text-sm text-text-muted leading-relaxed">
+              {{ activePhase.description }}
+            </p>
+
+            <!-- Teacher Note -->
+            <div v-if="trail.teacher_notes" class="mt-2.5 p-3 rounded-2xl bg-primary/5 border border-primary/15 flex items-start gap-2.5">
+              <span class="text-sm">👩‍🏫</span>
+              <p class="text-xs text-text-muted leading-relaxed">
+                <strong class="text-primary font-bold">Teacher Tati:</strong> {{ trail.teacher_notes }}
+              </p>
             </div>
           </div>
 
-          <!-- Selector de Fases (Fase 1, Fase 2...) -->
-          <div v-if="trail.phases.length > 1" class="mt-6 pt-5 border-t border-border flex items-center gap-2 overflow-x-auto pb-1">
-            <span class="text-[0.65rem] font-bold text-text-muted uppercase tracking-wider shrink-0 mr-2">Fases:</span>
-            <button
-              v-for="(phase, idx) in trail.phases"
-              :key="phase.id"
-              type="button"
-              @click="selectedPhaseIndex = idx"
-              class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer border"
-              :class="selectedPhaseIndex === idx ? 'bg-primary text-white border-primary shadow-xs' : 'bg-surface border-border text-text hover:bg-surface-hover'"
-            >
-              <component
-                :is="phase.status === 'completed' ? CheckCircle2 : (phase.status === 'locked' ? Lock : Swords)"
-                class="w-3.5 h-3.5"
-                :class="selectedPhaseIndex === idx ? 'text-white' : (phase.status === 'completed' ? 'text-success' : 'text-text-muted')"
-              />
-              Fase {{ phase.number }}
-            </button>
+          <!-- Progress Widget -->
+          <div class="p-4 rounded-2xl bg-surface border border-border shadow-xs flex flex-col items-center justify-center shrink-0 min-w-[190px]">
+            <span class="text-[0.65rem] font-bold uppercase tracking-wider text-text-subtle">Phase Progress</span>
+            <div class="text-2xl font-black text-text my-1">
+              {{ phaseProgress.completed }} <span class="text-text-muted text-base font-bold">/ {{ phaseProgress.total }}</span>
+            </div>
+            <div class="w-full bg-bg-secondary h-2 rounded-full overflow-hidden mt-1 border border-border">
+              <div
+                class="h-full rounded-full transition-all duration-500"
+                :class="phaseProgress.percent === 100 ? 'bg-success' : 'bg-primary'"
+                :style="{ width: `${phaseProgress.percent}%` }"
+              ></div>
+            </div>
+            <span class="text-[0.65rem] font-bold text-text-muted mt-2">
+              {{ phaseProgress.percent === 100 ? 'Boss Ready to Fight!' : `${phaseProgress.remaining} quests until Boss` }}
+            </span>
           </div>
         </div>
 
-        <!-- Trilha de Missões (Steps) -->
-        <div class="space-y-4">
-          <div class="flex items-center justify-between">
-            <h3 class="text-sm font-extrabold uppercase tracking-wider text-text-subtle flex items-center gap-2">
-              <Sparkles class="w-4 h-4 text-primary" />
-              Missões Obrigatórias desta Fase
-            </h3>
-            <span class="text-xs font-bold text-text-muted">
-              {{ phaseProgress.completed }} de {{ phaseProgress.total }} concluídas
-            </span>
-          </div>
+        <!-- Phase Selector Pills (Phase 1, Phase 2...) -->
+        <div v-if="trail.phases.length > 1" class="flex items-center gap-2 overflow-x-auto pb-1">
+          <span class="text-[0.65rem] font-bold text-text-muted uppercase tracking-wider shrink-0 mr-1">Phases:</span>
+          <button
+            v-for="(phase, idx) in trail.phases"
+            :key="phase.id"
+            type="button"
+            @click="selectedPhaseIndex = idx"
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer border"
+            :class="selectedPhaseIndex === idx ? 'bg-primary text-white border-primary shadow-xs' : 'bg-surface border-border text-text hover:bg-surface-hover'"
+          >
+            <component
+              :is="phase.status === 'completed' ? CheckCircle2 : (phase.status === 'locked' ? Lock : Swords)"
+              class="w-3.5 h-3.5"
+              :class="selectedPhaseIndex === idx ? 'text-white' : (phase.status === 'completed' ? 'text-success' : 'text-text-muted')"
+            />
+            Phase {{ phase.number }}
+          </button>
+        </div>
 
-          <!-- Lista de Steps -->
-          <div class="space-y-3">
+        <!-- ============================================================= -->
+        <!-- DUOLINGO WINDING PATH CONTAINER                               -->
+        <!-- ============================================================= -->
+        <div class="relative py-12 px-4 flex flex-col items-center justify-center bg-surface/40 border border-border/80 rounded-3xl overflow-hidden min-h-[500px]">
+          <!-- Background Subtle Grid -->
+          <div class="absolute inset-0 bg-[radial-gradient(#6366f1_1px,transparent_1px)] [background-size:24px_24px] opacity-10 pointer-events-none"></div>
+
+          <!-- Trail Nodes List -->
+          <div class="flex flex-col items-center gap-14 relative z-10 w-full max-w-sm">
             <div
               v-for="(step, sIdx) in activePhase.steps"
               :key="step.id || sIdx"
-              class="p-4 rounded-2xl border transition-all duration-300 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-              :class="step.is_completed ? 'bg-success/5 border-success/30 shadow-xs' : 'bg-surface border-border hover:border-primary/40 hover:shadow-sm'"
+              class="relative flex flex-col items-center"
+              :style="{ transform: `translateX(${getNodeOffset(sIdx)}px)` }"
             >
-              <!-- Info do Step -->
-              <div class="flex items-start sm:items-center gap-3.5 min-w-0">
-                <!-- Status Icon -->
-                <div
-                  class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border transition-transform duration-300"
-                  :class="step.is_completed ? 'bg-success text-white border-success' : getCategoryColor(step.category)"
-                >
-                  <component
-                    :is="step.is_completed ? CheckCircle2 : getCategoryIcon(step.category)"
-                    class="w-5 h-5"
-                  />
+              <!-- START Floating Speech Bubble Tooltip (Duolingo Style above current node) -->
+              <div
+                v-if="step.id === activeStepId && !step.is_completed"
+                class="absolute -top-11 z-20 flex flex-col items-center animate-bounce pointer-events-none"
+              >
+                <div class="px-3 py-1 rounded-xl bg-primary text-white text-[0.7rem] font-black uppercase tracking-wider shadow-lg shadow-primary/30 flex items-center gap-1">
+                  <Play class="w-3 h-3 fill-white" />
+                  START
                 </div>
-
-                <div class="min-w-0">
-                  <div class="flex items-center gap-2">
-                    <h4 class="text-sm font-bold text-text truncate">{{ step.title }}</h4>
-                    <span class="px-2 py-0.2 rounded-full text-[0.6rem] font-bold uppercase tracking-wider bg-bg-secondary border border-border text-text-muted">
-                      {{ step.category }}
-                    </span>
-                  </div>
-                  <p class="text-xs text-text-muted mt-0.5 line-clamp-2">
-                    {{ step.description || 'Complete a atividade recomendada para pontuar nesta fase.' }}
-                  </p>
-                </div>
+                <div class="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-primary"></div>
               </div>
 
-              <!-- Action Button -->
-              <div class="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                <button
-                  type="button"
-                  @click="handleStartStep(step)"
-                  class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-xs"
-                  :class="step.is_completed ? 'bg-surface border border-border text-text hover:bg-surface-hover' : 'bg-primary text-white hover:bg-primary-hover shadow-primary/20'"
-                >
-                  <span>{{ step.is_completed ? 'Revisar' : 'Praticar Agora' }}</span>
-                  <ArrowRight class="w-3.5 h-3.5" />
-                </button>
+              <!-- Duolingo Circular 3D Button -->
+              <button
+                type="button"
+                @click="handleNodeClick(step, sIdx)"
+                class="w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center transition-all duration-200 transform cursor-pointer active:translate-y-1 active:border-b-2 shadow-md"
+                :class="[
+                  step.is_completed
+                    ? 'bg-emerald-500 border-b-[6px] border-b-emerald-700 text-white shadow-emerald-500/25 hover:scale-105'
+                    : step.id === activeStepId
+                    ? 'bg-primary border-b-[6px] border-b-[#3730a3] text-white ring-4 ring-primary/40 ring-offset-2 ring-offset-bg shadow-primary/30 hover:scale-105'
+                    : 'bg-surface border border-border border-b-[6px] border-b-border/80 text-text-muted hover:border-primary/40',
+                ]"
+              >
+                <!-- Inner Icon -->
+                <component
+                  :is="step.is_completed ? Check : getCategoryMeta(step.category).icon"
+                  class="w-7 h-7 sm:w-8 sm:h-8"
+                  :class="step.is_completed ? 'stroke-[3]' : ''"
+                />
+              </button>
+
+              <!-- Node Label Below (English) -->
+              <div class="mt-2 text-center max-w-[130px]">
+                <span class="text-[0.7rem] font-bold text-text truncate block">
+                  {{ step.title }}
+                </span>
+                <span class="text-[0.6rem] font-semibold uppercase text-text-muted">
+                  {{ getCategoryMeta(step.category).label }}
+                </span>
               </div>
             </div>
-          </div>
 
-          <!-- BOSS FIGHT FINAL (Exame Trimestral da Fase) -->
-          <div
-            class="mt-6 rounded-3xl p-6 md:p-8 border transition-all duration-500 shadow-md relative overflow-hidden"
-            :class="{
-              'border-amber-500/50 bg-gradient-to-br from-amber-500/10 via-surface to-amber-500/5': activePhase.boss_fight?.is_unlocked && !activePhase.boss_fight?.is_completed,
-              'border-success/40 bg-gradient-to-br from-success/10 via-surface to-success/5': activePhase.boss_fight?.is_completed,
-              'border-border bg-surface/50 opacity-90': !activePhase.boss_fight?.is_unlocked && !activePhase.boss_fight?.is_completed,
-            }"
-          >
-            <!-- Background Glow -->
-            <div
-              v-if="activePhase.boss_fight?.is_unlocked"
-              class="absolute -right-8 -top-8 w-40 h-40 bg-amber-500/15 rounded-full blur-2xl pointer-events-none"
-            ></div>
+            <!-- Milestone / Treasure Chest Node in Between -->
+            <div class="relative flex flex-col items-center my-2 opacity-80">
+              <div class="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 shadow-xs">
+                <Award class="w-6 h-6" />
+              </div>
+              <span class="text-[0.6rem] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 mt-1">
+                Milestone
+              </span>
+            </div>
 
-            <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-              <div class="flex items-start gap-4">
-                <div
-                  class="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 border shadow-sm transition-transform duration-300"
-                  :class="{
-                    'bg-amber-500 text-white border-amber-400 animate-pulse': activePhase.boss_fight?.is_unlocked && !activePhase.boss_fight?.is_completed,
-                    'bg-success text-white border-success': activePhase.boss_fight?.is_completed,
-                    'bg-bg-secondary text-text-muted border-border': !activePhase.boss_fight?.is_unlocked && !activePhase.boss_fight?.is_completed,
-                  }"
-                >
-                  <component
-                    :is="activePhase.boss_fight?.is_completed ? Trophy : (activePhase.boss_fight?.is_unlocked ? Swords : Lock)"
-                    class="w-7 h-7"
-                  />
+            <!-- FINAL BOSS FIGHT NODE (Duolingo Style End of Unit Boss) -->
+            <div class="relative flex flex-col items-center mt-4">
+              <!-- Speech Bubble Tooltip for Boss -->
+              <div
+                v-if="activePhase.boss_fight?.is_unlocked && !activePhase.boss_fight?.is_completed"
+                class="absolute -top-11 z-20 flex flex-col items-center animate-bounce pointer-events-none"
+              >
+                <div class="px-3 py-1 rounded-xl bg-amber-500 text-white text-[0.7rem] font-black uppercase tracking-wider shadow-lg shadow-amber-500/40 flex items-center gap-1">
+                  <Swords class="w-3.5 h-3.5" />
+                  TAKE EXAM
                 </div>
-
-                <div class="space-y-1">
-                  <div class="flex items-center gap-2">
-                    <span
-                      class="px-2 py-0.5 rounded-full text-[0.65rem] font-black uppercase tracking-wider"
-                      :class="{
-                        'bg-amber-500 text-white': activePhase.boss_fight?.is_unlocked && !activePhase.boss_fight?.is_completed,
-                        'bg-success text-white': activePhase.boss_fight?.is_completed,
-                        'bg-muted/20 text-text-muted': !activePhase.boss_fight?.is_unlocked && !activePhase.boss_fight?.is_completed,
-                      }"
-                    >
-                      {{ activePhase.boss_fight?.is_completed ? 'Derrotado 🏆' : (activePhase.boss_fight?.is_unlocked ? 'Pronto para a Batalha ⚔️' : 'Bloqueado 🔒') }}
-                    </span>
-                    <span class="text-xs font-bold text-text-muted">
-                      Nota de corte: {{ activePhase.boss_fight?.min_score || 7.0 }} / 10
-                    </span>
-                  </div>
-
-                  <h3 class="text-lg md:text-xl font-display font-black text-text">
-                    {{ activePhase.boss_fight?.title || '👑 Boss Fight: Exame Trimestral de Fase' }}
-                  </h3>
-                  <p class="text-xs text-text-muted max-w-lg leading-relaxed">
-                    {{ activePhase.boss_fight?.description }}
-                  </p>
-                </div>
+                <div class="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-amber-500"></div>
               </div>
 
-              <!-- CTA do Boss Fight -->
-              <div class="shrink-0 flex flex-col sm:flex-row items-center gap-3">
-                <button
-                  type="button"
-                  @click="handleEnterBossFight(activePhase.boss_fight)"
-                  :disabled="!activePhase.boss_fight?.is_unlocked && !activePhase.boss_fight?.is_completed"
-                  class="w-full sm:w-auto px-6 py-3.5 rounded-2xl text-xs md:text-sm font-black uppercase tracking-wider transition-all duration-300 shadow-md cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  :class="{
-                    'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/25 active:scale-95': activePhase.boss_fight?.is_unlocked && !activePhase.boss_fight?.is_completed,
-                    'bg-success hover:bg-success/90 text-white shadow-success/20': activePhase.boss_fight?.is_completed,
-                    'bg-bg-secondary text-text-muted border border-border': !activePhase.boss_fight?.is_unlocked && !activePhase.boss_fight?.is_completed,
-                  }"
+              <!-- Epic Boss Circular 3D Button -->
+              <button
+                type="button"
+                @click="handleBossClick(activePhase.boss_fight)"
+                class="w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center transition-all duration-300 transform cursor-pointer active:translate-y-1 active:border-b-2 shadow-xl"
+                :class="[
+                  activePhase.boss_fight?.is_completed
+                    ? 'bg-success border-b-[8px] border-b-emerald-800 text-white shadow-success/30 hover:scale-105'
+                    : activePhase.boss_fight?.is_unlocked
+                    ? 'bg-gradient-to-b from-amber-400 to-amber-500 border-b-[8px] border-b-amber-700 text-white ring-4 ring-amber-400/40 ring-offset-2 ring-offset-bg shadow-amber-500/40 animate-pulse hover:scale-105'
+                    : 'bg-surface border-2 border-border border-b-[8px] border-b-border text-text-muted opacity-80',
+                ]"
+              >
+                <component
+                  :is="activePhase.boss_fight?.is_completed ? Trophy : (activePhase.boss_fight?.is_unlocked ? Swords : Lock)"
+                  class="w-9 h-9 sm:w-10 sm:h-10"
+                />
+              </button>
+
+              <!-- Boss Label Below -->
+              <div class="mt-2 text-center max-w-[160px]">
+                <span class="text-xs font-black uppercase tracking-wider text-text block">
+                  {{ activePhase.boss_fight?.title || 'Boss Fight: Phase Exam' }}
+                </span>
+                <span
+                  class="text-[0.65rem] font-extrabold uppercase mt-0.5 inline-block px-2 py-0.2 rounded-full"
+                  :class="activePhase.boss_fight?.is_completed ? 'bg-success/15 text-success' : (activePhase.boss_fight?.is_unlocked ? 'bg-amber-500/15 text-amber-500' : 'bg-surface text-text-muted border border-border')"
                 >
-                  <component
-                    :is="activePhase.boss_fight?.is_completed ? Trophy : (activePhase.boss_fight?.is_unlocked ? Swords : Lock)"
-                    class="w-4 h-4"
-                  />
-                  <span>
-                    {{
-                      activePhase.boss_fight?.is_completed
-                        ? 'Ver Resultado do Boss'
-                        : activePhase.boss_fight?.is_unlocked
-                        ? 'Enfrentar o Boss Agora!'
-                        : 'Boss Bloqueado'
-                    }}
-                  </span>
-                </button>
+                  {{ activePhase.boss_fight?.is_completed ? 'DEFEATED 🏆' : (activePhase.boss_fight?.is_unlocked ? 'UNLOCKED ⚔️' : 'LOCKED 🔒') }}
+                </span>
               </div>
             </div>
           </div>
@@ -548,7 +530,7 @@ onMounted(() => {
     </div>
 
     <!-- =================================================================== -->
-    <!-- ABA 2: METAS SEMANAIS & STREAK (VISÃO ORIGINAL PRESERVADA)          -->
+    <!-- TAB 2: WEEKLY GOALS & STREAK (ORIGINAL VIEW PRESERVED)               -->
     <!-- =================================================================== -->
     <div v-else class="space-y-8 animate-fade-in">
       <!-- Summary 3 Cards -->
@@ -587,21 +569,20 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- Abas de filtro & Section Header -->
+      <!-- Filter Tabs -->
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4">
         <div>
-          <h2 class="text-lg font-bold text-text">Activity Goals</h2>
+          <h2 class="text-lg font-bold text-text">Weekly Category Goals</h2>
           <p class="text-xs text-text-muted mt-0.5">
-            Completed activities, simulations and practice sessions automatically update your goals.
+            Complete activities across each category to maintain your weekly consistency bonus.
           </p>
         </div>
 
-        <!-- Tab Buttons -->
         <div class="flex bg-surface border border-border p-1 rounded-xl shrink-0">
           <button
             type="button"
             @click="filterTab = 'todo'"
-            class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
+            class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer"
             :class="filterTab === 'todo' ? 'bg-primary text-white shadow-xs' : 'text-text-muted hover:text-text'"
           >
             To Do ({{ summary.active }})
@@ -609,7 +590,7 @@ onMounted(() => {
           <button
             type="button"
             @click="filterTab = 'completed'"
-            class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
+            class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer"
             :class="filterTab === 'completed' ? 'bg-primary text-white shadow-xs' : 'text-text-muted hover:text-text'"
           >
             Completed ({{ summary.completed }})
@@ -617,7 +598,7 @@ onMounted(() => {
           <button
             type="button"
             @click="filterTab = 'all'"
-            class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
+            class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer"
             :class="filterTab === 'all' ? 'bg-primary text-white shadow-xs' : 'text-text-muted hover:text-text'"
           >
             All ({{ goals.length }})
@@ -641,7 +622,7 @@ onMounted(() => {
           <div class="flex items-start justify-between gap-3 mb-3">
             <div class="flex items-center gap-3">
               <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                <component :is="getCategoryIcon(goal.type)" class="w-5 h-5" />
+                <component :is="getCategoryMeta(goal.type).icon" class="w-5 h-5" />
               </div>
               <div>
                 <h3 class="font-bold text-sm text-text">{{ goal.title || goal.type }}</h3>
@@ -686,16 +667,129 @@ onMounted(() => {
           </div>
         </div>
       </div>
+    </div>
 
-      <!-- Empty State -->
-      <div v-else class="p-12 text-center bg-surface border border-border rounded-3xl">
-        <CheckCircle2 class="w-12 h-12 text-success mx-auto mb-3 opacity-70" />
-        <h3 class="font-bold text-text text-base">
-          {{ filterTab === 'todo' ? 'All caught up!' : 'No goals found' }}
-        </h3>
-        <p class="text-xs text-text-muted mt-1">
-          {{ filterTab === 'todo' ? 'You have completed all active study goals. Awesome work!' : 'No goals match the selected filter.' }}
-        </p>
+    <!-- =================================================================== -->
+    <!-- DUOLINGO NODE POPUP / DIALOG (IN ENGLISH)                           -->
+    <!-- =================================================================== -->
+    <div
+      v-if="selectedNode"
+      class="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in"
+      @click.self="selectedNode = null"
+    >
+      <div class="bg-surface border border-border rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-5 text-center relative animate-zoom-in">
+        <!-- Close Button -->
+        <button
+          type="button"
+          @click="selectedNode = null"
+          class="absolute right-4 top-4 p-1.5 rounded-xl text-text-muted hover:text-text hover:bg-surface-hover transition-colors cursor-pointer"
+        >
+          <X class="w-4 h-4" />
+        </button>
+
+        <!-- STEP POPUP -->
+        <template v-if="selectedNode.type === 'step' && selectedNode.step">
+          <!-- Icon Bubble -->
+          <div
+            class="w-16 h-16 rounded-full mx-auto flex items-center justify-center border-b-[4px] shadow-md"
+            :class="[
+              selectedNode.step.is_completed
+                ? 'bg-emerald-500 border-b-emerald-700 text-white'
+                : 'bg-primary border-b-[#3730a3] text-white',
+            ]"
+          >
+            <component
+              :is="selectedNode.step.is_completed ? Check : getCategoryMeta(selectedNode.step.category).icon"
+              class="w-8 h-8"
+            />
+          </div>
+
+          <div class="space-y-1">
+            <span class="px-2.5 py-0.5 rounded-full text-[0.65rem] font-bold uppercase tracking-wider bg-bg-secondary border border-border text-text-muted">
+              {{ getCategoryMeta(selectedNode.step.category).label }}
+            </span>
+            <h3 class="text-base font-black text-text mt-1">
+              {{ selectedNode.step.title }}
+            </h3>
+            <p class="text-xs text-text-muted leading-relaxed">
+              {{ selectedNode.step.description || 'Complete this exercise to progress toward the Boss Exam!' }}
+            </p>
+          </div>
+
+          <!-- Action Button -->
+          <button
+            type="button"
+            @click="handleStartActivity(selectedNode.step)"
+            class="w-full py-3.5 px-6 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg transition-all transform active:translate-y-1 active:border-b-2 cursor-pointer border-b-[5px]"
+            :class="[
+              selectedNode.step.is_completed
+                ? 'bg-emerald-500 border-b-emerald-700 hover:bg-emerald-600 text-white shadow-emerald-500/25'
+                : 'bg-primary border-b-[#3730a3] hover:bg-primary-hover text-white shadow-primary/25',
+            ]"
+          >
+            {{ selectedNode.step.is_completed ? 'REVIEW ACTIVITY' : 'START QUEST ▶' }}
+          </button>
+        </template>
+
+        <!-- BOSS FIGHT POPUP -->
+        <template v-else-if="selectedNode.type === 'boss' && selectedNode.boss">
+          <div
+            class="w-20 h-20 rounded-full mx-auto flex items-center justify-center border-b-[6px] shadow-xl"
+            :class="[
+              selectedNode.boss.is_completed
+                ? 'bg-success border-b-emerald-800 text-white shadow-success/30'
+                : selectedNode.boss.is_unlocked
+                ? 'bg-amber-500 border-b-amber-700 text-white shadow-amber-500/40 animate-pulse'
+                : 'bg-surface border-2 border-border border-b-border text-text-muted',
+            ]"
+          >
+            <component
+              :is="selectedNode.boss.is_completed ? Trophy : (selectedNode.boss.is_unlocked ? Swords : Lock)"
+              class="w-10 h-10"
+            />
+          </div>
+
+          <div class="space-y-1.5">
+            <span
+              class="px-2.5 py-0.5 rounded-full text-[0.65rem] font-black uppercase tracking-wider"
+              :class="selectedNode.boss.is_completed ? 'bg-success/15 text-success' : (selectedNode.boss.is_unlocked ? 'bg-amber-500/15 text-amber-500' : 'bg-surface text-text-muted border border-border')"
+            >
+              {{ selectedNode.boss.is_completed ? 'DEFEATED 🏆' : (selectedNode.boss.is_unlocked ? 'READY FOR BATTLE ⚔️' : 'LOCKED 🔒') }}
+            </span>
+            <h3 class="text-base font-black text-text">
+              {{ selectedNode.boss.title || 'Boss Fight: Phase Exam' }}
+            </h3>
+            <p class="text-xs text-text-muted leading-relaxed">
+              {{ selectedNode.boss.description || 'Custom evaluation exam based on the activities completed in this phase.' }}
+            </p>
+            <div class="text-[0.7rem] font-bold text-text-muted pt-1">
+              Passing grade: <span class="text-amber-500">{{ selectedNode.boss.min_score || 7.0 }} / 10</span>
+            </div>
+          </div>
+
+          <!-- Boss Action Button -->
+          <button
+            type="button"
+            @click="handleStartBoss(selectedNode.boss)"
+            :disabled="!selectedNode.boss.is_unlocked && !selectedNode.boss.is_completed"
+            class="w-full py-3.5 px-6 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg transition-all transform active:translate-y-1 active:border-b-2 cursor-pointer border-b-[5px] disabled:opacity-50 disabled:cursor-not-allowed"
+            :class="[
+              selectedNode.boss.is_completed
+                ? 'bg-success border-b-emerald-800 text-white shadow-success/25'
+                : selectedNode.boss.is_unlocked
+                ? 'bg-amber-500 border-b-amber-700 hover:bg-amber-600 text-white shadow-amber-500/30'
+                : 'bg-surface border-border text-text-muted',
+            ]"
+          >
+            {{
+              selectedNode.boss.is_completed
+                ? 'VIEW EXAM RESULTS 🏆'
+                : selectedNode.boss.is_unlocked
+                ? 'ENTER BOSS BATTLE ⚔️'
+                : 'COMPLETE ALL QUESTS TO UNLOCK'
+            }}
+          </button>
+        </template>
       </div>
     </div>
   </div>
