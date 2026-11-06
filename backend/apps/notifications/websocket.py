@@ -2,7 +2,7 @@ from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 
 
-def sent_to_group(group_name: str, event_type: str, data: dict) -> None:
+def send_to_group(group_name: str, event_type: str, data: dict) -> None:
     """
     Publica um evento para todos os clientes conectados
     a determinado grupo WebSocket.

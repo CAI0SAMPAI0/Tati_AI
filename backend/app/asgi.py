@@ -3,7 +3,11 @@ from django.core.asgi import get_asgi_application
 from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.security.websocket import AllowedHostsOriginValidator
 from channels.auth import AuthMiddlewareStack
-from apps.notifications.out import websocket_urlpatterns as notifications_ws_patterns
+from apps.notifications.routing import (
+    websocket_urlpatterns as notifications_ws_patterns,
+)
+from apps.chat.routing import websocket_urlpatterns as chat_ws_patterns
+
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "app.settings.development")
 
@@ -14,6 +18,7 @@ from apps.chat.routing import websocket_urlpatterns as chat_ws_patterns
 
 websocket_urlpatterns = [
     *chat_ws_patterns,
+    *notifications_ws_patterns,
 ]
 
 async def lifespan_handler(scope, receive, send):
