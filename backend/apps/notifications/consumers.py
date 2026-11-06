@@ -2,6 +2,7 @@ import logging
 import urllib.parse
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from apps.authentication.security import decode_token
+from apps.notifications.websocket import get_user_group
 from shared.async_db import aget_user_by_username
 
 logger = logging.getLogger(__name__)
@@ -30,14 +31,20 @@ class NotificationConsumer(AsyncJsonWebsocketConsumer):
             await self.close(code=4001)
             return
 
-        self.user_group = f"user_{self.user.id}"
+        self.user_group = get_user_group(self.user.id)
 
         await self.channel_layer.group_add(
             self.user_group,
             self.channel_name
         )
 
-        if getattr(self.user, "is_teacher", False):
+        is_teacher = bool(
+            getattr(self.user, "is_teacher", False)
+            or getattr(self.user, "is_staff", False)
+            or getattr(self.user, "is_programmer", False)
+        )
+
+        if is_teacher:
             await self.channel_layer.group_add(
                 "teachers",
                 self.channel_name
@@ -46,8 +53,9 @@ class NotificationConsumer(AsyncJsonWebsocketConsumer):
         await self.accept()
 
         logger.info(
-            "[NotificationsWS] Conexão aceita para %s",
+            "[NotificationsWS] Conexão aceita para %s (is_teacher=%s)",
             self.username,
+            is_teacher,
         )
     
     async def disconnect(self, close_code):
@@ -57,13 +65,17 @@ class NotificationConsumer(AsyncJsonWebsocketConsumer):
                 self.channel_name,
             )
 
-        if getattr(self, "user", None) and getattr(
-            self.user, "is_teacher", False
-        ):
-            await self.channel_layer.group_discard(
-                "teachers",
-                self.channel_name,
+        if getattr(self, "user", None):
+            is_teacher = bool(
+                getattr(self.user, "is_teacher", False)
+                or getattr(self.user, "is_staff", False)
+                or getattr(self.user, "is_programmer", False)
             )
+            if is_teacher:
+                await self.channel_layer.group_discard(
+                    "teachers",
+                    self.channel_name,
+                )
 
     async def send_notification(self, event):
         await self.send_json(

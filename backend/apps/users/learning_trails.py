@@ -1,5 +1,5 @@
 from django.db import transaction
-from apps.notifications.websocket import notify_teacher
+from apps.notifications.websocket import notify_teacher, notify_user
 import copy
 import logging
 import uuid
@@ -923,21 +923,49 @@ class LearningTrailService:
             student_username,
             trail,
         )
+        
+        # 4. Notifica via WebSocket sempre que o status de uma etapa mudar (Completed ou Pending)
+        status_changed = was_completed != new_status
+        if status_changed:
+            phase_obj = next((p for p in phases if p.get("id") == phase_id or not phase_id), None)
+            phase_steps = phase_obj.get("steps", []) if phase_obj else []
+            completed_count = sum(1 for s in phase_steps if s.get("is_completed"))
+            total_steps = len(phase_steps)
+            boss = phase_obj.get("boss_fight", {}) if phase_obj else {}
 
-        # 4. Notifica os professores somente quando um step é concluído
-        if completed_now:
-            transaction.on_commit(
-                lambda: notify_teacher(
-                    event_type="learning_trail_step_completed",
-                    data={
-                        "student_id": student.id,
-                        "student_username": student.username,
-                        "phase_id": phase_id,
-                        "step_id": step_id,
-                        "step_title": target_step.get("title"),
-                    },
-                )
-            )
+            event_data = {
+                "student_id": getattr(student, "id", None),
+                "student_username": student.username,
+                "student_name": getattr(student, "name", student.username),
+                "phase_id": phase_id or (phase_obj.get("id") if phase_obj else ""),
+                "step_id": step_id,
+                "step_title": target_step.get("title", ""),
+                "is_completed": bool(new_status),
+                "progress": target_step.get("progress", 1 if new_status else 0),
+                "completed_count": completed_count,
+                "total_steps": total_steps,
+                "boss_unlocked": bool(boss.get("is_unlocked") or (total_steps > 0 and completed_count == total_steps)),
+            }
+
+            def broadcast_trail_update():
+                try:
+                    notify_teacher(
+                        event_type="learning_trail_step_updated",
+                        data=event_data,
+                    )
+                    if student and getattr(student, "id", None):
+                        notify_user(
+                            user_id=student.id,
+                            event_type="learning_trail_step_updated",
+                            data=event_data,
+                        )
+                except Exception as err:
+                    logger.warning(f"[LearningTrail] Erro ao emitir evento WS: {err}")
+
+            try:
+                transaction.on_commit(broadcast_trail_update)
+            except Exception:
+                broadcast_trail_update()
 
         return saved_trail
 

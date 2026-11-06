@@ -25,11 +25,18 @@ function startNotificationWebSocket() {
   if (notificationSocket) return;
 
   notificationSocket = new NotificationWebSocket((message) => {
-    if (message.type === 'learning_trail_step_completed') {
-      console.log('[NotificationWS] Etapa concluída:', message.data);
-
+    if (message.type) {
       window.dispatchEvent(
-        new CustomEvent('learning-trail-step-completed', {
+        new CustomEvent(message.type, {
+          detail: message.data,
+        })
+      );
+    }
+
+    if (message.type === 'learning_trail_step_updated') {
+      console.log('[NotificationWS] Etapa da trilha atualizada:', message.data);
+      window.dispatchEvent(
+        new CustomEvent('learning-trail-step-updated', {
           detail: message.data,
         })
       );

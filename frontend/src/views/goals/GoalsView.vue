@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   Compass,
@@ -508,9 +508,35 @@ function handleStartExam(boss?: BossFight) {
   router.push('/exams');
 }
 
+function handleLearningTrailUpdate(event: any) {
+  const data = event?.detail || event;
+  if (!data) return;
+
+  if (trail.value?.phases) {
+    for (const phase of trail.value.phases) {
+      if (!data.phase_id || phase.id === data.phase_id) {
+        const step = phase.steps?.find((s) => s.id === data.step_id);
+        if (step) {
+          step.is_completed = data.is_completed;
+          step.progress = data.is_completed ? (step.target_count || 1) : 0;
+        }
+        if (data.boss_unlocked !== undefined && phase.boss_fight) {
+          phase.boss_fight.is_unlocked = data.boss_unlocked;
+        }
+      }
+    }
+    trail.value = { ...trail.value };
+  }
+}
+
 onMounted(() => {
   loadTrail();
   loadGoals();
+  window.addEventListener('learning-trail-step-updated', handleLearningTrailUpdate);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('learning-trail-step-updated', handleLearningTrailUpdate);
 });
 </script>
 
@@ -748,22 +774,22 @@ onMounted(() => {
               >
                 <!-- 1. ACTIVITY STEP NODE -->
                 <template v-if="item.type === 'step' && item.step">
-                  <!-- Floating START Speech Bubble Tooltip for active step -->
+                  <!-- Floating START Speech Bubble Tooltip for active step (Duolingo Style) -->
                   <div
                     v-if="item.isActive"
                     class="absolute -top-11 z-30 flex flex-col items-center animate-bounce pointer-events-none"
                   >
-                    <div class="px-3.5 py-1 rounded-xl bg-surface border-2 border-primary/40 text-primary text-[0.7rem] font-black uppercase tracking-wider shadow-lg shadow-primary/15 flex items-center gap-1.5">
-                      <Play class="w-3 h-3 fill-primary text-primary" />
+                    <div class="px-3.5 py-1.5 rounded-2xl bg-primary text-white text-[0.7rem] font-black uppercase tracking-wider shadow-xl shadow-primary/30 flex items-center gap-1.5 border border-white/20">
+                      <Play class="w-3 h-3 fill-white text-white" />
                       START
                     </div>
-                    <div class="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-primary/40"></div>
+                    <div class="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-primary"></div>
                   </div>
 
                   <!-- Generous Pulsing Ring for Active Node (Never cut off) -->
                   <div
                     v-if="item.isActive"
-                    class="absolute -inset-2.5 rounded-full ring-4 ring-primary/30 ring-offset-4 ring-offset-surface animate-pulse pointer-events-none"
+                    class="absolute -inset-2.5 sm:-inset-3 rounded-full ring-4 ring-primary/40 ring-offset-4 ring-offset-bg animate-pulse pointer-events-none"
                   ></div>
 
                   <!-- Trilha de Aprendizado 3D Button (System Primary Palette) -->

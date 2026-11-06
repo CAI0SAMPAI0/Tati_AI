@@ -124,11 +124,57 @@ const CATEGORIES = [
   { id: 'custom', label: 'Custom Quest', icon: FileText, tab: 'grammar', color: 'text-cyan-500 bg-cyan-500/10 border-cyan-500/20' },
 ];
 
-function handleLearningTrailUpdate() {
-  if (selectedUsername.value) {
-    loadTrail(selectedUsername.value);
+function handleLearningTrailUpdate(event?: any) {
+  const data = event?.detail || event;
+  if (!data) return;
+
+  // Atualização instantânea em memória se for o aluno atualmente selecionado
+  if (selectedUsername.value && data.student_username === selectedUsername.value && trail.value) {
+    let stepFound = false;
+    for (const phase of trail.value.phases) {
+      if (!data.phase_id || phase.id === data.phase_id) {
+        const step = phase.steps.find((s) => s.id === data.step_id);
+        if (step) {
+          step.is_completed = data.is_completed;
+          step.progress = data.is_completed ? (step.target_count || 1) : 0;
+          stepFound = true;
+        }
+        if (data.boss_unlocked !== undefined && phase.boss_fight) {
+          phase.boss_fight.is_unlocked = data.boss_unlocked;
+        }
+      }
+    }
+    trail.value = { ...trail.value };
+
+    if (!stepFound) {
+      loadTrail(selectedUsername.value);
+    }
+  }
+
+  if (data.student_name && data.step_title) {
+    toast.info(
+      `${data.student_name}: "${data.step_title}" marked as ${
+        data.is_completed ? 'Completed' : 'Pending'
+      }`
+    );
   }
 }
+
+onMounted(() => {
+  loadStudents();
+
+  window.addEventListener(
+    'learning-trail-step-updated',
+    handleLearningTrailUpdate
+  );
+});
+
+onUnmounted(() => {
+  window.removeEventListener(
+    'learning-trail-step-updated',
+    handleLearningTrailUpdate
+  );
+});
 
 function getCategoryMeta(cat: string) {
   const c = (cat || '').toLowerCase();
@@ -456,22 +502,6 @@ function handleDeletePhase(phaseIdx: number) {
   trail.value.phases.splice(phaseIdx, 1);
   toast.success('Phase removed.');
 }
-
-onMounted(() => {
-  loadStudents();
-
-  window.addEventListener(
-    'learning-trail-step-completed',
-    handleLearningTrailUpdate
-  );
-});
-
-onUnmounted(() => {
-  window.removeEventListener(
-    'learning-trail-step-completed',
-    handleLearningTrailUpdate
-  );
-});
 </script>
 
 <template>
