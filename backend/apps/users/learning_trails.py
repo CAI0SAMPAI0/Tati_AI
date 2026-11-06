@@ -845,16 +845,13 @@ class LearningTrailService:
 
         target_found = False
         target_step: Optional[Dict[str, Any]] = None
-        completed_now = not step.get('completed', False)
-        step['completed'] = completed_now
+        completed_now = False
 
-        # 1. Localiza o step e atualiza seu status
+        # Localiza o step e atualiza seu status
         for phase in phases:
             if phase.get("id") == phase_id or not phase_id:
                 for step in phase.get("steps", []):
                     if step.get("id") == step_id:
-
-                        # Captura o estado anterior antes da alteração
                         was_completed = step.get("is_completed", False)
 
                         new_status = (
@@ -863,7 +860,6 @@ class LearningTrailService:
                             else not was_completed
                         )
 
-                        # Identifica uma transição real de pendente para concluído
                         completed_now = not was_completed and new_status
 
                         step["is_completed"] = new_status
