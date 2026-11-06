@@ -45,7 +45,7 @@ class NotificationConsumer(AsyncJsonWebsocketConsumer):
 
         await self.accept()
 
-        loger.info(
+        logger.info(
             "[NotificationsWS] Conexão aceita para %s",
             self.username,
         )

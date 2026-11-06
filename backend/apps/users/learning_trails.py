@@ -1,9 +1,5 @@
-"""
-Learning Trail Service & Structures (Trilha de Aprendizado Gamificada).
-Permite que a Professora Tatiana crie e customize planos com Fases (estágios),
-atividades pedagógicas diretas (Grammar, Vocab, Reading, Listening, Music, Games, Simulations, Flashcards)
-e o Exame da Fase (Trimestral).
-"""
+from django.db import transaction
+from apps.notifications.websocket import notify_teacher
 import copy
 import logging
 import uuid
@@ -902,7 +898,23 @@ class LearningTrailService:
         except Exception as e:
             logger.warning(f"[LearningTrail] Aviso ao sincronizar submissão via toggle_step: {e}")
 
-        return cls.save_student_trail(user, student_username, trail)
+        saved_trail = cls.save_student_trail(user, student_username, trail)
+        
+        if target_step.get("is_completed"):
+            transaction.on_commit(
+                lambda: notify_teacher(
+                    event_type="learning_trail_step_completed",
+                    data={
+                        "student_id": student.id,
+                        "student_username": student.username,
+                        "phase_id": phase_id,
+                        "step_id": step_id,
+                        "step_title": target_step.get("title"),
+                    },
+                )
+            )
+            
+        return saved_trail
 
     @classmethod
     def unlock_boss(cls, teacher_user: User, student_username: str, phase_id: str) -> Dict[str, Any]:
