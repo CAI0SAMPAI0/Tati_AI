@@ -845,7 +845,8 @@ class LearningTrailService:
 
         target_found = False
         target_step: Optional[Dict[str, Any]] = None
-        completed_now = False
+        completed_now = not step.get('completed', False)
+        step['completed'] = completed_now
 
         # 1. Localiza o step e atualiza seu status
         for phase in phases:

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import {
   Compass,
   Plus,
@@ -7,8 +7,6 @@ import {
   Save,
   RotateCcw,
   Unlock,
-  CheckCircle2,
-  Lock,
   Swords,
   Trophy,
   BookOpen,
@@ -17,10 +15,8 @@ import {
   Gamepad2,
   Sparkles,
   Users,
-  MessageSquare,
   FileText,
   Search,
-  ExternalLink,
   Edit2,
   Check,
   ChevronDown,
@@ -127,6 +123,12 @@ const CATEGORIES = [
   { id: 'flashcards', label: 'Flashcards (SRS)', icon: Sparkles, tab: 'flashcards', color: 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20' },
   { id: 'custom', label: 'Custom Quest', icon: FileText, tab: 'grammar', color: 'text-cyan-500 bg-cyan-500/10 border-cyan-500/20' },
 ];
+
+function handleLearningTrailUpdate() {
+  if (selectedUsername.value) {
+    loadTrail(selectedUsername.value);
+  }
+}
 
 function getCategoryMeta(cat: string) {
   const c = (cat || '').toLowerCase();
@@ -457,21 +459,36 @@ function handleDeletePhase(phaseIdx: number) {
 
 onMounted(() => {
   loadStudents();
+
+  window.addEventListener(
+    'learning-trail-step-completed',
+    handleLearningTrailUpdate
+  );
+});
+
+onUnmounted(() => {
+  window.removeEventListener(
+    'learning-trail-step-completed',
+    handleLearningTrailUpdate
+  );
 });
 </script>
 
 <template>
   <div class="space-y-8 animate-fade-in">
     <!-- Header Controls -->
-    <div class="bg-surface border border-border rounded-2xl p-6 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+    <div
+      class="bg-surface border border-border rounded-2xl p-6 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-6">
       <div class="flex items-center gap-4">
-        <div class="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
+        <div
+          class="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
           <Compass class="w-6 h-6" />
         </div>
         <div>
           <div class="flex items-center gap-2">
             <h2 class="text-xl font-display font-black text-text">Learning Trails & Goals</h2>
-            <span class="px-2 py-0.5 rounded-full text-[0.65rem] font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20">
+            <span
+              class="px-2 py-0.5 rounded-full text-[0.65rem] font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20">
               Teacher Hub
             </span>
           </div>
@@ -486,42 +503,27 @@ onMounted(() => {
         <!-- Preset Templates Dropdown -->
         <div class="flex items-center gap-1.5 bg-bg-secondary p-1 rounded-xl border border-border">
           <span class="text-[0.65rem] font-bold text-text-muted px-2 uppercase">Presets:</span>
-          <button
-            v-for="lvl in ['A1', 'A2', 'B1', 'B2', 'C1']"
-            :key="lvl"
-            type="button"
-            @click="handleApplyTemplate(lvl)"
-            :disabled="isApplyingTemplate"
-            class="px-2.5 py-1 rounded-lg text-xs font-bold transition-all hover:bg-surface text-text hover:text-primary active:scale-95 disabled:opacity-50 cursor-pointer"
-          >
+          <button v-for="lvl in ['A1', 'A2', 'B1', 'B2', 'C1']" :key="lvl" type="button"
+            @click="handleApplyTemplate(lvl)" :disabled="isApplyingTemplate"
+            class="px-2.5 py-1 rounded-lg text-xs font-bold transition-all hover:bg-surface text-text hover:text-primary active:scale-95 disabled:opacity-50 cursor-pointer">
             {{ lvl }}
           </button>
         </div>
 
-        <button
-          type="button"
-          @click="handleAddPhase"
-          class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-surface hover:bg-surface-hover border border-border text-text transition-all active:scale-95 cursor-pointer"
-        >
+        <button type="button" @click="handleAddPhase"
+          class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-surface hover:bg-surface-hover border border-border text-text transition-all active:scale-95 cursor-pointer">
           <Plus class="w-4 h-4 text-primary" />
           New Phase
         </button>
 
-        <button
-          type="button"
-          @click="handleResetTrail"
+        <button type="button" @click="handleResetTrail"
           class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-surface hover:bg-error/10 border border-border text-text-muted hover:text-error transition-all active:scale-95 cursor-pointer"
-          title="Reset student trail to level default"
-        >
+          title="Reset student trail to level default">
           <RotateCcw class="w-3.5 h-3.5" />
         </button>
 
-        <button
-          type="button"
-          @click="handleSaveTrail"
-          :disabled="isSaving"
-          class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-primary text-white hover:bg-primary-hover shadow-xs transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
-        >
+        <button type="button" @click="handleSaveTrail" :disabled="isSaving"
+          class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-primary text-white hover:bg-primary-hover shadow-xs transition-all active:scale-95 disabled:opacity-50 cursor-pointer">
           <Save class="w-4 h-4" />
           {{ isSaving ? 'Saving...' : 'Save Trail' }}
         </button>
@@ -540,32 +542,20 @@ onMounted(() => {
         <!-- Search Input -->
         <div class="relative">
           <Search class="w-3.5 h-3.5 text-text-muted absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            v-model="searchQuery"
-            type="text"
-            placeholder="Search student by name..."
-            class="w-full pl-8 pr-3 py-1.5 bg-bg-secondary border border-border rounded-xl text-xs text-text placeholder:text-text-muted focus:outline-none focus:border-primary"
-          />
+          <input v-model="searchQuery" type="text" placeholder="Search student by name..."
+            class="w-full pl-8 pr-3 py-1.5 bg-bg-secondary border border-border rounded-xl text-xs text-text placeholder:text-text-muted focus:outline-none focus:border-primary" />
         </div>
 
         <!-- Students List -->
         <div class="space-y-1 max-h-[580px] overflow-y-auto custom-scrollbar pr-1">
-          <button
-            v-for="s in filteredStudents"
-            :key="s.username"
-            type="button"
-            @click="selectedUsername = s.username"
+          <button v-for="s in filteredStudents" :key="s.username" type="button" @click="selectedUsername = s.username"
             class="w-full flex items-center justify-between p-2.5 rounded-xl text-left transition-all cursor-pointer border"
-            :class="selectedUsername === s.username ? 'bg-primary/10 border-primary text-primary font-bold shadow-xs' : 'bg-transparent border-transparent hover:bg-surface-hover text-text'"
-          >
+            :class="selectedUsername === s.username ? 'bg-primary/10 border-primary text-primary font-bold shadow-xs' : 'bg-transparent border-transparent hover:bg-surface-hover text-text'">
             <div class="flex items-center gap-2.5 min-w-0">
-              <div class="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-[0.65rem] font-bold shrink-0 overflow-hidden">
-                <img
-                  v-if="s.avatar_url && s.avatar_url !== DEFAULT_AVATAR_URL"
-                  :src="s.avatar_url"
-                  :alt="s.name || s.username"
-                  class="w-full h-full object-cover"
-                />
+              <div
+                class="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-[0.65rem] font-bold shrink-0 overflow-hidden">
+                <img v-if="s.avatar_url && s.avatar_url !== DEFAULT_AVATAR_URL" :src="s.avatar_url"
+                  :alt="s.name || s.username" class="w-full h-full object-cover" />
                 <span v-else>{{ (s.name || s.username || '?').charAt(0).toUpperCase() }}</span>
               </div>
               <div class="min-w-0">
@@ -573,7 +563,8 @@ onMounted(() => {
                 <div class="text-[0.65rem] text-text-muted truncate">@{{ s.username }}</div>
               </div>
             </div>
-            <span class="text-[0.65rem] font-bold px-1.5 py-0.5 rounded-md bg-surface border border-border text-text-subtle shrink-0">
+            <span
+              class="text-[0.65rem] font-bold px-1.5 py-0.5 rounded-md bg-surface border border-border text-text-subtle shrink-0">
               {{ s.level || 'A1' }}
             </span>
           </button>
@@ -583,21 +574,21 @@ onMounted(() => {
       <!-- 2. Coluna Principal do Editor da Trilha -->
       <div class="lg:col-span-3 space-y-6">
         <!-- Banner do Aluno Ativo -->
-        <div v-if="currentStudent" class="p-5 rounded-2xl bg-surface border border-border shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div v-if="currentStudent"
+          class="p-5 rounded-2xl bg-surface border border-border shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div class="flex items-center gap-3.5">
-            <div class="w-11 h-11 rounded-2xl bg-primary/15 flex items-center justify-center font-bold text-primary text-sm shrink-0 overflow-hidden">
-              <img
-                v-if="currentStudent.avatar_url && currentStudent.avatar_url !== DEFAULT_AVATAR_URL"
-                :src="currentStudent.avatar_url"
-                :alt="currentStudent.name"
-                class="w-full h-full object-cover"
-              />
+            <div
+              class="w-11 h-11 rounded-2xl bg-primary/15 flex items-center justify-center font-bold text-primary text-sm shrink-0 overflow-hidden">
+              <img v-if="currentStudent.avatar_url && currentStudent.avatar_url !== DEFAULT_AVATAR_URL"
+                :src="currentStudent.avatar_url" :alt="currentStudent.name" class="w-full h-full object-cover" />
               <span v-else>{{ (currentStudent.name || currentStudent.username || '?').charAt(0).toUpperCase() }}</span>
             </div>
             <div>
               <div class="flex items-center gap-2">
-                <h3 class="font-display font-bold text-base text-text">{{ currentStudent.name || currentStudent.username }}</h3>
-                <span class="px-2 py-0.2 rounded-full text-[0.65rem] font-extrabold bg-primary/15 text-primary border border-primary/20">
+                <h3 class="font-display font-bold text-base text-text">{{ currentStudent.name || currentStudent.username
+                  }}</h3>
+                <span
+                  class="px-2 py-0.2 rounded-full text-[0.65rem] font-extrabold bg-primary/15 text-primary border border-primary/20">
                   CEFR Level: {{ currentStudent.level || 'A1' }}
                 </span>
               </div>
@@ -609,20 +600,11 @@ onMounted(() => {
 
           <!-- Campos editáveis de título e recado da professora -->
           <div class="flex-1 max-w-md space-y-2">
-            <input
-              v-if="trail"
-              v-model="trail.title"
-              type="text"
+            <input v-if="trail" v-model="trail.title" type="text"
               placeholder="Trail Name (e.g. Intermediate Trail: Fluency & Career)"
-              class="w-full px-3 py-1.5 bg-bg-secondary border border-border rounded-xl text-xs font-semibold text-text focus:outline-none focus:border-primary"
-            />
-            <input
-              v-if="trail"
-              v-model="trail.teacher_notes"
-              type="text"
-              placeholder="Teacher notes for the student..."
-              class="w-full px-3 py-1.5 bg-bg-secondary border border-border rounded-xl text-xs text-text-muted focus:outline-none focus:border-primary"
-            />
+              class="w-full px-3 py-1.5 bg-bg-secondary border border-border rounded-xl text-xs font-semibold text-text focus:outline-none focus:border-primary" />
+            <input v-if="trail" v-model="trail.teacher_notes" type="text" placeholder="Teacher notes for the student..."
+              class="w-full px-3 py-1.5 bg-bg-secondary border border-border rounded-xl text-xs text-text-muted focus:outline-none focus:border-primary" />
           </div>
         </div>
 
@@ -634,61 +616,44 @@ onMounted(() => {
 
         <!-- Fases da Trilha -->
         <div v-else-if="trail && trail.phases && trail.phases.length > 0" class="space-y-6">
-          <div
-            v-for="(phase, pIdx) in trail.phases"
-            :key="phase.id || pIdx"
-            class="bg-surface border border-border rounded-2xl overflow-hidden shadow-xs transition-all hover:border-primary/40"
-          >
+          <div v-for="(phase, pIdx) in trail.phases" :key="phase.id || pIdx"
+            class="bg-surface border border-border rounded-2xl overflow-hidden shadow-xs transition-all hover:border-primary/40">
             <!-- Header da Fase -->
-            <div class="p-5 border-b border-border bg-bg-secondary/40 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div
+              class="p-5 border-b border-border bg-bg-secondary/40 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div class="space-y-1 min-w-0">
                 <div class="flex items-center gap-2">
-                  <span class="px-2 py-0.5 rounded-md text-[0.65rem] font-black uppercase tracking-wider bg-primary text-white">
+                  <span
+                    class="px-2 py-0.5 rounded-md text-[0.65rem] font-black uppercase tracking-wider bg-primary text-white">
                     Phase {{ phase.number || pIdx + 1 }}
                   </span>
-                  <input
-                    v-model="phase.title"
-                    type="text"
-                    class="font-display font-extrabold text-sm md:text-base text-text bg-transparent border-b border-transparent hover:border-border focus:border-primary focus:outline-none px-1 py-0.5"
-                  />
-                  <span
-                    class="px-2 py-0.2 rounded-full text-[0.65rem] font-bold uppercase tracking-wider"
-                    :class="{
-                      'bg-success/15 text-success border border-success/30': phase.status === 'completed',
-                      'bg-primary/15 text-primary border border-primary/30': phase.status === 'active',
-                      'bg-muted/15 text-text-muted border border-border': phase.status === 'locked',
-                    }"
-                  >
+                  <input v-model="phase.title" type="text"
+                    class="font-display font-extrabold text-sm md:text-base text-text bg-transparent border-b border-transparent hover:border-border focus:border-primary focus:outline-none px-1 py-0.5" />
+                  <span class="px-2 py-0.2 rounded-full text-[0.65rem] font-bold uppercase tracking-wider" :class="{
+                    'bg-success/15 text-success border border-success/30': phase.status === 'completed',
+                    'bg-primary/15 text-primary border border-primary/30': phase.status === 'active',
+                    'bg-muted/15 text-text-muted border border-border': phase.status === 'locked',
+                  }">
                     {{ phase.status }}
                   </span>
                 </div>
-                <input
-                  v-model="phase.description"
-                  type="text"
-                  placeholder="Phase description or learning objectives..."
-                  class="w-full text-xs text-text-muted bg-transparent border-b border-transparent hover:border-border focus:border-primary focus:outline-none px-1"
-                />
+                <input v-model="phase.description" type="text" placeholder="Phase description or learning objectives..."
+                  class="w-full text-xs text-text-muted bg-transparent border-b border-transparent hover:border-border focus:border-primary focus:outline-none px-1" />
               </div>
 
               <!-- Controles da Fase -->
               <div class="flex items-center gap-2 shrink-0">
                 <span class="text-xs font-bold text-text-subtle">
-                  {{ phase.steps.filter((s) => s.is_completed).length }} / {{ phase.steps.length }} completed
+                  {{phase.steps.filter((s) => s.is_completed).length}} / {{ phase.steps.length }} completed
                 </span>
-                <button
-                  type="button"
-                  @click="openAddStepModal(phase.id)"
-                  class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-all active:scale-95 cursor-pointer"
-                >
+                <button type="button" @click="openAddStepModal(phase.id)"
+                  class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-all active:scale-95 cursor-pointer">
                   <Plus class="w-3.5 h-3.5" />
                   Add Activity
                 </button>
-                <button
-                  type="button"
-                  @click="handleDeletePhase(pIdx)"
+                <button type="button" @click="handleDeletePhase(pIdx)"
                   class="p-1.5 rounded-lg text-text-muted hover:text-error hover:bg-error/10 transition-colors cursor-pointer"
-                  title="Delete phase"
-                >
+                  title="Delete phase">
                   <Trash2 class="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -696,45 +661,36 @@ onMounted(() => {
 
             <!-- Lista de Atividades (Steps) da Fase -->
             <div class="p-5 space-y-3">
-              <div v-if="phase.steps.length === 0" class="py-6 text-center border-2 border-dashed border-border rounded-xl">
+              <div v-if="phase.steps.length === 0"
+                class="py-6 text-center border-2 border-dashed border-border rounded-xl">
                 <p class="text-xs text-text-muted">No activities added to this phase.</p>
-                <button
-                  type="button"
-                  @click="openAddStepModal(phase.id)"
-                  class="mt-2 text-xs font-bold text-primary hover:underline inline-flex items-center gap-1 cursor-pointer"
-                >
+                <button type="button" @click="openAddStepModal(phase.id)"
+                  class="mt-2 text-xs font-bold text-primary hover:underline inline-flex items-center gap-1 cursor-pointer">
                   <Plus class="w-3.5 h-3.5" /> Add first activity
                 </button>
               </div>
 
-              <div
-                v-for="(step, sIdx) in phase.steps"
-                :key="step.id || sIdx"
+              <div v-for="(step, sIdx) in phase.steps" :key="step.id || sIdx"
                 class="flex items-center justify-between p-3.5 rounded-xl border transition-all"
-                :class="step.is_completed ? 'bg-success/5 border-success/20' : 'bg-surface border-border hover:border-border/80'"
-              >
+                :class="step.is_completed ? 'bg-success/5 border-success/20' : 'bg-surface border-border hover:border-border/80'">
                 <!-- Checkbox + Category Icon + Info -->
                 <div class="flex items-center gap-3 min-w-0">
-                  <button
-                    type="button"
-                    @click="handleToggleStep(phase.id, step)"
+                  <button type="button" @click="handleToggleStep(phase.id, step)"
                     class="w-5 h-5 rounded-md border flex items-center justify-center transition-all shrink-0 cursor-pointer"
-                    :class="step.is_completed ? 'bg-success border-success text-white' : 'border-border hover:border-primary text-transparent'"
-                  >
+                    :class="step.is_completed ? 'bg-success border-success text-white' : 'border-border hover:border-primary text-transparent'">
                     <Check class="w-3.5 h-3.5" />
                   </button>
 
-                  <div
-                    class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border"
-                    :class="getCategoryMeta(step.category).color"
-                  >
+                  <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border"
+                    :class="getCategoryMeta(step.category).color">
                     <component :is="getCategoryMeta(step.category).icon" class="w-4 h-4" />
                   </div>
 
                   <div class="min-w-0">
                     <div class="flex items-center gap-2">
                       <span class="text-xs font-bold text-text truncate">{{ step.title }}</span>
-                      <span class="px-1.5 py-0.2 rounded text-[0.6rem] font-bold uppercase tracking-wider bg-bg-secondary border border-border text-text-muted">
+                      <span
+                        class="px-1.5 py-0.2 rounded text-[0.6rem] font-bold uppercase tracking-wider bg-bg-secondary border border-border text-text-muted">
                         {{ step.category }}
                       </span>
                     </div>
@@ -746,28 +702,20 @@ onMounted(() => {
 
                 <!-- Ações do Step: Editar / Excluir / Status -->
                 <div class="flex items-center gap-2 shrink-0">
-                  <span
-                    class="text-[0.65rem] font-black uppercase px-2 py-0.5 rounded-full"
-                    :class="step.is_completed ? 'bg-success/15 text-success' : 'bg-primary/10 text-primary'"
-                  >
+                  <span class="text-[0.65rem] font-black uppercase px-2 py-0.5 rounded-full"
+                    :class="step.is_completed ? 'bg-success/15 text-success' : 'bg-primary/10 text-primary'">
                     {{ step.is_completed ? 'Completed' : 'Pending' }}
                   </span>
 
-                  <button
-                    type="button"
-                    @click="openEditStepModal(phase.id, step)"
+                  <button type="button" @click="openEditStepModal(phase.id, step)"
                     class="p-1 rounded-md text-text-muted hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer"
-                    title="Edit Activity"
-                  >
+                    title="Edit Activity">
                     <Edit2 class="w-3.5 h-3.5" />
                   </button>
 
-                  <button
-                    type="button"
-                    @click="handleDeleteStep(phase, sIdx)"
+                  <button type="button" @click="handleDeleteStep(phase, sIdx)"
                     class="p-1 rounded-md text-text-muted hover:text-error hover:bg-error/10 transition-colors cursor-pointer"
-                    title="Delete"
-                  >
+                    title="Delete">
                     <Trash2 class="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -775,11 +723,11 @@ onMounted(() => {
 
               <!-- Phase Exam Card (Exame Trimestral Personalizado da Fase) -->
               <div
-                class="mt-4 p-4 rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/5 via-amber-500/10 to-amber-500/5 shadow-xs"
-              >
+                class="mt-4 p-4 rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/5 via-amber-500/10 to-amber-500/5 shadow-xs">
                 <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
                   <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-500 shrink-0">
+                    <div
+                      class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-500 shrink-0">
                       <Swords class="w-5 h-5" />
                     </div>
                     <div>
@@ -787,11 +735,10 @@ onMounted(() => {
                         <h4 class="text-xs font-extrabold text-text uppercase tracking-wider flex items-center gap-1.5">
                           Phase {{ phase.number }} Exam
                         </h4>
-                        <span
-                          class="px-2 py-0.2 rounded-full text-[0.6rem] font-black uppercase"
-                          :class="phase.boss_fight?.is_completed ? 'bg-success text-white' : (phase.boss_fight?.is_unlocked ? 'bg-amber-500 text-white animate-pulse' : 'bg-surface border border-border text-text-muted')"
-                        >
-                          {{ phase.boss_fight?.is_completed ? 'Completed' : (phase.boss_fight?.is_unlocked ? 'Unlocked' : 'Locked') }}
+                        <span class="px-2 py-0.2 rounded-full text-[0.6rem] font-black uppercase"
+                          :class="phase.boss_fight?.is_completed ? 'bg-success text-white' : (phase.boss_fight?.is_unlocked ? 'bg-amber-500 text-white animate-pulse' : 'bg-surface border border-border text-text-muted')">
+                          {{ phase.boss_fight?.is_completed ? 'Completed' : (phase.boss_fight?.is_unlocked ? 'Unlocked'
+                          : 'Locked') }}
                         </span>
                       </div>
                       <p class="text-[0.7rem] text-text-muted mt-0.5">
@@ -809,19 +756,14 @@ onMounted(() => {
                       </span>
                     </div>
 
-                    <button
-                      v-if="!phase.boss_fight?.is_unlocked && !phase.boss_fight?.is_completed"
-                      type="button"
+                    <button v-if="!phase.boss_fight?.is_unlocked && !phase.boss_fight?.is_completed" type="button"
                       @click="handleUnlockBoss(phase.id)"
-                      class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 shadow-xs transition-all active:scale-95 cursor-pointer"
-                    >
+                      class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 shadow-xs transition-all active:scale-95 cursor-pointer">
                       <Unlock class="w-3.5 h-3.5" />
                       Unlock Exam
                     </button>
-                    <span
-                      v-else-if="phase.boss_fight?.is_completed"
-                      class="flex items-center gap-1 text-xs font-bold text-success"
-                    >
+                    <span v-else-if="phase.boss_fight?.is_completed"
+                      class="flex items-center gap-1 text-xs font-bold text-success">
                       <Trophy class="w-4 h-4" />
                       Passed (Score: {{ phase.boss_fight?.score ?? '10' }})
                     </span>
@@ -840,13 +782,9 @@ onMounted(() => {
             Select a student or apply a standard preset (A1, A2, B1, B2, C1) to start.
           </p>
           <div class="mt-4 flex justify-center gap-2">
-            <button
-              v-for="lvl in ['A1', 'A2', 'B1', 'B2', 'C1']"
-              :key="lvl"
-              type="button"
+            <button v-for="lvl in ['A1', 'A2', 'B1', 'B2', 'C1']" :key="lvl" type="button"
               @click="handleApplyTemplate(lvl)"
-              class="px-3 py-1.5 rounded-lg text-xs font-bold bg-primary text-white hover:bg-primary-hover transition-all cursor-pointer"
-            >
+              class="px-3 py-1.5 rounded-lg text-xs font-bold bg-primary text-white hover:bg-primary-hover transition-all cursor-pointer">
               Create {{ lvl }} Trail
             </button>
           </div>
@@ -856,17 +794,12 @@ onMounted(() => {
 
     <!-- Modal de Adicionar / Editar Atividade à Fase (Teleported directly to body to avoid container scroll cutoff) -->
     <Teleport to="body">
-      <div
-        v-if="isStepModalOpen"
+      <div v-if="isStepModalOpen"
         class="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm overflow-y-auto"
-        @click.self="isStepModalOpen = false"
-      >
-        <div
-          role="dialog"
-          aria-modal="true"
+        @click.self="isStepModalOpen = false">
+        <div role="dialog" aria-modal="true"
           class="relative w-full max-w-lg bg-surface border border-border rounded-3xl shadow-2xl p-6 space-y-4 max-h-[85vh] overflow-y-auto mx-auto my-auto animate-in fade-in zoom-in-95 duration-150"
-          @click.stop
-        >
+          @click.stop>
           <h3 class="text-base font-bold text-text">
             {{ isEditingStep ? 'Edit Phase Activity' : 'Add Activity to Phase' }}
           </h3>
@@ -874,11 +807,8 @@ onMounted(() => {
           <!-- Categoria -->
           <div class="space-y-1.5">
             <label class="text-xs font-bold text-text-subtle">Pedagogical Category</label>
-            <select
-              v-model="newStepCategory"
-              @change="handleCategoryChange"
-              class="w-full px-3 py-2 bg-bg-secondary border border-border rounded-xl text-xs font-semibold text-text focus:outline-none focus:border-primary cursor-pointer"
-            >
+            <select v-model="newStepCategory" @change="handleCategoryChange"
+              class="w-full px-3 py-2 bg-bg-secondary border border-border rounded-xl text-xs font-semibold text-text focus:outline-none focus:border-primary cursor-pointer">
               <option v-for="c in CATEGORIES" :key="c.id" :value="c.id">
                 {{ c.label }}
               </option>
@@ -895,35 +825,21 @@ onMounted(() => {
             </div>
 
             <div class="relative">
-              <input
-                v-model="newStepTitle"
-                type="text"
-                @input="handleTitleInput"
+              <input v-model="newStepTitle" type="text" @input="handleTitleInput"
                 placeholder="Type activity name (e.g. Adjectives: Old, new...)"
-                class="w-full px-3 py-2 bg-bg-secondary border border-border rounded-xl text-xs font-semibold text-text focus:outline-none focus:border-primary"
-              />
-              <button
-                v-if="catalogSuggestions.length > 0"
-                type="button"
-                @click="showSuggestions = !showSuggestions"
-                class="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text cursor-pointer"
-              >
+                class="w-full px-3 py-2 bg-bg-secondary border border-border rounded-xl text-xs font-semibold text-text focus:outline-none focus:border-primary" />
+              <button v-if="catalogSuggestions.length > 0" type="button" @click="showSuggestions = !showSuggestions"
+                class="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text cursor-pointer">
                 <ChevronDown class="w-4 h-4" />
               </button>
             </div>
 
             <!-- Dropdown Autocomplete de Sugestões Reais da Categoria -->
-            <div
-              v-if="showSuggestions && catalogSuggestions.length > 0"
-              class="absolute left-0 right-0 top-full mt-1 bg-surface border border-border rounded-xl shadow-2xl max-h-52 overflow-y-auto z-[10000] divide-y divide-border/50"
-            >
-              <button
-                v-for="sug in catalogSuggestions"
-                :key="sug.id || sug.title"
-                type="button"
+            <div v-if="showSuggestions && catalogSuggestions.length > 0"
+              class="absolute left-0 right-0 top-full mt-1 bg-surface border border-border rounded-xl shadow-2xl max-h-52 overflow-y-auto z-[10000] divide-y divide-border/50">
+              <button v-for="sug in catalogSuggestions" :key="sug.id || sug.title" type="button"
                 @click="handleSelectSuggestion(sug)"
-                class="w-full px-3 py-2.5 text-left hover:bg-surface-hover flex items-center justify-between gap-3 text-xs transition-colors cursor-pointer"
-              >
+                class="w-full px-3 py-2.5 text-left hover:bg-surface-hover flex items-center justify-between gap-3 text-xs transition-colors cursor-pointer">
                 <div class="min-w-0">
                   <span class="font-semibold text-text block truncate">{{ sug.title }}</span>
                   <span class="text-[0.65rem] text-text-muted uppercase">{{ sug.category }}</span>
@@ -938,28 +854,19 @@ onMounted(() => {
           <!-- Instruções da Professora (Opcional) -->
           <div class="space-y-1.5">
             <label class="text-xs font-bold text-text-subtle">Teacher Instructions (Optional)</label>
-            <textarea
-              v-model="newStepDescription"
-              rows="2"
+            <textarea v-model="newStepDescription" rows="2"
               placeholder="e.g. Complete exercises and record your pronunciation of the final 3 sentences..."
-              class="w-full px-3 py-2 bg-bg-secondary border border-border rounded-xl text-xs text-text focus:outline-none focus:border-primary resize-none"
-            ></textarea>
+              class="w-full px-3 py-2 bg-bg-secondary border border-border rounded-xl text-xs text-text focus:outline-none focus:border-primary resize-none"></textarea>
           </div>
 
           <!-- Modal Actions -->
           <div class="flex items-center justify-end gap-2 pt-2 border-t border-border">
-            <button
-              type="button"
-              @click="isStepModalOpen = false"
-              class="px-3.5 py-2 rounded-xl text-xs font-bold text-text-muted hover:bg-surface-hover transition-colors cursor-pointer"
-            >
+            <button type="button" @click="isStepModalOpen = false"
+              class="px-3.5 py-2 rounded-xl text-xs font-bold text-text-muted hover:bg-surface-hover transition-colors cursor-pointer">
               Cancel
             </button>
-            <button
-              type="button"
-              @click="handleSaveStep"
-              class="px-4 py-2 rounded-xl text-xs font-bold bg-primary text-white hover:bg-primary-hover shadow-xs transition-all cursor-pointer"
-            >
+            <button type="button" @click="handleSaveStep"
+              class="px-4 py-2 rounded-xl text-xs font-bold bg-primary text-white hover:bg-primary-hover shadow-xs transition-all cursor-pointer">
               {{ isEditingStep ? 'Save Changes' : 'Add Activity' }}
             </button>
           </div>

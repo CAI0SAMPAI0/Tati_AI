@@ -7,6 +7,7 @@ import { useNotificationStore } from './stores/notifications';
 import { usePresence } from './composables/usePresence';
 import { registerServiceWorker, subscribeToPush } from './services/pushNotifications';
 import { isApkOrStandalone } from './router';
+import { NotificationWebSocket } from './ws/notificationSocket';
 
 const authStore = useAuthStore();
 const themeStore = useThemeStore();
@@ -18,6 +19,30 @@ usePresence();
 
 let notifPollTimer: any = null;
 let pushInitTimer: any = null;
+let notificationSocket: NotificationWebSocket | null = null;
+
+function startNotificationWebSocket() {
+  if (notificationSocket) return;
+
+  notificationSocket = new NotificationWebSocket((message) => {
+    if (message.type === 'learning_trail_step_completed') {
+      console.log('[NotificationWS] Etapa concluída:', message.data);
+
+      window.dispatchEvent(
+        new CustomEvent('learning-trail-step-completed', {
+          detail: message.data,
+        })
+      );
+    }
+  });
+
+  notificationSocket.connect();
+}
+
+function stopNotificationWebSocket() {
+  notificationSocket?.disconnect();
+  notificationSocket = null;
+}
 
 function handleGoogleMessage(event: MessageEvent) {
   if (event.data && event.data.type === 'GOOGLE_AUTH_SUCCESS' && event.data.token) {
@@ -38,7 +63,7 @@ function handleGoogleMessage(event: MessageEvent) {
 function handleFlutterReady() {
   try {
     localStorage.setItem('is_apk', '1');
-  } catch {}
+  } catch { }
   if (router.currentRoute.value.path === '/') {
     router.replace(authStore.isAuthenticated ? '/chat' : '/login');
   }
@@ -58,6 +83,10 @@ function startNotificationPolling() {
 onMounted(() => {
   themeStore.initTheme();
   authStore.init();
+
+  if (authStore.isAuthenticated) {
+    startNotificationWebSocket();
+  }
 
   // Register service worker for PWA / push notifications
   registerServiceWorker();
@@ -86,12 +115,14 @@ watch(
   (isAuth) => {
     if (isAuth) {
       startNotificationPolling();
+      startNotificationWebSocket();
       if (!pushInitTimer) {
         pushInitTimer = setTimeout(() => {
           subscribeToPush();
         }, 5000);
       }
     } else {
+      stopNotificationWebSocket();
       if (notifPollTimer) {
         clearInterval(notifPollTimer);
         notifPollTimer = null;
@@ -101,6 +132,7 @@ watch(
 );
 
 onUnmounted(() => {
+  stopNotificationWebSocket();
   if (typeof window !== 'undefined') {
     window.removeEventListener('message', handleGoogleMessage);
     window.removeEventListener('flutterInAppWebViewPlatformReady', handleFlutterReady);
