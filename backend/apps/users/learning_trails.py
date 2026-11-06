@@ -822,6 +822,8 @@ class LearningTrailService:
         return cls.save_student_trail(teacher_user, student_username, template)
 
     @classmethod
+    
+    @classmethod
     def toggle_step(
         cls,
         user: User,
@@ -843,32 +845,49 @@ class LearningTrailService:
 
         target_found = False
         target_step: Optional[Dict[str, Any]] = None
+        completed_now = False
+
+        # 1. Localiza o step e atualiza seu status
         for phase in phases:
             if phase.get("id") == phase_id or not phase_id:
                 for step in phase.get("steps", []):
                     if step.get("id") == step_id:
+
+                        # Captura o estado anterior antes da alteração
+                        was_completed = step.get("is_completed", False)
+
                         new_status = (
                             is_completed
                             if is_completed is not None
-                            else not step.get("is_completed", False)
+                            else not was_completed
                         )
+
+                        # Identifica uma transição real de pendente para concluído
+                        completed_now = not was_completed and new_status
+
                         step["is_completed"] = new_status
-                        step["progress"] = step.get("target_count", 1) if new_status else 0
-                        step["completed_at"] = (
-                            django_timezone.now().isoformat() if new_status else None
+                        step["progress"] = (
+                            step.get("target_count", 1) if new_status else 0
                         )
+                        step["completed_at"] = (
+                            django_timezone.now().isoformat()
+                            if new_status else None
+                        )
+
                         target_found = True
                         target_step = step
                         break
+
             if target_found:
                 break
 
         if not target_found or not target_step:
             raise ValueError(f"Step '{step_id}' não encontrado na trilha.")
 
-        # Sincroniza com SubmissionService para conceder XP e atualizar Streak
+        # 2. Sincroniza com SubmissionService para conceder XP e atualizar Streak
         try:
             from apps.activities.services import SubmissionService
+
             if target_step.get("is_completed"):
                 SubmissionService.submit_activity(student, {
                     "activity_id": target_step.get("id"),
@@ -895,12 +914,21 @@ class LearningTrailService:
                         "url": target_step.get("route"),
                     },
                 })
-        except Exception as e:
-            logger.warning(f"[LearningTrail] Aviso ao sincronizar submissão via toggle_step: {e}")
 
-        saved_trail = cls.save_student_trail(user, student_username, trail)
-        
-        if target_step.get("is_completed"):
+        except Exception as e:
+            logger.warning(
+                f"[LearningTrail] Aviso ao sincronizar submissão via toggle_step: {e}"
+            )
+
+        # 3. Salva a trilha atualizada no banco
+        saved_trail = cls.save_student_trail(
+            user,
+            student_username,
+            trail,
+        )
+
+        # 4. Notifica os professores somente quando um step é concluído
+        if completed_now:
             transaction.on_commit(
                 lambda: notify_teacher(
                     event_type="learning_trail_step_completed",
@@ -913,7 +941,7 @@ class LearningTrailService:
                     },
                 )
             )
-            
+
         return saved_trail
 
     @classmethod
