@@ -231,7 +231,7 @@ const sectionTitles: Record<DashSection, { title: string; subtitle: string }> = 
   premium: { title: "Taty's Materials", subtitle: 'Premium materials & payments' },
   feedbacks: { title: 'Student Feedback', subtitle: 'Opinions and reviews submitted by students' },
   whatsapp: { title: 'WhatsApp Connection', subtitle: 'Connect and manage WhatsApp WAHA sessions' },
-  learning_trails: { title: 'Learning Trails & Goals', subtitle: 'Gamified student learning phases, quests, and boss fights' },
+  learning_trails: { title: 'Learning Trails & Goals', subtitle: 'Student learning phases, activities, and quarterly exams' },
 };
 
 

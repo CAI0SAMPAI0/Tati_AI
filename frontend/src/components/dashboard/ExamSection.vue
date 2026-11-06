@@ -1073,11 +1073,11 @@ onUnmounted(() => {
                   class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border"
                   :class="selectedCompletedExamIdx === aIdx ? 'bg-primary text-white border-primary shadow-xs' : 'bg-surface border-border text-text-muted hover:text-text'"
                 >
-                  Tentativa #{{ aIdx + 1 }} • {{ ae.score }}% ({{ formatDate(ae.completed_at || ae.started_at) }})
+                  Exam done on {{ formatDate(ae.completed_at || ae.started_at) }}
                 </button>
               </div>
 
-              <!-- ⭐ PAINEL DE AVALIAÇÃO DA PROFESSORA (TATIANA) ⭐ -->
+              <!-- PAINEL DE AVALIAÇÃO DA PROFESSORA (TATIANA) -->
               <div class="bg-surface border-2 border-primary/30 rounded-2xl p-5 shadow-sm space-y-4">
                 <div class="flex items-center justify-between gap-2 border-b border-border/80 pb-3">
                   <div class="flex items-center gap-2.5">

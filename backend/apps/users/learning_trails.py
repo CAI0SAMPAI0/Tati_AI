@@ -1,8 +1,8 @@
 """
-Serviço e Estruturas de Trilha de Aprendizado Gamificada (Learning Trails).
+Learning Trail Service & Structures (Trilha de Aprendizado Gamificada).
 Permite que a Professora Tatiana crie e customize planos com Fases (estágios),
-atividades obrigatórias (Grammar, Vocab, Reading, Listening, Music, Games, Simulations, PDFs)
-e o Boss Fight final (Exame Trimestral da Fase).
+atividades pedagógicas diretas (Grammar, Vocab, Reading, Listening, Music, Games, Simulations, Flashcards)
+e o Exame da Fase (Trimestral).
 """
 import copy
 import logging
@@ -15,28 +15,28 @@ from apps.authentication.models import User
 
 logger = logging.getLogger(__name__)
 
-# Modelos padrão de trilhas divididos por nível CEFR
+# Standard learning trail templates by CEFR level with direct URLs and English content
 TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
     "A1": {
         "template_id": "a1_beginner_quest",
         "level": "A1",
-        "title": "Jornada do Aprendiz: Desbravando o Básico (A1)",
-        "teacher_notes": "Concentre-se nos cumprimentos, Simple Present e vocabulário básico do cotidiano.",
+        "title": "Beginner Journey: Foundations & Daily Life (A1)",
+        "teacher_notes": "Focus on personal introductions, the verb to be, and essential everyday vocabulary.",
         "phases": [
             {
                 "id": "phase-1",
                 "number": 1,
-                "title": "Fase 1: Apresentações Pessoais & Rotina",
-                "description": "Aprenda a se apresentar, falar de onde você é e descrever seus hábitos.",
+                "title": "Phase 1: Personal Introductions & Daily Routine",
+                "description": "Learn to introduce yourself, describe everyday objects, and talk about your family.",
                 "duration_days": 30,
                 "status": "active",
                 "steps": [
                     {
                         "id": "step-a1-1",
                         "category": "grammar",
-                        "title": "Grammar: Verbo To Be e Pronomes Pessoais",
-                        "description": "Pratique a conjugação de 'am, is, are' com frases afirmativas e interrogativas.",
-                        "route": "/activities?tab=grammar",
+                        "title": "Present simple forms of 'to be': am/is/are",
+                        "description": "Practice affirmative, negative, and interrogative sentences with the verb to be.",
+                        "route": "https://test-english.com/grammar-points/a1/present-simple-forms-of-to-be/",
                         "target_count": 1,
                         "progress": 0,
                         "is_completed": False,
@@ -45,9 +45,9 @@ TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
                     {
                         "id": "step-a1-2",
                         "category": "vocabulary",
-                        "title": "Vocabulário: Família, Países e Números",
-                        "description": "Expanda seu vocabulário e domine palavras essenciais para apresentações.",
-                        "route": "/activities?tab=vocabulary",
+                        "title": "Common things - A1 English Vocabulary",
+                        "description": "Expand your vocabulary with essential everyday objects and personal items.",
+                        "route": "https://test-english.com/vocabulary/a1/common-things-a1-english-vocabulary/",
                         "target_count": 1,
                         "progress": 0,
                         "is_completed": False,
@@ -56,9 +56,9 @@ TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
                     {
                         "id": "step-a1-3",
                         "category": "listening",
-                        "title": "Listening: Diálogo de Apresentação em Inglês",
-                        "description": "Ouça o diálogo entre duas pessoas se conhecendo e identifique os detalhes.",
-                        "route": "/activities?tab=listening",
+                        "title": "Meeting people - A1 English Listening Test",
+                        "description": "Listen to people meeting for the first time and identify personal details.",
+                        "route": "https://test-english.com/listening/a1/meeting-people-a1-english-listening-test/",
                         "target_count": 1,
                         "progress": 0,
                         "is_completed": False,
@@ -67,9 +67,9 @@ TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
                     {
                         "id": "step-a1-4",
                         "category": "reading",
-                        "title": "Reading: Meu Primeiro Dia de Aula",
-                        "description": "Texto curto para treinar leitura inicial e responder perguntas de compreensão.",
-                        "route": "/activities?tab=reading",
+                        "title": "Personal profiles - A1 English Reading Test",
+                        "description": "Read short personal profiles and answer reading comprehension questions.",
+                        "route": "https://test-english.com/reading/a1/personal-profiles-a1-reading-test/",
                         "target_count": 1,
                         "progress": 0,
                         "is_completed": False,
@@ -78,8 +78,8 @@ TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
                     {
                         "id": "step-a1-5",
                         "category": "simulations",
-                        "title": "Simulação: Conhecendo Alguém no Café",
-                        "description": "Converse com a Teacher Tati simulando uma saudação amigável.",
+                        "title": "Simulation: Meeting Someone at a Cafe",
+                        "description": "Practice conversational English with Teacher Tati in a friendly cafe greeting.",
                         "route": "/voice",
                         "target_count": 1,
                         "progress": 0,
@@ -89,8 +89,8 @@ TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
                 ],
                 "boss_fight": {
                     "id": "boss-a1-p1",
-                    "title": "👑 Boss Fight: Phase 1 Exam",
-                    "description": "Teste completo de 4 habilidades. Atinja nota mínima de 7.0 para derrotar o Boss e desbloquear a Fase 2!",
+                    "title": "Phase 1 Exam",
+                    "description": "Comprehensive evaluation covering grammar, vocabulary, listening, and speaking.",
                     "min_score": 7.0,
                     "is_unlocked": False,
                     "is_completed": False,
@@ -103,17 +103,17 @@ TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
             {
                 "id": "phase-2",
                 "number": 2,
-                "title": "Fase 2: Vida na Cidade & Compras",
-                "description": "Pergunte direções, faça compras no mercado e descreva seu ambiente.",
+                "title": "Phase 2: City Life & Food",
+                "description": "Ask for directions, talk about food and restaurants, and describe locations.",
                 "duration_days": 30,
                 "status": "locked",
                 "steps": [
                     {
                         "id": "step-a1-6",
                         "category": "grammar",
-                        "title": "Grammar: There is / There are e Preposições de Lugar",
-                        "description": "Descreva o que há em uma sala ou bairro usando there is/are.",
-                        "route": "/activities?tab=grammar",
+                        "title": "There is, there are, some, any - Plural nouns",
+                        "description": "Describe places, rooms, and available items using there is/are.",
+                        "route": "https://test-english.com/grammar-points/a1/there-is-there-are-some-any/",
                         "target_count": 1,
                         "progress": 0,
                         "is_completed": False,
@@ -122,9 +122,9 @@ TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
                     {
                         "id": "step-a1-7",
                         "category": "vocabulary",
-                        "title": "Vocabulário: Comida, Bebidas e Restaurante",
-                        "description": "Aprenda itens do cardápio e termos comuns em restaurantes.",
-                        "route": "/activities?tab=vocabulary",
+                        "title": "Food and meals - A1 English Vocabulary",
+                        "description": "Master essential terms for food, drinks, and ordering at a restaurant.",
+                        "route": "https://test-english.com/vocabulary/a1/food-and-meals-a1-english-vocabulary/",
                         "target_count": 1,
                         "progress": 0,
                         "is_completed": False,
@@ -133,8 +133,8 @@ TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
                     {
                         "id": "step-a1-8",
                         "category": "games",
-                        "title": "Game: Wordwall das Palavras Urbanas",
-                        "description": "Fixe o vocabulário de forma dinâmica e divertida no jogo interativo.",
+                        "title": "Learning Game: Food & Urban Vocabulary",
+                        "description": "Reinforce your knowledge through quick interactive practice.",
                         "route": "/activities?tab=games",
                         "target_count": 1,
                         "progress": 0,
@@ -144,8 +144,8 @@ TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
                 ],
                 "boss_fight": {
                     "id": "boss-a1-p2",
-                    "title": "👑 Boss Fight: Phase 2 Exam",
-                    "description": "Desafio decisivo para certificar a conclusão do nível A1 rumo ao nível A2!",
+                    "title": "Phase 2 Exam",
+                    "description": "Evaluation test to assess readiness for Level A2.",
                     "min_score": 7.0,
                     "is_unlocked": False,
                     "is_completed": False,
@@ -160,23 +160,23 @@ TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
     "A2": {
         "template_id": "a2_waystage_quest",
         "level": "A2",
-        "title": "Caminho da Autonomia: Passado e Viagens (A2)",
-        "teacher_notes": "Foque no Simple Past (verbos regulares e irregulares) e descrições de experiências passadas.",
+        "title": "Autonomy Path: Past Events & Travel (A2)",
+        "teacher_notes": "Focus on the Simple Past (regular and irregular verbs) and describing past trips.",
         "phases": [
             {
                 "id": "phase-1",
                 "number": 1,
-                "title": "Fase 1: Minhas Últimas Férias & Simple Past",
-                "description": "Aprenda a narrar eventos que já aconteceram e falar sobre suas lembranças.",
+                "title": "Phase 1: Last Holidays & Simple Past",
+                "description": "Narrate past events, talk about previous experiences, and ask past questions.",
                 "duration_days": 30,
                 "status": "active",
                 "steps": [
                     {
                         "id": "step-a2-1",
                         "category": "grammar",
-                        "title": "Grammar: Simple Past (Regular vs Irregular Verbs)",
-                        "description": "Pratique verbos no passado e as perguntas com 'Did you...?'",
-                        "route": "/activities?tab=grammar",
+                        "title": "Past simple - Regular and irregular verbs",
+                        "description": "Practice affirmative, negative, and question forms with 'Did you...?'",
+                        "route": "https://test-english.com/grammar-points/a2/past-simple-regular-irregular/",
                         "target_count": 1,
                         "progress": 0,
                         "is_completed": False,
@@ -185,9 +185,9 @@ TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
                     {
                         "id": "step-a2-2",
                         "category": "vocabulary",
-                        "title": "Vocabulário: Viagens, Aeroporto e Hotéis",
-                        "description": "Termos indispensáveis para se virar em viagens ao exterior.",
-                        "route": "/activities?tab=vocabulary",
+                        "title": "Holidays and travel - A2 English Vocabulary",
+                        "description": "Essential terms for booking flights, navigating hotels, and vacations.",
+                        "route": "https://test-english.com/vocabulary/a2/holidays-travel-a2-english-vocabulary/",
                         "target_count": 1,
                         "progress": 0,
                         "is_completed": False,
@@ -196,9 +196,9 @@ TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
                     {
                         "id": "step-a2-3",
                         "category": "reading",
-                        "title": "Reading: Um Diário de Bordo em Londres",
-                        "description": "Leia a crônica de viagem e responda às perguntas.",
-                        "route": "/activities?tab=reading",
+                        "title": "A travel blog from London - A2 Reading Test",
+                        "description": "Read a travel diary and answer questions about the itinerary.",
+                        "route": "https://test-english.com/reading/a2/travel-blog-london-a2-reading-test/",
                         "target_count": 1,
                         "progress": 0,
                         "is_completed": False,
@@ -207,9 +207,9 @@ TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
                     {
                         "id": "step-a2-4",
                         "category": "listening",
-                        "title": "Listening: Check-in no Aeroporto",
-                        "description": "Entenda as instruções do agente de imigração e portão de embarque.",
-                        "route": "/activities?tab=listening",
+                        "title": "Airport announcements - A2 Listening Test",
+                        "description": "Listen to boarding gates and airport staff instructions.",
+                        "route": "https://test-english.com/listening/a2/airport-announcements-a2-listening-test/",
                         "target_count": 1,
                         "progress": 0,
                         "is_completed": False,
@@ -218,8 +218,8 @@ TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
                     {
                         "id": "step-a2-5",
                         "category": "simulations",
-                        "title": "Simulação: Pedindo Ajuda no Hotel",
-                        "description": "Simule uma conversa em inglês na recepção de um hotel.",
+                        "title": "Simulation: Asking for Help at Hotel Reception",
+                        "description": "Practice conversational English with Teacher Tati checking into a hotel.",
                         "route": "/voice",
                         "target_count": 1,
                         "progress": 0,
@@ -229,8 +229,8 @@ TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
                 ],
                 "boss_fight": {
                     "id": "boss-a2-p1",
-                    "title": "👑 Boss Fight: Phase 1 Exam",
-                    "description": "Mostre seu domínio do Simple Past e compreensão auditiva. Nota mínima: 7.0.",
+                    "title": "Phase 1 Exam",
+                    "description": "Evaluation of Simple Past mastery and listening comprehension. Minimum score: 7.0.",
                     "min_score": 7.0,
                     "is_unlocked": False,
                     "is_completed": False,
@@ -243,17 +243,17 @@ TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
             {
                 "id": "phase-2",
                 "number": 2,
-                "title": "Fase 2: Planos Futuros & Vida Saudável",
-                "description": "Expresse intenções com 'going to' e conselhos com 'should'.",
+                "title": "Phase 2: Future Plans & Lifestyle",
+                "description": "Express future intentions with 'be going to' and give recommendations with 'should'.",
                 "duration_days": 30,
                 "status": "locked",
                 "steps": [
                     {
                         "id": "step-a2-6",
                         "category": "grammar",
-                        "title": "Grammar: Going to vs Will para o Futuro",
-                        "description": "Diferencie planos planejados de decisões tomadas no momento.",
-                        "route": "/activities?tab=grammar",
+                        "title": "Future forms - Will, be going to, present continuous",
+                        "description": "Differentiate between planned intentions and spontaneous decisions.",
+                        "route": "https://test-english.com/grammar-points/a2/future-forms-will-be-going-to/",
                         "target_count": 1,
                         "progress": 0,
                         "is_completed": False,
@@ -262,8 +262,8 @@ TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
                     {
                         "id": "step-a2-7",
                         "category": "music",
-                        "title": "Música & Letras: Canção em Inglês com Teacher Tati",
-                        "description": "Treine audição e ritmo cantando e completando a letra.",
+                        "title": "Music & Lyrics: Sing along with Teacher Tati",
+                        "description": "Improve your ear and pronunciation with interactive lyrics.",
                         "route": "/activities?tab=musics",
                         "target_count": 1,
                         "progress": 0,
@@ -273,8 +273,8 @@ TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
                 ],
                 "boss_fight": {
                     "id": "boss-a2-p2",
-                    "title": "👑 Boss Fight: Phase 2 Exam",
-                    "description": "Prove que está pronto para o nível Intermediário B1!",
+                    "title": "Phase 2 Exam",
+                    "description": "Assess complete mastery of A2 topics and readiness for Intermediate B1.",
                     "min_score": 7.0,
                     "is_unlocked": False,
                     "is_completed": False,
@@ -289,23 +289,23 @@ TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
     "B1": {
         "template_id": "b1_threshold_quest",
         "level": "B1",
-        "title": "Trilha Intermediária: Rumo à Fluência & Carreira (B1)",
-        "teacher_notes": "Foque no Present Perfect, conectores de discurso e situações de trabalho.",
+        "title": "Intermediate Trail: Fluency & Career (B1)",
+        "teacher_notes": "Focus on the Present Perfect, discourse connectors, and workplace conversations.",
         "phases": [
             {
                 "id": "phase-1",
                 "number": 1,
-                "title": "Fase 1: Experiências de Vida & Present Perfect",
-                "description": "Conecte o passado ao presente e compartilhe conquistas profissionais e pessoais.",
+                "title": "Phase 1: Life Experiences & Present Perfect",
+                "description": "Connect the past to the present and share professional and personal achievements.",
                 "duration_days": 30,
                 "status": "active",
                 "steps": [
                     {
                         "id": "step-b1-1",
                         "category": "grammar",
-                        "title": "Grammar: Present Perfect vs Simple Past",
-                        "description": "Diferencie 'have you ever...?' de eventos com tempo determinado.",
-                        "route": "/activities?tab=grammar",
+                        "title": "Past simple or present perfect?",
+                        "description": "Differentiate between finished past events and ongoing experiences.",
+                        "route": "https://test-english.com/grammar-points/b1/past-simple-present-perfect/",
                         "target_count": 1,
                         "progress": 0,
                         "is_completed": False,
@@ -314,9 +314,9 @@ TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
                     {
                         "id": "step-b1-2",
                         "category": "vocabulary",
-                        "title": "Vocabulário: Carreira, Entrevistas e Soft Skills",
-                        "description": "Expressões corporativas para falar de responsabilidades e metas.",
-                        "route": "/activities?tab=vocabulary",
+                        "title": "More daily routines - B1 English Vocabulary",
+                        "description": "Expand your vocabulary to discuss routines, tasks, and responsibilities.",
+                        "route": "https://test-english.com/vocabulary/b1/more-daily-routines-b1-english-vocabulary/",
                         "target_count": 1,
                         "progress": 0,
                         "is_completed": False,
@@ -325,9 +325,9 @@ TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
                     {
                         "id": "step-b1-3",
                         "category": "reading",
-                        "title": "Reading: As Novas Formas de Trabalho Remoto",
-                        "description": "Artigo moderno sobre trabalho híbrido com vocabulário de negócios.",
-                        "route": "/activities?tab=reading",
+                        "title": "Why your coworkers hate you - B1 English Reading Test",
+                        "description": "Engaging workplace article with relevant professional vocabulary.",
+                        "route": "https://test-english.com/reading/b1/why-your-coworkers-hate-you-b1-english-reading-test/",
                         "target_count": 1,
                         "progress": 0,
                         "is_completed": False,
@@ -336,9 +336,9 @@ TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
                     {
                         "id": "step-b1-4",
                         "category": "listening",
-                        "title": "Listening: Podcast sobre Inovação e Carreira",
-                        "description": "Ouça especialistas internacionais discutindo o futuro das profissões.",
-                        "route": "/activities?tab=listening",
+                        "title": "Personal Work Stories - B1 English Listening Test",
+                        "description": "Listen to professionals sharing their career milestones and challenges.",
+                        "route": "https://test-english.com/listening/b1/personal-work-stories-b1-english-listening-test/",
                         "target_count": 1,
                         "progress": 0,
                         "is_completed": False,
@@ -347,8 +347,8 @@ TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
                     {
                         "id": "step-b1-5",
                         "category": "simulations",
-                        "title": "Simulação: Entrevista de Emprego em Inglês",
-                        "description": "Simule com a Teacher Tati perguntas clássicas de entrevista (strengths, goals).",
+                        "title": "Simulation: Job Interview in English",
+                        "description": "Simulate answering key interview questions with Teacher Tati.",
                         "route": "/voice",
                         "target_count": 1,
                         "progress": 0,
@@ -358,8 +358,8 @@ TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
                 ],
                 "boss_fight": {
                     "id": "boss-b1-p1",
-                    "title": "👑 Boss Fight: Phase 1 Exam",
-                    "description": "Avaliação completa com áudio e escrita. Conquiste 7.0 para derrotar o Boss e liberar a Fase 2!",
+                    "title": "Phase 1 Exam",
+                    "description": "Comprehensive evaluation covering the activities practiced in Phase 1. Minimum score: 7.0.",
                     "min_score": 7.0,
                     "is_unlocked": False,
                     "is_completed": False,
@@ -372,17 +372,17 @@ TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
             {
                 "id": "phase-2",
                 "number": 2,
-                "title": "Fase 2: Condicionais, Argumentação & Debates",
-                "description": "Use First & Second Conditionals para discutir hipóteses e defender opiniões.",
+                "title": "Phase 2: Conditionals, Arguments & Debates",
+                "description": "Use First & Second Conditionals to discuss hypothetical scenarios and give opinions.",
                 "duration_days": 30,
                 "status": "locked",
                 "steps": [
                     {
                         "id": "step-b1-6",
                         "category": "grammar",
-                        "title": "Grammar: Second Conditional (Hypothetical Scenarios)",
-                        "description": "Estruturas com 'If I had... I would...' para expressar desejos e hipóteses.",
-                        "route": "/activities?tab=grammar",
+                        "title": "First, second, and third conditionals",
+                        "description": "Express hypothetical situations using 'If I had... I would...'",
+                        "route": "https://test-english.com/grammar-points/b1/first-second-third-conditionals/",
                         "target_count": 1,
                         "progress": 0,
                         "is_completed": False,
@@ -391,8 +391,8 @@ TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
                     {
                         "id": "step-b1-7",
                         "category": "flashcards",
-                        "title": "Flashcards: Conectores e Phrasal Verbs de Negócios",
-                        "description": "Domine 'although', 'however', 'in addition' e verbos frasais essenciais.",
+                        "title": "Flashcards: Business Connectors & Phrasal Verbs",
+                        "description": "Master essential connectors like 'although', 'however', and key phrasal verbs.",
                         "route": "/activities?tab=flashcards",
                         "target_count": 1,
                         "progress": 0,
@@ -402,8 +402,8 @@ TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
                 ],
                 "boss_fight": {
                     "id": "boss-b1-p2",
-                    "title": "👑 Boss Fight: Phase 2 Exam",
-                    "description": "Prove sua capacidade de se comunicar com independência e solidez.",
+                    "title": "Phase 2 Exam",
+                    "description": "Evaluation test assessing readiness for Upper-Intermediate B2.",
                     "min_score": 7.0,
                     "is_unlocked": False,
                     "is_completed": False,
@@ -418,23 +418,23 @@ TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
     "B2": {
         "template_id": "b2_vantage_quest",
         "level": "B2",
-        "title": "Domínio Avançado: Fluência Espontânea & Negociações (B2)",
-        "teacher_notes": "Foco em nuances de vocabulário, passive voice avançada e argumentação persuasiva.",
+        "title": "Upper-Intermediate Trail: Spontaneous Fluency (B2)",
+        "teacher_notes": "Focus on vocabulary nuances, complex clauses, and persuasive communication.",
         "phases": [
             {
                 "id": "phase-1",
                 "number": 1,
-                "title": "Fase 1: Comunicação Persuasiva & Estruturas Complexas",
-                "description": "Participe de conversas com ritmo natural e use estruturas avançadas com clareza.",
+                "title": "Phase 1: Persuasive Communication & Complex Structures",
+                "description": "Engage in discussions at natural speed and use complex clauses with precision.",
                 "duration_days": 30,
                 "status": "active",
                 "steps": [
                     {
                         "id": "step-b2-1",
                         "category": "grammar",
-                        "title": "Grammar: Third & Mixed Conditionals",
-                        "description": "Analise consequências do passado com 'If I had known, I wouldn't have...'",
-                        "route": "/activities?tab=grammar",
+                        "title": "Clauses of contrast, purpose, reason and result",
+                        "description": "Connect ideas logically with advanced linking structures.",
+                        "route": "https://test-english.com/grammar-points/b2/clauses-contrast-purpose-reason-result/",
                         "target_count": 1,
                         "progress": 0,
                         "is_completed": False,
@@ -443,9 +443,9 @@ TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
                     {
                         "id": "step-b2-2",
                         "category": "vocabulary",
-                        "title": "Vocabulário: Idioms, Collocations & Nuanced Adjectives",
-                        "description": "Expanda o vocabulário para além dos termos comuns.",
-                        "route": "/activities?tab=vocabulary",
+                        "title": "Feelings and emotions - B2 English Vocabulary",
+                        "description": "Nuanced adjectives and idiomatic expressions for precise communication.",
+                        "route": "https://test-english.com/vocabulary/b2/feelings-and-emotions-b2-english-vocabulary/",
                         "target_count": 1,
                         "progress": 0,
                         "is_completed": False,
@@ -454,9 +454,9 @@ TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
                     {
                         "id": "step-b2-3",
                         "category": "reading",
-                        "title": "Reading: Relatório Socioeconômico e Editorial",
-                        "description": "Interpretação de textos opinativos e pontos de vista sutis.",
-                        "route": "/activities?tab=reading",
+                        "title": "Remote work trends - B2 English Reading Test",
+                        "description": "In-depth editorial article analyzing modern workplace dynamics.",
+                        "route": "https://test-english.com/reading/b2/remote-work-trends-b2-reading-test/",
                         "target_count": 1,
                         "progress": 0,
                         "is_completed": False,
@@ -465,9 +465,9 @@ TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
                     {
                         "id": "step-b2-4",
                         "category": "listening",
-                        "title": "Listening: Debate Técnico & Painel de Discussão",
-                        "description": "Compreensão de falas rápidas com diferentes sotaques nativos.",
-                        "route": "/activities?tab=listening",
+                        "title": "Technical Discussion & Panel - B2 English Listening Test",
+                        "description": "Comprehend natural dialogue with various international accents.",
+                        "route": "https://test-english.com/listening/b2/panel-discussion-b2-listening-test/",
                         "target_count": 1,
                         "progress": 0,
                         "is_completed": False,
@@ -476,8 +476,8 @@ TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
                     {
                         "id": "step-b2-5",
                         "category": "simulations",
-                        "title": "Simulação: Negociação Comercial com Cliente Difícil",
-                        "description": "Defenda sua proposta com diplomacia e firmeza.",
+                        "title": "Simulation: Negotiating with a Difficult Client",
+                        "description": "Defend your proposal with diplomacy and confidence in voice chat.",
                         "route": "/voice",
                         "target_count": 1,
                         "progress": 0,
@@ -487,8 +487,8 @@ TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
                 ],
                 "boss_fight": {
                     "id": "boss-b2-p1",
-                    "title": "👑 Boss Fight: Phase 1 Exam",
-                    "description": "Exame aprofundado com avaliação de pronúncia e fluência via IA. Nota mínima: 7.0.",
+                    "title": "Phase 1 Exam",
+                    "description": "Comprehensive evaluation of spoken and written skills. Minimum passing score: 7.0.",
                     "min_score": 7.0,
                     "is_unlocked": False,
                     "is_completed": False,
@@ -503,23 +503,23 @@ TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
     "C1": {
         "template_id": "c1_proficiency_quest",
         "level": "C1",
-        "title": "Maestria Profissional: Eloquência e Precisão (C1)",
-        "teacher_notes": "Inversões enfáticas, linguagem acadêmica e discurso natural sem hesitações.",
+        "title": "Professional Mastery: Eloquence & Precision (C1)",
+        "teacher_notes": "Emphatic inversions, academic discourse, and fluent natural speech without hesitation.",
         "phases": [
             {
                 "id": "phase-1",
                 "number": 1,
-                "title": "Fase 1: Discurso Sofisticado & Nuances Linguísticas",
-                "description": "Compreensão e produção textual de nível nativo em contextos formais e profissionais.",
+                "title": "Phase 1: Sophisticated Discourse & Nuanced Speech",
+                "description": "Native-level textual comprehension and precision in formal and professional contexts.",
                 "duration_days": 30,
                 "status": "active",
                 "steps": [
                     {
                         "id": "step-c1-1",
                         "category": "grammar",
-                        "title": "Grammar: Negative Inversion & Cleft Sentences",
-                        "description": "'Seldom have I seen...', 'What matters most is...'",
-                        "route": "/activities?tab=grammar",
+                        "title": "Negative inversion and cleft sentences",
+                        "description": "Master emphatic sentence structures like 'Seldom have I seen...'",
+                        "route": "https://test-english.com/grammar-points/c1/negative-inversion-cleft-sentences/",
                         "target_count": 1,
                         "progress": 0,
                         "is_completed": False,
@@ -528,8 +528,8 @@ TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
                     {
                         "id": "step-c1-2",
                         "category": "simulations",
-                        "title": "Simulação: Keynote Presentation & Q&A Sessão",
-                        "description": "Apresentação executiva e resposta a perguntas complexas em inglês.",
+                        "title": "Simulation: Executive Keynote Presentation & Q&A",
+                        "description": "Deliver a professional presentation and answer complex audience questions.",
                         "route": "/voice",
                         "target_count": 1,
                         "progress": 0,
@@ -539,8 +539,8 @@ TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
                 ],
                 "boss_fight": {
                     "id": "boss-c1-p1",
-                    "title": "👑 Boss Fight: Phase 1 Exam",
-                    "description": "Avaliação de alta performance com critérios rígidos do CEFR.",
+                    "title": "Phase 1 Exam",
+                    "description": "High-performance evaluation according to CEFR C1 standards. Minimum score: 7.5.",
                     "min_score": 7.5,
                     "is_unlocked": False,
                     "is_completed": False,
@@ -570,45 +570,70 @@ class LearningTrailService:
     @classmethod
     def get_student_trail(cls, user: User) -> Dict[str, Any]:
         """
-        Retorna a trilha atual do aluno, sincronizando automaticamente o progresso
+        Retorna a trilha atual do aluno, sincronizando o progresso
         com as atividades e exames reais realizados no banco de dados.
+        Auto-migra trilhas antigas com textos em português para os templates oficiais em inglês.
         """
         username = getattr(user, "username", "")
         level = (getattr(user, "level", "A1") or "A1").upper()
 
         trail_data = None
-        # 1. Tenta recuperar do weekly_plan["learning_trail"]
         if isinstance(user.weekly_plan, dict) and "learning_trail" in user.weekly_plan:
             trail_data = user.weekly_plan.get("learning_trail")
         elif isinstance(user.study_goals, dict) and "learning_trail" in user.study_goals:
             trail_data = user.study_goals.get("learning_trail")
 
-        # 2. Se o aluno ainda não possui trilha customizada, cria uma inicial baseada no nível dele
-        if not trail_data or not isinstance(trail_data, dict) or not trail_data.get("phases"):
-            trail_data = cls.get_template_for_level(level)
-            trail_data["username"] = username
-            trail_data["created_at"] = django_timezone.now().isoformat()
-            # Salva como baseline inicial
+        # Verifica se a trilha salva é legada (em português ou com rotas antigas /grammar, /vocabulary)
+        is_legacy = False
+        if trail_data and isinstance(trail_data, dict):
+            t_title = str(trail_data.get("title", ""))
+            if any(w in t_title for w in ["Trilha", "Jornada", "Caminho", "Aprendiz", "Desbravando", "Fluência", "Carreira", "Maestria"]):
+                is_legacy = True
+            for ph in trail_data.get("phases", []):
+                p_title = str(ph.get("title", ""))
+                if any(w in p_title for w in ["Fase", "Experiências", "Apresentações", "Vida na Cidade", "Férias", "Condicionais", "Comunicação", "Discurso"]):
+                    is_legacy = True
+                for st in ph.get("steps", []):
+                    s_route = str(st.get("route", ""))
+                    s_title = str(st.get("title", ""))
+                    if s_route in ["/grammar", "/vocabulary", "/reading", "/listening", ""] or any(w in s_title for w in ["Vocabulário", "Simulação", "Música"]):
+                        is_legacy = True
+
+        if not trail_data or not isinstance(trail_data, dict) or not trail_data.get("phases") or is_legacy:
+            fresh = cls.get_template_for_level(level)
+            fresh["username"] = username
+            fresh["created_at"] = django_timezone.now().isoformat()
+
+            # Se for migração de trilha existente, preserva os passos que o aluno já havia completado
+            if is_legacy and trail_data and trail_data.get("phases"):
+                for old_p, new_p in zip(trail_data.get("phases", []), fresh.get("phases", [])):
+                    for old_s, new_s in zip(old_p.get("steps", []), new_p.get("steps", [])):
+                        if old_s.get("is_completed"):
+                            new_s["is_completed"] = True
+                            new_s["progress"] = new_s.get("target_count", 1)
+                            new_s["completed_at"] = old_s.get("completed_at")
+
+            trail_data = fresh
             if not isinstance(user.weekly_plan, dict):
                 user.weekly_plan = {}
             user.weekly_plan["learning_trail"] = trail_data
             user.save(update_fields=["weekly_plan"])
+            logger.info(f"[LearningTrail] Trilha de {username} migrada para o template em inglês com links diretos.")
 
-        # 3. Sincroniza progresso em tempo real com ActivitySubmission e TrimestralExam
         trail_data = cls._sync_live_progress(user, trail_data)
         return trail_data
 
     @classmethod
     def _sync_live_progress(cls, user: User, trail: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Atualiza o status dos steps e do Boss Fight com base no banco de dados.
+        Atualiza o status dos steps e do Exame com base no banco de dados.
+        Remove emojis legados e assegura nomes limpos em inglês.
         """
         username = getattr(user, "username", "")
         phases = trail.get("phases", [])
         if not phases:
             return trail
 
-        # Busca histórico de submissões do aluno
         from apps.activities.models import ActivitySubmission, TrimestralExam
 
         subs = list(
@@ -638,20 +663,65 @@ class LearningTrailService:
         exam_passed = bool(completed_exam and (completed_exam.passed or (exam_score and exam_score >= 70)))
         exam_date = completed_exam.completed_at.isoformat() if completed_exam and completed_exam.completed_at else None
 
-        # Processa cada fase
         all_prior_phases_done = True
+        import re
         for idx, phase in enumerate(phases):
+            p_num = phase.get("number", idx + 1)
+            # Sanitiza título e descrição da fase (remove prefixo redundante Phase X: ou Fase X:)
+            raw_p_title = str(phase.get("title", ""))
+            cleaned_p_title = re.sub(r'^(Phase|Fase)\s*\d+\s*:\s*', '', raw_p_title, flags=re.IGNORECASE).strip()
+            phase["title"] = (
+                cleaned_p_title
+                .replace("👑", "")
+                .replace("⚔️", "")
+                .replace("🏆", "")
+                .replace("🔒", "")
+                .replace("👩‍🏫", "")
+                .strip()
+            )
+            phase["description"] = (
+                str(phase.get("description", ""))
+                .replace("👑", "")
+                .replace("⚔️", "")
+                .replace("🏆", "")
+                .replace("🔒", "")
+                .replace("👩‍🏫", "")
+                .strip()
+            )
+
             steps = phase.get("steps", [])
             phase_steps_done = 0
 
             for step in steps:
                 cat = step.get("category", "").lower()
-                # Se já estiver marcado manualmente pela professora ou aluno, respeita
+                step["title"] = (
+                    str(step.get("title", ""))
+                    .replace("👑", "")
+                    .replace("⚔️", "")
+                    .replace("🏆", "")
+                    .replace("🔒", "")
+                    .replace("👩‍🏫", "")
+                    .strip()
+                )
+
+                # Assegura que rotas de atividades pedagógicas apontem para links diretos
+                s_route = (step.get("route") or "").strip()
+                if not s_route.startswith("http") and not s_route.startswith("/voice"):
+                    if cat in ("grammar", "vocabulary", "reading", "listening"):
+                        from apps.activities.services import ExternalContentService
+                        te_data = ExternalContentService.get_test_english_content("all", cat)
+                        items = te_data.get("items", []) if isinstance(te_data, dict) else []
+                        s_title_lower = step.get("title", "").lower()
+                        match = next((it for it in items if it.get("title", "").lower() in s_title_lower or s_title_lower in it.get("title", "").lower()), None)
+                        if match and match.get("url"):
+                            step["route"] = match["url"]
+                        elif items:
+                            step["route"] = items[0].get("url", f"https://test-english.com/{cat}/")
+
                 if step.get("is_completed"):
                     phase_steps_done += 1
                     continue
 
-                # Auto-marcação por categoria completada
                 if cat in completed_categories:
                     step["is_completed"] = True
                     step["progress"] = step.get("target_count", 1)
@@ -661,14 +731,35 @@ class LearningTrailService:
             all_steps_completed = (total_steps > 0 and phase_steps_done >= total_steps)
 
             boss = phase.get("boss_fight") or {}
+            # Limpa título do boss/exam
+            b_title = boss.get("title", "")
+            if not b_title or "Boss Fight" in b_title or "Transição" in b_title:
+                boss["title"] = f"Phase {p_num} Exam"
+            boss["title"] = (
+                str(boss["title"])
+                .replace("👑", "")
+                .replace("⚔️", "")
+                .replace("🏆", "")
+                .replace("🔒", "")
+                .replace("Boss Fight: ", "")
+                .strip()
+            )
+            boss["description"] = (
+                str(boss.get("description", ""))
+                .replace("👑", "")
+                .replace("⚔️", "")
+                .replace("🏆", "")
+                .replace("🔒", "")
+                .replace("Boss Fight", "Exam")
+                .strip()
+            )
+
             min_score = float(boss.get("min_score", 7.0))
             min_score_percent = min_score * 10 if min_score <= 10 else min_score
 
-            # Se todos os steps foram feitos, o Boss Fight é desbloqueado!
             if all_steps_completed:
                 boss["is_unlocked"] = True
-            
-            # Se já fez o exame com nota suficiente para este nível/fase
+
             if exam_passed and (exam_score is not None and exam_score >= min_score_percent):
                 boss["is_unlocked"] = True
                 boss["is_completed"] = True
@@ -681,11 +772,9 @@ class LearningTrailService:
                 else:
                     phase["status"] = "locked"
 
-            # Se a fase está bloqueada, o boss também deve permanecer bloqueado
             if phase.get("status") == "locked":
                 boss["is_unlocked"] = False
 
-            # Atualiza flags para a próxima fase
             if phase.get("status") == "completed":
                 all_prior_phases_done = True
             else:
@@ -709,7 +798,6 @@ class LearningTrailService:
         if not student:
             raise ValueError(f"Aluno {student_username} não encontrado.")
 
-        # Validações básicas
         if not isinstance(trail_data, dict):
             raise ValueError("Dados da trilha devem ser um objeto JSON.")
 
@@ -748,6 +836,7 @@ class LearningTrailService:
     ) -> Dict[str, Any]:
         """
         Alterna ou marca o status de conclusão de um step específico.
+        Atualiza também ActivitySubmission, XP e Streak no sistema todo.
         """
         student = User.objects.filter(username=student_username).first()
         if not student:
@@ -757,6 +846,7 @@ class LearningTrailService:
         phases = trail.get("phases", [])
 
         target_found = False
+        target_step: Optional[Dict[str, Any]] = None
         for phase in phases:
             if phase.get("id") == phase_id or not phase_id:
                 for step in phase.get("steps", []):
@@ -772,17 +862,52 @@ class LearningTrailService:
                             django_timezone.now().isoformat() if new_status else None
                         )
                         target_found = True
+                        target_step = step
                         break
+            if target_found:
+                break
 
-        if not target_found:
+        if not target_found or not target_step:
             raise ValueError(f"Step '{step_id}' não encontrado na trilha.")
+
+        # Sincroniza com SubmissionService para conceder XP e atualizar Streak
+        try:
+            from apps.activities.services import SubmissionService
+            if target_step.get("is_completed"):
+                SubmissionService.submit_activity(student, {
+                    "activity_id": target_step.get("id"),
+                    "activity_type": target_step.get("category", "exercise"),
+                    "score": 100,
+                    "metadata": {
+                        "id": target_step.get("id"),
+                        "activity_id": target_step.get("id"),
+                        "title": target_step.get("title"),
+                        "category": target_step.get("category"),
+                        "url": target_step.get("route"),
+                        "route": target_step.get("route"),
+                        "points_awarded": 25,
+                    },
+                })
+            else:
+                SubmissionService.submit_activity(student, {
+                    "activity_id": target_step.get("id"),
+                    "score": 0,
+                    "status": "pending",
+                    "metadata": {
+                        "id": target_step.get("id"),
+                        "activity_id": target_step.get("id"),
+                        "url": target_step.get("route"),
+                    },
+                })
+        except Exception as e:
+            logger.warning(f"[LearningTrail] Aviso ao sincronizar submissão via toggle_step: {e}")
 
         return cls.save_student_trail(user, student_username, trail)
 
     @classmethod
     def unlock_boss(cls, teacher_user: User, student_username: str, phase_id: str) -> Dict[str, Any]:
         """
-        A Professora Tatiana pode liberar manualmente o Boss Fight de uma fase.
+        A Professora Tatiana pode liberar manualmente o Exame de uma fase.
         """
         student = User.objects.filter(username=student_username).first()
         if not student:

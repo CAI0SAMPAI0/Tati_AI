@@ -136,7 +136,7 @@ onMounted(() => {
   <!-- Main Landing Page -->
   <div v-else class="min-h-screen bg-bg text-text selection:bg-primary/20">
     <!-- Top Navigation -->
-    <header class="sticky top-0 z-50 border-b border-border/80 bg-surface/85 backdrop-blur-md">
+    <header class="sticky top-0 z-50 bg-surface/85 backdrop-blur-md">
       <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
         <!-- Brand Logo -->
         <RouterLink to="/" class="flex items-center gap-3 hover:opacity-90 transition-opacity">

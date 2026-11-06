@@ -553,7 +553,7 @@ async function handleCompleteForm() {
             @keydown.enter="handleSendMessage"
             :disabled="isLoading"
             placeholder="Digite sua resposta em inglês..."
-            class="flex-1 rounded-xl border border-border bg-bgSecondary/60 px-4 py-2.5 text-xs text-text focus:border-primary focus:outline-hidden disabled:opacity-50"
+            class="flex-1 rounded-xl border border-border bg-bgSecondary/60 px-4 py-2.5 text-xs text-gray-950 focus:border-primary focus:outline-hidden disabled:opacity-50"
           />
 
           <button

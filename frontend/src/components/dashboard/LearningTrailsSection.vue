@@ -194,16 +194,23 @@ watch(selectedUsername, (newVal) => {
 
 // Autocomplete de atividades
 async function fetchCatalogSuggestions(queryText = '') {
+  const cleanQ = queryText.trim();
+  if (cleanQ.length < 2) {
+    catalogSuggestions.value = [];
+    showSuggestions.value = false;
+    return;
+  }
   isSearchingCatalog.value = true;
   try {
     const cat = newStepCategory.value;
     const res = await apiGet<{ items: CatalogItem[] }>(
-      `/dashboard/activities/catalog?category=${cat}&query=${encodeURIComponent(queryText)}`
+      `/dashboard/activities/catalog?category=${cat}&query=${encodeURIComponent(cleanQ)}`
     );
     catalogSuggestions.value = res?.items || [];
     showSuggestions.value = catalogSuggestions.value.length > 0;
   } catch (err) {
     catalogSuggestions.value = [];
+    showSuggestions.value = false;
   } finally {
     isSearchingCatalog.value = false;
   }
@@ -211,19 +218,30 @@ async function fetchCatalogSuggestions(queryText = '') {
 
 function handleTitleInput() {
   clearTimeout(searchDebounceTimer);
+  const q = newStepTitle.value.trim();
+  if (q.length < 2) {
+    catalogSuggestions.value = [];
+    showSuggestions.value = false;
+    return;
+  }
   searchDebounceTimer = setTimeout(() => {
-    fetchCatalogSuggestions(newStepTitle.value);
+    fetchCatalogSuggestions(q);
   }, 250);
 }
 
 function handleCategoryChange() {
+  catalogSuggestions.value = [];
+  showSuggestions.value = false;
   const meta = getCategoryMeta(newStepCategory.value);
   if (newStepCategory.value === 'simulations') {
     newStepRoute.value = '/voice';
   } else {
     newStepRoute.value = `/activities?tab=${meta.tab}`;
   }
-  fetchCatalogSuggestions(newStepTitle.value);
+  const q = newStepTitle.value.trim();
+  if (q.length >= 2) {
+    fetchCatalogSuggestions(q);
+  }
 }
 
 function handleSelectSuggestion(item: CatalogItem) {
@@ -244,7 +262,6 @@ function openAddStepModal(phaseId: string) {
   catalogSuggestions.value = [];
   showSuggestions.value = false;
   isStepModalOpen.value = true;
-  fetchCatalogSuggestions('');
 }
 
 function openEditStepModal(phaseId: string, step: Step) {
@@ -263,18 +280,29 @@ function openEditStepModal(phaseId: string, step: Step) {
 function handleSaveStep() {
   if (!trail.value || !targetPhaseId.value) return;
   if (!newStepTitle.value.trim()) {
-    toast.error('Informe o título da atividade.');
+    toast.error('Please enter the activity title.');
     return;
   }
 
   const phase = trail.value.phases.find((p) => p.id === targetPhaseId.value);
   if (!phase) return;
 
-  const meta = getCategoryMeta(newStepCategory.value);
-  let resolvedRoute = newStepRoute.value;
-  if (!resolvedRoute || resolvedRoute.startsWith('/grammar') || resolvedRoute.startsWith('/vocabulary')) {
-    if (newStepCategory.value === 'simulations') resolvedRoute = '/voice';
-    else resolvedRoute = `/activities?tab=${meta.tab}&search=${encodeURIComponent(newStepTitle.value.trim())}`;
+  const cat = newStepCategory.value;
+  let resolvedRoute = (newStepRoute.value || '').trim();
+  if (!resolvedRoute || resolvedRoute.startsWith('/grammar') || resolvedRoute.startsWith('/vocabulary') || resolvedRoute.startsWith('/activities')) {
+    if (cat === 'simulations') {
+      resolvedRoute = '/voice';
+    } else {
+      const match = catalogSuggestions.value.find(
+        (s) => s.title.toLowerCase() === newStepTitle.value.trim().toLowerCase()
+      );
+      if (match?.route) {
+        resolvedRoute = match.route;
+      } else {
+        const cleanSlug = newStepTitle.value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        resolvedRoute = `https://test-english.com/${cat}/${cleanSlug}/`;
+      }
+    }
   }
 
   if (isEditingStep.value && editingStepId.value) {
@@ -284,7 +312,7 @@ function handleSaveStep() {
       existing.title = newStepTitle.value.trim();
       existing.description = newStepDescription.value.trim();
       existing.route = resolvedRoute;
-      toast.success('Atividade atualizada! Lembre-se de salvar a trilha.');
+      toast.success('Activity updated! Remember to save the trail.');
     }
   } else {
     const newStep: Step = {
@@ -299,7 +327,7 @@ function handleSaveStep() {
       completed_at: null,
     };
     phase.steps.push(newStep);
-    toast.success('Atividade adicionada à fase! Lembre-se de salvar a trilha.');
+    toast.success('Activity added to phase! Remember to save the trail.');
   }
 
   isStepModalOpen.value = false;
@@ -307,7 +335,7 @@ function handleSaveStep() {
 
 function handleDeleteStep(phase: Phase, stepIdx: number) {
   phase.steps.splice(stepIdx, 1);
-  toast.success('Atividade removida.');
+  toast.success('Activity removed.');
 }
 
 async function handleSaveTrail() {
@@ -318,9 +346,9 @@ async function handleSaveTrail() {
       trail: trail.value,
     });
     trail.value = res;
-    toast.success('Trilha do aluno salva com sucesso!');
+    toast.success('Student trail saved successfully!');
   } catch (err: any) {
-    toast.error(err?.message || 'Erro ao salvar trilha.');
+    toast.error(err?.message || 'Error saving trail.');
   } finally {
     isSaving.value = false;
   }
@@ -328,16 +356,16 @@ async function handleSaveTrail() {
 
 async function handleApplyTemplate(level: string) {
   if (!selectedUsername.value) return;
-  if (!confirm(`Substituir a trilha atual do aluno pelo template padrão ${level}?`)) return;
+  if (!confirm(`Replace current student trail with the standard ${level} preset?`)) return;
   isApplyingTemplate.value = true;
   try {
     const res = await apiPost<LearningTrail>(`/dashboard/students/${selectedUsername.value}/trail/template`, {
       level,
     });
     trail.value = res;
-    toast.success(`Template ${level} aplicado com sucesso!`);
+    toast.success(`${level} preset applied successfully!`);
   } catch (err: any) {
-    toast.error(err?.message || 'Erro ao aplicar template.');
+    toast.error(err?.message || 'Error applying template.');
   } finally {
     isApplyingTemplate.value = false;
   }
@@ -345,46 +373,50 @@ async function handleApplyTemplate(level: string) {
 
 async function handleResetTrail() {
   if (!selectedUsername.value) return;
-  if (!confirm('Deseja resetar a trilha deste aluno para o padrão inicial do seu nível?')) return;
+  if (!confirm('Reset this student trail to the initial level default?')) return;
   try {
     const res = await apiPost<LearningTrail>(`/dashboard/students/${selectedUsername.value}/trail/reset`, {});
     trail.value = res;
-    toast.success('Trilha resetada com sucesso!');
+    toast.success('Trail reset successfully!');
   } catch (err: any) {
-    toast.error(err?.message || 'Erro ao resetar trilha.');
+    toast.error(err?.message || 'Error resetting trail.');
   }
 }
 
 async function handleToggleStep(phaseId: string, step: Step) {
   if (!selectedUsername.value) return;
   const oldVal = step.is_completed;
+  const oldProgress = step.progress;
+  const newVal = !oldVal;
+
   step.is_completed = !oldVal;
   step.progress = step.is_completed ? (step.target_count || 1) : 0;
   try {
     await apiPost(`/dashboard/students/${selectedUsername.value}/trail/step-toggle`, {
       phase_id: phaseId,
       step_id: step.id,
-      is_completed: step.is_completed,
+      is_completed: newVal,
     });
-    toast.success(`Etapa "${step.title}" atualizada!`);
-    loadTrail(selectedUsername.value);
+    toast.success(`Quest "${step.title}" updated!`);
   } catch (err) {
     step.is_completed = oldVal;
-    toast.error('Erro ao atualizar etapa.');
+    step.progress = oldProgress;
+    console.error(err);
+    toast.error('Error updating step.');
   }
 }
 
 async function handleUnlockBoss(phaseId: string) {
   if (!selectedUsername.value) return;
-  if (!confirm('Liberar manualmente o Boss Fight (Exame) para esta fase?')) return;
+  if (!confirm('Manually unlock the Exam for this phase?')) return;
   try {
     const res = await apiPost<LearningTrail>(`/dashboard/students/${selectedUsername.value}/trail/unlock-boss`, {
       phase_id: phaseId,
     });
     trail.value = res;
-    toast.success('Boss Fight liberado com sucesso para o aluno!');
+    toast.success('Exam unlocked successfully for the student!');
   } catch (err: any) {
-    toast.error(err?.message || 'Erro ao liberar Boss Fight.');
+    toast.error(err?.message || 'Error unlocking Exam.');
   }
 }
 
@@ -394,14 +426,14 @@ function handleAddPhase() {
   const newPhase: Phase = {
     id: `phase-${num}-${Date.now().toString(36)}`,
     number: num,
-    title: `Fase ${num}: Novo Módulo de Aprendizado`,
-    description: 'Defina os objetivos específicos para este estágio.',
+    title: `Phase ${num}: New Learning Module`,
+    description: 'Define specific learning goals and topics for this stage.',
     duration_days: 30,
     status: num === 1 ? 'active' : 'locked',
     steps: [],
     boss_fight: {
       id: `boss-p${num}`,
-      title: `👑 Boss Fight: Phase ${num} Exam`,
+      title: `Phase ${num} Exam`,
       description: 'Custom evaluation exam based on the activities completed in this phase.',
       min_score: 7.0,
       is_unlocked: false,
@@ -413,14 +445,14 @@ function handleAddPhase() {
     },
   };
   trail.value.phases.push(newPhase);
-  toast.success(`Fase ${num} adicionada! Lembre-se de salvar.`);
+  toast.success(`Phase ${num} added! Remember to save.`);
 }
 
 function handleDeletePhase(phaseIdx: number) {
   if (!trail.value) return;
-  if (!confirm('Excluir esta fase da trilha?')) return;
+  if (!confirm('Delete this phase from the trail?')) return;
   trail.value.phases.splice(phaseIdx, 1);
-  toast.success('Fase removida.');
+  toast.success('Phase removed.');
 }
 
 onMounted(() => {
@@ -444,7 +476,7 @@ onMounted(() => {
             </span>
           </div>
           <p class="text-xs text-text-muted mt-0.5">
-            Monte a trilha estilo Duolingo com as atividades que você selecionar. O Exame do Boss avalia exatamente o que o aluno praticou!
+            Build custom learning phases with direct activities. The Exam evaluates exactly what the student practiced!
           </p>
         </div>
       </div>
@@ -472,14 +504,14 @@ onMounted(() => {
           class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-surface hover:bg-surface-hover border border-border text-text transition-all active:scale-95 cursor-pointer"
         >
           <Plus class="w-4 h-4 text-primary" />
-          Nova Fase
+          New Phase
         </button>
 
         <button
           type="button"
           @click="handleResetTrail"
           class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-surface hover:bg-error/10 border border-border text-text-muted hover:text-error transition-all active:scale-95 cursor-pointer"
-          title="Resetar trilha do aluno para o padrão"
+          title="Reset student trail to level default"
         >
           <RotateCcw class="w-3.5 h-3.5" />
         </button>
@@ -491,7 +523,7 @@ onMounted(() => {
           class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-primary text-white hover:bg-primary-hover shadow-xs transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
         >
           <Save class="w-4 h-4" />
-          {{ isSaving ? 'Salvando...' : 'Salvar Trilha' }}
+          {{ isSaving ? 'Saving...' : 'Save Trail' }}
         </button>
       </div>
     </div>
@@ -501,8 +533,8 @@ onMounted(() => {
       <!-- 1. Coluna de Alunos -->
       <div class="bg-surface border border-border rounded-2xl p-4 shadow-xs space-y-4 lg:col-span-1">
         <div class="flex items-center justify-between">
-          <h3 class="text-xs font-bold uppercase tracking-wider text-text-subtle">Alunos ({{ students.length }})</h3>
-          <span v-if="isLoadingStudents" class="text-[0.65rem] text-primary animate-pulse">Carregando...</span>
+          <h3 class="text-xs font-bold uppercase tracking-wider text-text-subtle">Students ({{ students.length }})</h3>
+          <span v-if="isLoadingStudents" class="text-[0.65rem] text-primary animate-pulse">Loading...</span>
         </div>
 
         <!-- Search Input -->
@@ -511,7 +543,7 @@ onMounted(() => {
           <input
             v-model="searchQuery"
             type="text"
-            placeholder="Buscar aluno por nome..."
+            placeholder="Search student by name..."
             class="w-full pl-8 pr-3 py-1.5 bg-bg-secondary border border-border rounded-xl text-xs text-text placeholder:text-text-muted focus:outline-none focus:border-primary"
           />
         </div>
@@ -566,11 +598,11 @@ onMounted(() => {
               <div class="flex items-center gap-2">
                 <h3 class="font-display font-bold text-base text-text">{{ currentStudent.name || currentStudent.username }}</h3>
                 <span class="px-2 py-0.2 rounded-full text-[0.65rem] font-extrabold bg-primary/15 text-primary border border-primary/20">
-                  Nível CEFR: {{ currentStudent.level || 'A1' }}
+                  CEFR Level: {{ currentStudent.level || 'A1' }}
                 </span>
               </div>
               <p class="text-xs text-text-muted mt-0.5">
-                Trilha Ativa: <span class="font-semibold text-text">{{ trail?.title || 'Carregando...' }}</span>
+                Active Trail: <span class="font-semibold text-text">{{ trail?.title || 'Loading...' }}</span>
               </p>
             </div>
           </div>
@@ -581,14 +613,14 @@ onMounted(() => {
               v-if="trail"
               v-model="trail.title"
               type="text"
-              placeholder="Nome da Trilha (ex: Trilha Rumo à Fluência)"
+              placeholder="Trail Name (e.g. Intermediate Trail: Fluency & Career)"
               class="w-full px-3 py-1.5 bg-bg-secondary border border-border rounded-xl text-xs font-semibold text-text focus:outline-none focus:border-primary"
             />
             <input
               v-if="trail"
               v-model="trail.teacher_notes"
               type="text"
-              placeholder="Recado da Professora para o aluno..."
+              placeholder="Teacher notes for the student..."
               class="w-full px-3 py-1.5 bg-bg-secondary border border-border rounded-xl text-xs text-text-muted focus:outline-none focus:border-primary"
             />
           </div>
@@ -597,7 +629,7 @@ onMounted(() => {
         <!-- Loading State -->
         <div v-if="isLoadingTrail" class="py-16 text-center bg-surface border border-border rounded-2xl">
           <div class="w-8 h-8 border-3 border-primary/20 border-t-primary rounded-full animate-spin mx-auto mb-2"></div>
-          <p class="text-xs font-bold text-text-muted">Carregando fases da trilha...</p>
+          <p class="text-xs font-bold text-text-muted">Loading trail phases...</p>
         </div>
 
         <!-- Fases da Trilha -->
@@ -612,7 +644,7 @@ onMounted(() => {
               <div class="space-y-1 min-w-0">
                 <div class="flex items-center gap-2">
                   <span class="px-2 py-0.5 rounded-md text-[0.65rem] font-black uppercase tracking-wider bg-primary text-white">
-                    Fase {{ phase.number || pIdx + 1 }}
+                    Phase {{ phase.number || pIdx + 1 }}
                   </span>
                   <input
                     v-model="phase.title"
@@ -633,7 +665,7 @@ onMounted(() => {
                 <input
                   v-model="phase.description"
                   type="text"
-                  placeholder="Descrição ou objetivo pedagógico desta fase..."
+                  placeholder="Phase description or learning objectives..."
                   class="w-full text-xs text-text-muted bg-transparent border-b border-transparent hover:border-border focus:border-primary focus:outline-none px-1"
                 />
               </div>
@@ -641,7 +673,7 @@ onMounted(() => {
               <!-- Controles da Fase -->
               <div class="flex items-center gap-2 shrink-0">
                 <span class="text-xs font-bold text-text-subtle">
-                  {{ phase.steps.filter((s) => s.is_completed).length }} / {{ phase.steps.length }} concluídas
+                  {{ phase.steps.filter((s) => s.is_completed).length }} / {{ phase.steps.length }} completed
                 </span>
                 <button
                   type="button"
@@ -649,13 +681,13 @@ onMounted(() => {
                   class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-all active:scale-95 cursor-pointer"
                 >
                   <Plus class="w-3.5 h-3.5" />
-                  Atividade
+                  Add Activity
                 </button>
                 <button
                   type="button"
                   @click="handleDeletePhase(pIdx)"
                   class="p-1.5 rounded-lg text-text-muted hover:text-error hover:bg-error/10 transition-colors cursor-pointer"
-                  title="Excluir fase"
+                  title="Delete phase"
                 >
                   <Trash2 class="w-3.5 h-3.5" />
                 </button>
@@ -665,13 +697,13 @@ onMounted(() => {
             <!-- Lista de Atividades (Steps) da Fase -->
             <div class="p-5 space-y-3">
               <div v-if="phase.steps.length === 0" class="py-6 text-center border-2 border-dashed border-border rounded-xl">
-                <p class="text-xs text-text-muted">Nenhuma atividade adicionada a esta fase.</p>
+                <p class="text-xs text-text-muted">No activities added to this phase.</p>
                 <button
                   type="button"
                   @click="openAddStepModal(phase.id)"
                   class="mt-2 text-xs font-bold text-primary hover:underline inline-flex items-center gap-1 cursor-pointer"
                 >
-                  <Plus class="w-3.5 h-3.5" /> Adicionar primeira atividade
+                  <Plus class="w-3.5 h-3.5" /> Add first activity
                 </button>
               </div>
 
@@ -718,14 +750,14 @@ onMounted(() => {
                     class="text-[0.65rem] font-black uppercase px-2 py-0.5 rounded-full"
                     :class="step.is_completed ? 'bg-success/15 text-success' : 'bg-primary/10 text-primary'"
                   >
-                    {{ step.is_completed ? 'Concluída' : 'Pendente' }}
+                    {{ step.is_completed ? 'Completed' : 'Pending' }}
                   </span>
 
                   <button
                     type="button"
                     @click="openEditStepModal(phase.id, step)"
                     class="p-1 rounded-md text-text-muted hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer"
-                    title="Editar Atividade"
+                    title="Edit Activity"
                   >
                     <Edit2 class="w-3.5 h-3.5" />
                   </button>
@@ -734,14 +766,14 @@ onMounted(() => {
                     type="button"
                     @click="handleDeleteStep(phase, sIdx)"
                     class="p-1 rounded-md text-text-muted hover:text-error hover:bg-error/10 transition-colors cursor-pointer"
-                    title="Excluir"
+                    title="Delete"
                   >
                     <Trash2 class="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
 
-              <!-- Boss Fight Card (Exame Trimestral Personalizado da Fase) -->
+              <!-- Phase Exam Card (Exame Trimestral Personalizado da Fase) -->
               <div
                 class="mt-4 p-4 rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/5 via-amber-500/10 to-amber-500/5 shadow-xs"
               >
@@ -753,25 +785,25 @@ onMounted(() => {
                     <div>
                       <div class="flex items-center gap-2">
                         <h4 class="text-xs font-extrabold text-text uppercase tracking-wider flex items-center gap-1.5">
-                          👑 Boss Fight: Phase {{ phase.number }} Exam
+                          Phase {{ phase.number }} Exam
                         </h4>
                         <span
                           class="px-2 py-0.2 rounded-full text-[0.6rem] font-black uppercase"
                           :class="phase.boss_fight?.is_completed ? 'bg-success text-white' : (phase.boss_fight?.is_unlocked ? 'bg-amber-500 text-white animate-pulse' : 'bg-surface border border-border text-text-muted')"
                         >
-                          {{ phase.boss_fight?.is_completed ? 'Derrotado 🏆' : (phase.boss_fight?.is_unlocked ? 'Desbloqueado ⚔️' : 'Bloqueado 🔒') }}
+                          {{ phase.boss_fight?.is_completed ? 'Completed' : (phase.boss_fight?.is_unlocked ? 'Unlocked' : 'Locked') }}
                         </span>
                       </div>
                       <p class="text-[0.7rem] text-text-muted mt-0.5">
-                        Exame gerado com base nas atividades configuradas acima para este aluno.
+                        Exam generated based on the activities configured above for this student.
                       </p>
                     </div>
                   </div>
 
-                  <!-- Botão de Liberar Boss Manualmente -->
+                  <!-- Botão de Liberar Exame Manualmente -->
                   <div class="flex items-center gap-2 shrink-0">
                     <div class="text-right mr-2">
-                      <span class="text-[0.65rem] text-text-muted block">Nota mínima:</span>
+                      <span class="text-[0.65rem] text-text-muted block">Minimum score:</span>
                       <span class="text-xs font-bold text-amber-600 dark:text-amber-400">
                         {{ phase.boss_fight?.min_score || 7.0 }} / 10
                       </span>
@@ -784,14 +816,14 @@ onMounted(() => {
                       class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 shadow-xs transition-all active:scale-95 cursor-pointer"
                     >
                       <Unlock class="w-3.5 h-3.5" />
-                      Liberar Boss Agora
+                      Unlock Exam
                     </button>
                     <span
                       v-else-if="phase.boss_fight?.is_completed"
                       class="flex items-center gap-1 text-xs font-bold text-success"
                     >
                       <Trophy class="w-4 h-4" />
-                      Aprovado! (Nota: {{ phase.boss_fight?.score ?? '10' }})
+                      Passed (Score: {{ phase.boss_fight?.score ?? '10' }})
                     </span>
                   </div>
                 </div>
@@ -803,9 +835,9 @@ onMounted(() => {
         <!-- Empty State -->
         <div v-else class="p-12 text-center bg-surface border border-border rounded-2xl">
           <Compass class="w-12 h-12 text-primary/40 mx-auto mb-3" />
-          <h3 class="font-bold text-text text-base">Nenhuma trilha encontrada</h3>
+          <h3 class="font-bold text-text text-base">No learning trail found</h3>
           <p class="text-xs text-text-muted mt-1 max-w-sm mx-auto">
-            Selecione um aluno ou aplique um dos templates padrão (A1, A2, B1, B2, C1) para começar.
+            Select a student or apply a standard preset (A1, A2, B1, B2, C1) to start.
           </p>
           <div class="mt-4 flex justify-center gap-2">
             <button
@@ -815,118 +847,124 @@ onMounted(() => {
               @click="handleApplyTemplate(lvl)"
               class="px-3 py-1.5 rounded-lg text-xs font-bold bg-primary text-white hover:bg-primary-hover transition-all cursor-pointer"
             >
-              Criar Trilha {{ lvl }}
+              Create {{ lvl }} Trail
             </button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Modal de Adicionar / Editar Atividade à Fase -->
-    <div
-      v-if="isStepModalOpen"
-      class="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in"
-      @click.self="showSuggestions = false"
-    >
-      <div class="bg-surface border border-border rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 relative">
-        <h3 class="text-base font-bold text-text">
-          {{ isEditingStep ? 'Editar Atividade da Fase' : 'Adicionar Atividade à Fase' }}
-        </h3>
+    <!-- Modal de Adicionar / Editar Atividade à Fase (Teleported directly to body to avoid container scroll cutoff) -->
+    <Teleport to="body">
+      <div
+        v-if="isStepModalOpen"
+        class="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm overflow-y-auto"
+        @click.self="isStepModalOpen = false"
+      >
+        <div
+          role="dialog"
+          aria-modal="true"
+          class="relative w-full max-w-lg bg-surface border border-border rounded-3xl shadow-2xl p-6 space-y-4 max-h-[85vh] overflow-y-auto mx-auto my-auto animate-in fade-in zoom-in-95 duration-150"
+          @click.stop
+        >
+          <h3 class="text-base font-bold text-text">
+            {{ isEditingStep ? 'Edit Phase Activity' : 'Add Activity to Phase' }}
+          </h3>
 
-        <!-- Categoria -->
-        <div class="space-y-1.5">
-          <label class="text-xs font-bold text-text-subtle">Categoria Pedagógica</label>
-          <select
-            v-model="newStepCategory"
-            @change="handleCategoryChange"
-            class="w-full px-3 py-2 bg-bg-secondary border border-border rounded-xl text-xs font-semibold text-text focus:outline-none focus:border-primary cursor-pointer"
-          >
-            <option v-for="c in CATEGORIES" :key="c.id" :value="c.id">
-              {{ c.label }}
-            </option>
-          </select>
-        </div>
-
-        <!-- Título com Busca / Autocomplete ao digitar -->
-        <div class="space-y-1.5 relative">
-          <div class="flex items-center justify-between">
-            <label class="text-xs font-bold text-text-subtle">Título da Atividade</label>
-            <span v-if="isSearchingCatalog" class="text-[0.65rem] text-primary flex items-center gap-1">
-              <Loader2 class="w-3 h-3 animate-spin" /> Buscando catálogo...
-            </span>
+          <!-- Categoria -->
+          <div class="space-y-1.5">
+            <label class="text-xs font-bold text-text-subtle">Pedagogical Category</label>
+            <select
+              v-model="newStepCategory"
+              @change="handleCategoryChange"
+              class="w-full px-3 py-2 bg-bg-secondary border border-border rounded-xl text-xs font-semibold text-text focus:outline-none focus:border-primary cursor-pointer"
+            >
+              <option v-for="c in CATEGORIES" :key="c.id" :value="c.id">
+                {{ c.label }}
+              </option>
+            </select>
           </div>
 
-          <div class="relative">
-            <input
-              v-model="newStepTitle"
-              type="text"
-              @input="handleTitleInput"
-              @focus="fetchCatalogSuggestions(newStepTitle)"
-              placeholder="Digite o nome da atividade (ex: Adjectives: Old, new...)"
-              class="w-full px-3 py-2 bg-bg-secondary border border-border rounded-xl text-xs font-semibold text-text focus:outline-none focus:border-primary"
-            />
-            <button
-              v-if="catalogSuggestions.length > 0"
-              type="button"
-              @click="showSuggestions = !showSuggestions"
-              class="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text cursor-pointer"
-            >
-              <ChevronDown class="w-4 h-4" />
-            </button>
-          </div>
-
-          <!-- Dropdown Autocomplete de Sugestões Reais da Categoria -->
-          <div
-            v-if="showSuggestions && catalogSuggestions.length > 0"
-            class="absolute left-0 right-0 top-full mt-1 bg-surface border border-border rounded-xl shadow-xl max-h-52 overflow-y-auto z-[110] divide-y divide-border/50"
-          >
-            <button
-              v-for="sug in catalogSuggestions"
-              :key="sug.id || sug.title"
-              type="button"
-              @click="handleSelectSuggestion(sug)"
-              class="w-full px-3 py-2.5 text-left hover:bg-surface-hover flex items-center justify-between gap-3 text-xs transition-colors cursor-pointer"
-            >
-              <div class="min-w-0">
-                <span class="font-semibold text-text block truncate">{{ sug.title }}</span>
-                <span class="text-[0.65rem] text-text-muted uppercase">{{ sug.category }}</span>
-              </div>
-              <span class="px-1.5 py-0.5 rounded text-[0.6rem] font-bold bg-primary/10 text-primary shrink-0">
-                {{ sug.level }}
+          <!-- Título com Busca / Autocomplete ao digitar -->
+          <div class="space-y-1.5 relative">
+            <div class="flex items-center justify-between">
+              <label class="text-xs font-bold text-text-subtle">Activity Title</label>
+              <span v-if="isSearchingCatalog" class="text-[0.65rem] text-primary flex items-center gap-1">
+                <Loader2 class="w-3 h-3 animate-spin" /> Searching catalog...
               </span>
+            </div>
+
+            <div class="relative">
+              <input
+                v-model="newStepTitle"
+                type="text"
+                @input="handleTitleInput"
+                placeholder="Type activity name (e.g. Adjectives: Old, new...)"
+                class="w-full px-3 py-2 bg-bg-secondary border border-border rounded-xl text-xs font-semibold text-text focus:outline-none focus:border-primary"
+              />
+              <button
+                v-if="catalogSuggestions.length > 0"
+                type="button"
+                @click="showSuggestions = !showSuggestions"
+                class="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text cursor-pointer"
+              >
+                <ChevronDown class="w-4 h-4" />
+              </button>
+            </div>
+
+            <!-- Dropdown Autocomplete de Sugestões Reais da Categoria -->
+            <div
+              v-if="showSuggestions && catalogSuggestions.length > 0"
+              class="absolute left-0 right-0 top-full mt-1 bg-surface border border-border rounded-xl shadow-2xl max-h-52 overflow-y-auto z-[10000] divide-y divide-border/50"
+            >
+              <button
+                v-for="sug in catalogSuggestions"
+                :key="sug.id || sug.title"
+                type="button"
+                @click="handleSelectSuggestion(sug)"
+                class="w-full px-3 py-2.5 text-left hover:bg-surface-hover flex items-center justify-between gap-3 text-xs transition-colors cursor-pointer"
+              >
+                <div class="min-w-0">
+                  <span class="font-semibold text-text block truncate">{{ sug.title }}</span>
+                  <span class="text-[0.65rem] text-text-muted uppercase">{{ sug.category }}</span>
+                </div>
+                <span class="px-1.5 py-0.5 rounded text-[0.6rem] font-bold bg-primary/10 text-primary shrink-0">
+                  {{ sug.level }}
+                </span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Instruções da Professora (Opcional) -->
+          <div class="space-y-1.5">
+            <label class="text-xs font-bold text-text-subtle">Teacher Instructions (Optional)</label>
+            <textarea
+              v-model="newStepDescription"
+              rows="2"
+              placeholder="e.g. Complete exercises and record your pronunciation of the final 3 sentences..."
+              class="w-full px-3 py-2 bg-bg-secondary border border-border rounded-xl text-xs text-text focus:outline-none focus:border-primary resize-none"
+            ></textarea>
+          </div>
+
+          <!-- Modal Actions -->
+          <div class="flex items-center justify-end gap-2 pt-2 border-t border-border">
+            <button
+              type="button"
+              @click="isStepModalOpen = false"
+              class="px-3.5 py-2 rounded-xl text-xs font-bold text-text-muted hover:bg-surface-hover transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              @click="handleSaveStep"
+              class="px-4 py-2 rounded-xl text-xs font-bold bg-primary text-white hover:bg-primary-hover shadow-xs transition-all cursor-pointer"
+            >
+              {{ isEditingStep ? 'Save Changes' : 'Add Activity' }}
             </button>
           </div>
         </div>
-
-        <!-- Instruções da Professora (Opcional) -->
-        <div class="space-y-1.5">
-          <label class="text-xs font-bold text-text-subtle">Instruções da Professora (Opcional)</label>
-          <textarea
-            v-model="newStepDescription"
-            rows="2"
-            placeholder="ex: Faça os exercícios de fixação e grave a pronúncia das 3 frases finais..."
-            class="w-full px-3 py-2 bg-bg-secondary border border-border rounded-xl text-xs text-text focus:outline-none focus:border-primary resize-none"
-          ></textarea>
-        </div>
-
-        <!-- Modal Actions -->
-        <div class="flex items-center justify-end gap-2 pt-2 border-t border-border">
-          <button
-            type="button"
-            @click="isStepModalOpen = false"
-            class="px-3.5 py-2 rounded-xl text-xs font-bold text-text-muted hover:bg-surface-hover transition-colors cursor-pointer"
-          >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            @click="handleSaveStep"
-            class="px-4 py-2 rounded-xl text-xs font-bold bg-primary text-white hover:bg-primary-hover shadow-xs transition-all cursor-pointer"
-          >
-            {{ isEditingStep ? 'Salvar Alterações' : 'Adicionar Atividade' }}
-          </button>
-        </div>
       </div>
-    </div>
+    </Teleport>
   </div>
 </template>

@@ -251,7 +251,6 @@ class TrailStepToggleInput(BaseModel):
     is_completed: Optional[bool] = None
 
 
-@dashboard_router.get("/trails/templates", auth=auth_required)
 @dashboard_router.get("/activities/catalog", auth=auth_required)
 def search_activities_catalog(request: HttpRequest, category: str = "grammar", query: str = "", level: str = "all"):
     """
@@ -273,15 +272,16 @@ def search_activities_catalog(request: HttpRequest, category: str = "grammar", q
         data = ExternalContentService.get_test_english_content("all" if lvl == "ALL" else lvl, cat)
         items = data.get("items", []) if isinstance(data, dict) else []
         for it in items:
-            title = it.get("title", "")
-            if not q or q in title.lower():
-                clean_route = f"/activities?tab={cat}&search={urllib.parse.quote(title)}"
+            raw_title = it.get("title", "")
+            clean_title = raw_title.replace("\u2013", "-").replace("\u2014", "-").replace("\xa0", " ").strip()
+            if not q or q in clean_title.lower() or q in raw_title.lower():
+                direct_url = it.get("url") or f"https://test-english.com/{cat}/{it.get('slug')}/"
                 results.append({
-                    "id": it.get("slug") or title,
-                    "title": title,
+                    "id": it.get("slug") or clean_title,
+                    "title": clean_title,
                     "level": it.get("level", lvl),
                     "category": cat,
-                    "route": clean_route,
+                    "route": direct_url,
                 })
     elif cat in ("games", "game"):
         games = Game.objects.all()
@@ -306,23 +306,38 @@ def search_activities_catalog(request: HttpRequest, category: str = "grammar", q
                     "category": "simulations",
                     "route": "/voice",
                 })
+    elif cat in ("flashcards", "flashcard"):
+        from apps.activities.models import Flashcard
+        decks = Flashcard.objects.filter(is_published=True).values("topic", "level").distinct()
+        for d in decks:
+            t = d.get("topic") or "General"
+            if not q or q in t.lower():
+                results.append({
+                    "id": f"fc_{t}",
+                    "title": f"Flashcards: {t}",
+                    "level": d.get("level", "All"),
+                    "category": "flashcards",
+                    "route": "/activities?tab=flashcards",
+                })
     elif cat in ("music", "musics"):
-        data = ExternalContentService.get_test_english_content("all", "listening") # or music items
+        data = ExternalContentService.get_test_english_content("all", "listening")
         items = data.get("items", []) if isinstance(data, dict) else []
         for it in items:
-            title = it.get("title", "")
-            if not q or q in title.lower():
+            raw_title = it.get("title", "")
+            clean_title = raw_title.replace("\u2013", "-").replace("\u2014", "-").replace("\xa0", " ").strip()
+            if not q or q in clean_title.lower():
                 results.append({
-                    "id": it.get("slug") or title,
-                    "title": title,
+                    "id": it.get("slug") or clean_title,
+                    "title": clean_title,
                     "level": it.get("level", "All"),
                     "category": "music",
-                    "route": f"/activities?tab=musics&search={urllib.parse.quote(title)}",
+                    "route": it.get("url") or f"/activities?tab=musics&search={urllib.parse.quote(clean_title)}",
                 })
 
     return {"success": True, "category": cat, "count": len(results), "items": results[:50]}
 
 
+@dashboard_router.get("/trails/templates", auth=auth_required)
 def list_trail_templates(request: HttpRequest):
     """
     Retorna os templates prontos de trilha para cada nível CEFR.
