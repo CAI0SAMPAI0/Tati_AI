@@ -80,12 +80,12 @@ onMounted(() => {
         <Loader2 class="animate-spin text-primary" :size="36" />
       </div>
 
-      <!-- Error State -->
+      <!-- Estado de erro -->
       <div v-else-if="error" class="rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-xs text-danger">
         {{ error }}
       </div>
 
-      <!-- Not Logged In -->
+      <!-- Estado de usuário não autenticado -->
       <div v-else-if="!user" class="mx-auto max-w-lg p-10 text-center rounded-2xl border border-border bg-surface">
         <h2 class="text-xl font-bold text-text mb-2">Orders</h2>
         <p class="text-sm text-text-muted mb-6">Sign in to your account to view order history.</p>
@@ -94,7 +94,7 @@ onMounted(() => {
         </RouterLink>
       </div>
 
-      <!-- Empty Orders -->
+      <!-- Estado de pedidos vazio -->
       <div
         v-else-if="orders.length === 0"
         class="flex flex-col items-center rounded-2xl border border-border bg-surface p-12 text-center"

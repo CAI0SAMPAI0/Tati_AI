@@ -330,7 +330,7 @@ router.beforeEach((to, from, next) => {
     authStore.init();
   }
 
-  // Intercept Google OAuth / callback tokens from URL query parameters on auth routes
+  // Intercepta tokens de autenticação Google OAuth ou parâmetros nas rotas de autenticação
   const isAuthRoute = to.path === '/login' || to.path === '/auth/callback' || Boolean(to.query.token);
   let token = (to.query.token as string | undefined);
   let refreshToken = (to.query.refresh_token as string | undefined);

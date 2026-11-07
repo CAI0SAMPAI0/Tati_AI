@@ -1,1 +1,1 @@
-# Settings package initialization
+# Inicialização do pacote de configurações

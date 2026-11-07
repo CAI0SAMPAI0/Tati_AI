@@ -38,7 +38,7 @@ function getCacheKey() {
 async function fetchAccess(silent = false) {
   if (!contentId.value) return;
 
-  // Check 30-day cache first
+  // Consulta inicialmente o cache local de 30 dias
   const cacheKey = getCacheKey();
   const cached = peekActivityCache<SecureViewerAccess & { url?: string; processing_status?: string }>(cacheKey);
 

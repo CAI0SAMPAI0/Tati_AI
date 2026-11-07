@@ -90,13 +90,13 @@ function handleClick(e: MouseEvent) {
   }
 }
 
-// Sentence segments computed
+// Segmentos de frases computados
 const sentenceSegments = computed(() => {
   if (!props.content) return [];
   return splitIntoSentences(props.content);
 });
 
-// Word tokens computed for word-by-word mode
+// Tokens de palavras computados para o modo palavra por palavra
 const wordTokens = computed(() => {
   if (!props.content) return [];
   const parts = props.content.split(/(\s+|[.,!?;:()"]+)/);

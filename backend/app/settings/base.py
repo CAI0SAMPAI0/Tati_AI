@@ -35,7 +35,7 @@ ALLOWED_HOSTS = ["*"]
 INSTALLED_APPS = [
     # Daphne deve vir antes de django.contrib.staticfiles para ASGI WebSockets
     "daphne",
-    # Django Core
+    # Núcleo do Django
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -43,12 +43,12 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.postgres",
-    # Third-party Apps
+    # Aplicativos de terceiros
     "corsheaders",
     "channels",
     "django_celery_results",
     "django_celery_beat",
-    # Local Apps
+    # Aplicativos locais
     "apps.authentication",
     "apps.users",
     "apps.activities",
@@ -235,7 +235,7 @@ else:
         }
     }
 
-#    CELERY & BACKGROUND TASKS                                          
+# Celery e tarefas em segundo plano
 from celery.schedules import crontab
 
 def _validate_broker_url(url: str | None) -> bool:
@@ -274,6 +274,12 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "America/Sao_Paulo"
 CELERY_ENABLE_UTC = True
+CELERY_WORKER_CONCURRENCY = 2
+CELERY_WORKER_MAX_TASKS_PER_CHILD = 20
+CELERY_WORKER_MAX_MEMORY_PER_CHILD = 250000
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+CELERY_TASK_TIME_LIMIT = 300
+CELERY_TASK_SOFT_TIME_LIMIT = 240
 CELERY_BEAT_SCHEDULE = {
     "sync-hub-materials-every-30-mins": {
         "task": "apps.activities.tasks.sync_hub_materials_task",
@@ -309,7 +315,7 @@ CELERY_BEAT_SCHEDULE = {
     },
 }
 
-#    DJANGO CHANNELS (WEBSOCKETS LAYER)                                 
+# Django Channels e camada de WebSockets
 # Em containers autônomos (HF Spaces), InMemoryChannelLayer garante latência zero e 0 falhas de conexão de rede
 if (
     os.getenv("USE_REDIS_CHANNELS", "false").lower() in ("true", "1")

@@ -104,7 +104,7 @@ onMounted(() => {
     window.addEventListener('message', handleGoogleMessage);
   }
 
-  // Check for google callback tokens in query params or directly in window.location.search
+  // Verifica tokens de retorno do Google nos parâmetros da rota ou diretamente na URL
   const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
   const token = (route.query.token as string | undefined) || searchParams?.get('token') || undefined;
   const refreshToken = (route.query.refresh_token as string | undefined) || searchParams?.get('refresh_token') || undefined;
@@ -329,7 +329,7 @@ async function handleResetSubmit() {
         </p>
       </div>
 
-      <!-- Tabs - Sign in / Create Account -->
+      <!-- Abas de seleção: Entrar ou Criar Conta -->
       <div
         v-if="activeTab !== 'forgot' && activeTab !== 'reset'"
         class="flex bg-bg-secondary rounded-full p-[4px] mb-5 w-full max-w-[23.75rem] border border-border shadow-sm"

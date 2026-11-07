@@ -330,10 +330,10 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- Container Content -->
+    <!-- Contêiner de conteúdo principal -->
     <div class="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
       
-      <!-- Exam Status Header (when not taking exam and not viewing finished result) -->
+      <!-- Cabeçalho de status do exame (quando não estiver em prova ativa nem visualizando resultado) -->
       <div v-if="!activeExam && !isExamFinished && !isReviewing" class="space-y-6 animate-fade-in">
         <!-- CEFR Journey Roadmap -->
         <div class="bg-surface border border-border rounded-2xl p-6 shadow-sm space-y-4">
@@ -671,7 +671,7 @@ onMounted(() => {
             </div>
           </div>
 
-          <!-- Text input for open questions / writing -->
+          <!-- Campo de entrada de texto para questões abertas de escrita (Writing) -->
           <div v-else class="space-y-2 pt-2">
             <div class="flex items-center justify-between text-xs text-text-muted font-medium">
               <span>Write your response in English (aim for {{ question.min_words || 20 }}-{{ question.max_words || 60 }} words).</span>
@@ -695,7 +695,7 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- Submit Button at bottom of continuous scroll -->
+        <!-- Botão de finalização ao término da rolagem das questões -->
         <div class="text-center py-6">
           <Button
             size="lg"

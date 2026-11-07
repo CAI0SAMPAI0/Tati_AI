@@ -1,7 +1,7 @@
 /**
- * Smart Semantic Distractor Generator for Flashcards
- * Generates plausible, contextually-related alternative options for vocabulary testing
- * without repeating words from other cards in the deck.
+ * Gerador inteligente de alternativas semânticas para Flashcards
+ * Gera opções alternativas plausíveis e contextualmente relacionadas para testes de vocabulário
+ * sem repetir palavras de outros cards do baralho.
  */
 
 function capitalize(s: string): string {
@@ -162,7 +162,7 @@ export const GENERAL_VOCABULARY_BACKUP = [
 ];
 
 /**
- * Finds the most relevant category for a given word and/or deck topic
+ * Identifica a categoria mais relevante para uma palavra e/ou tópico de baralho
  */
 function detectCategory(targetWord: string, deckTopic?: string): string[] | null {
   const cleanTarget = cleanWord(targetWord);
@@ -184,7 +184,7 @@ function detectCategory(targetWord: string, deckTopic?: string): string[] | null
       (key === 'health_body' && (cleanTopic.includes('health') || cleanTopic.includes('lifestyle') || cleanTopic.includes('medic'))) ||
       (key === 'transport' && (cleanTopic.includes('travel') || cleanTopic.includes('trip') || cleanTopic.includes('transport')))
     ) {
-      // Check if target word exists in this or related pool
+      // Verifica se a palavra-alvo existe neste grupo semântico ou correlato
       return words;
     }
   }
@@ -201,7 +201,7 @@ function detectCategory(targetWord: string, deckTopic?: string): string[] | null
 }
 
 /**
- * Shuffles an array in place using Fisher-Yates
+ * Embaralha um array localmente utilizando o algoritmo Fisher-Yates
  */
 function shuffle<T>(arr: T[]): T[] {
   const result = [...arr];
@@ -213,13 +213,13 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 /**
- * Generates 3 semantic distractors for the given targetWord.
+ * Gera 3 alternativas distratoras semânticas para a palavra-alvo informada.
  *
- * Rules:
- * 1. Distractors are related to the word / topic ("palavras que tenham a ver com a correta mas não são").
- * 2. Words in `excludeWords` (e.g. other cards in the same deck) are STRICTLY excluded.
- * 3. Never returns duplicates.
- * 4. Never returns the target word itself.
+ * Regras:
+ * 1. Distratores possuem relação com o tópico pedagógico da palavra correta.
+ * 2. Termos presentes em `excludeWords` (ex: outros cards do baralho) são estritamente excluídos.
+ * 3. Nunca retorna opções duplicadas.
+ * 4. Nunca retorna a própria palavra correta.
  */
 export function getSemanticDistractors(
   targetWord: string,
@@ -248,7 +248,7 @@ export function getSemanticDistractors(
     }
   }
 
-  // If we still need more distractors, draw from other categories
+  // Se ainda forem necessários mais distratores, seleciona de outras categorias
   if (chosenDistractors.length < 3) {
     const allCategoryWords = Object.values(SEMANTIC_CATEGORIES).flat();
     const otherCandidates = shuffle(allCategoryWords).filter((w) => {

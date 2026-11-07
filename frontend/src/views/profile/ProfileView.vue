@@ -50,7 +50,7 @@ const { user, logout, updateUserData } = useAuth();
 
 const tab = ref<Tab>('personal');
 
-// Check URL query for tab param
+// Verifica os parâmetros da URL para definir a aba ativa
 onMounted(() => {
   const qTab = route.query.tab as string;
   if (qTab && ['personal', 'achievements', 'feedbacks', 'security'].includes(qTab)) {
@@ -205,7 +205,7 @@ onMounted(() => {
   }
 });
 
-// Sync user into formData when user updates
+// Sincroniza os dados do usuário no formulário quando o perfil for atualizado
 watch(
   user,
   (u) => {

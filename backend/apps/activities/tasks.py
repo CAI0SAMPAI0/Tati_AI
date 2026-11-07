@@ -142,6 +142,8 @@ def _sync_from_source(content: PremiumContent, content_id: str, local_dir: str) 
             page.save(os.path.join(pages_dir, img_name), "WEBP", quality=75)
             new_files.append(img_name)
         del pages
+        import gc
+        gc.collect()
 
         # Publica as páginas novas (substituição atômica arquivo a arquivo)
         os.makedirs(local_dir, exist_ok=True)

@@ -193,12 +193,12 @@ onMounted(() => {
       </ol>
     </section>
 
-    <!-- Action Card (Start or Resume Exam vs Locked) -->
+    <!-- Cartão de ação (Iniciar ou Continuar Exame vs Bloqueado) -->
     <div v-if="isLoading" class="h-48 bg-surface border border-border rounded-3xl animate-pulse flex items-center justify-center">
       <span class="text-xs text-text-muted font-bold">Loading quarterly exam status...</span>
     </div>
 
-    <!-- Active State: Ready or In Progress -->
+    <!-- Estado ativo: Pronto para iniciar ou Em andamento -->
     <section
       v-else-if="canStart"
       class="bg-gradient-to-br from-primary to-primary-hover text-white rounded-3xl p-6 md:p-8 shadow-md"

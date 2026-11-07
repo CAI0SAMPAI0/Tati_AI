@@ -241,7 +241,7 @@ async function handleSendMessage() {
     }
   } catch (err: any) {
     console.error('Error submitting answer:', err);
-    // Simulating next question or completion on error
+    // Simulação de transição para a próxima questão ou conclusão em caso de erro
     if (currentQuestion.value >= totalQuestions.value) {
       isCompleted.value = true;
       assessedLevel.value = 'B1';

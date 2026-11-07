@@ -51,7 +51,7 @@ function persistLocalSettings() {
 }
 
 onMounted(async () => {
-  // Load local settings
+  // Carrega configurações locais salvas no navegador
   const saved = localStorage.getItem('tati_settings');
   if (saved) {
     try {
@@ -59,7 +59,7 @@ onMounted(async () => {
     } catch {}
   }
 
-  // Load from backend
+  // Carrega preferências do usuário salvas no backend
   try {
     const data = await apiGet<any>('/users/notification-preferences');
     if (data) {

@@ -56,7 +56,7 @@ async function loadPlans() {
     plans.value = res || [];
   } catch (err) {
     console.error('Error loading plans:', err);
-    // Fallback plans if backend plans endpoint has issue
+    // Planos de contingência caso o endpoint do backend apresente instabilidade
     plans.value = [
       {
         id: 'full',

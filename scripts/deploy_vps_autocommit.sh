@@ -56,7 +56,7 @@ for cid in $APP_CONTAINERS; do
     echo ">>> Container $cid recarregado com gunicorn HUP!"
 done
 
-# 5. Atualiza o celery worker se estiver rodando
+# 5. Atualiza e recicla o celery worker para liberar memoria e swap
 if [ -n "$WORKER_CONTAINERS" ]; then
     for wid in $WORKER_CONTAINERS; do
         echo ">>> Atualizando codigo no worker $wid..."
@@ -64,6 +64,8 @@ if [ -n "$WORKER_CONTAINERS" ]; then
         docker exec "$wid" python -m compileall /app/apps/ >/dev/null 2>&1 || true
         echo ">>> Celery worker $wid atualizado!"
     done
+    echo ">>> Reciclando o servico tati_ai_celery_worker no Swarm para liberar RAM e Swap..."
+    docker service update --force tati_ai_celery_worker || true
 fi
 
 # 6. Teste de saude (Healthcheck)

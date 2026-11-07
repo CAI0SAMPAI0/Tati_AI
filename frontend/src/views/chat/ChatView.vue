@@ -66,12 +66,12 @@ watch(
 );
 
 async function loadConversationMessages(id: string) {
-  // 1. Instant load from memory cache (0ms delay)
+  // 1. Carregamento instantâneo a partir do cache em memória (latência zero)
   const memCached = memoryMessagesCache.get(id);
   if (memCached && memCached.length > 0) {
     messages.value = memCached;
   } else {
-    // 2. Fast load from indexedDB
+    // 2. Carregamento rápido via IndexedDB local
     getMessagesLocal(id).then((localMsgs) => {
       if (localMsgs && localMsgs.length > 0 && activeConvId.value === id) {
         messages.value = localMsgs;
@@ -167,7 +167,7 @@ async function handleSend(text: string) {
       memoryMessagesCache.set(convId, [...messages.value]);
       saveMessagesLocal(convId, messages.value).catch(() => {});
     }
-    // Synchronize DB UUIDs for all messages
+    // Sincroniza os identificadores UUID do banco de dados para todas as mensagens
     loadConversationMessages(convId);
   } catch (err: any) {
     console.error('Error sending message:', err);
@@ -224,7 +224,7 @@ async function handleSendAudio(base64: string) {
       memoryMessagesCache.set(convId, [...messages.value]);
       saveMessagesLocal(convId, messages.value).catch(() => {});
     }
-    // Synchronize DB UUIDs for all messages
+    // Sincroniza os identificadores UUID do banco de dados para todas as mensagens
     loadConversationMessages(convId);
   } catch (err: any) {
     console.error('Error sending audio message:', err);

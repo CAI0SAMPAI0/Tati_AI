@@ -46,7 +46,7 @@ onMounted(() => {
         <Loader2 class="animate-spin text-primary" :size="36" />
       </div>
 
-      <!-- Not Logged In State -->
+      <!-- Estado de usuário não autenticado -->
       <div v-else-if="!user" class="mx-auto max-w-lg p-10 text-center rounded-2xl border border-border bg-surface">
         <h2 class="text-xl font-bold text-text mb-2">My Materials</h2>
         <p class="text-sm text-text-muted mb-6">Sign in to your account to view your library.</p>
@@ -55,7 +55,7 @@ onMounted(() => {
         </RouterLink>
       </div>
 
-      <!-- Empty State -->
+      <!-- Estado vazio sem materiais -->
       <div
         v-else-if="items.length === 0"
         class="flex flex-col items-center rounded-2xl border border-border bg-surface p-12 text-center"

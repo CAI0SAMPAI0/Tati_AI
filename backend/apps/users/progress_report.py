@@ -137,7 +137,7 @@ class ProgressReportGenerator:
             "HeaderTableText", parent=styles["Normal"], fontSize=9, leading=14, textColor=TEXT_DARK
         )
 
-        # 1. Header with Tatiana's Logo on the top-right
+        # 1. Cabeçalho com o logotipo da Teacher Tatiana no canto superior direito
         logo_path = Path(settings.BASE_DIR) / "assets" / "images" / "tati_logo.jpg"
         if not logo_path.exists():
             logo_path = Path(settings.BASE_DIR).parent / "frontend" / "public" / "images" / "tati_logo.jpg"

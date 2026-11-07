@@ -225,7 +225,7 @@ onMounted(() => {
             {{ m.description }}
           </p>
 
-          <!-- Progress bar if locked and target exists -->
+          <!-- Barra de progresso para conquistas bloqueadas com meta definida -->
           <div v-if="!m.unlocked && m.target" class="pt-2 space-y-1">
             <div class="flex items-center justify-between text-[0.65rem] font-bold text-text-subtle">
               <span>Progress</span>

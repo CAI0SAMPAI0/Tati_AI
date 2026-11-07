@@ -39,5 +39,5 @@ class PushSubscription(models.Model):
         return f"Push {self.username} ({self.id})"
 
 
-# Alias for compatibility with external/diagnostic scripts
+# Apelido para compatibilidade com rotinas externas e diagnósticos
 DeviceToken = PushSubscription

@@ -230,7 +230,7 @@ services:
   celery_worker:
     image: ghcr.io/cai0sampai0/tati_ai:${APP_IMAGE_TAG:-latest}
     entrypoint: ["/app/worker-entrypoint.sh"]
-    command: celery -A app worker -l info --concurrency=2
+    command: celery -A app worker -l info --concurrency=2 --max-tasks-per-child=20 --max-memory-per-child=250000
     env_file: .env
     environment:
       ENVIRONMENT: "production"
@@ -276,10 +276,10 @@ services:
       resources:
         limits:
           cpus: "1.0"
-          memory: 1280M
+          memory: 512M
         reservations:
           cpus: "0.2"
-          memory: 256M
+          memory: 128M
 
   celery_beat:
     image: ghcr.io/cai0sampai0/tati_ai:${APP_IMAGE_TAG:-latest}

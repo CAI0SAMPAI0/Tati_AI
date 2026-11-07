@@ -166,7 +166,7 @@ watch(
   }
 );
 
-// Auto scroll on new messages or transcription
+// Rolagem automática ao receber novas mensagens ou atualizações de transcrição
 watch(
   [() => messages.value.length, transcription],
   () => {
@@ -783,7 +783,7 @@ onUnmounted(() => {
                 " @word-click="handleWordClick" />
           </div>
 
-          <!-- Processing bubble when waiting for assistant -->
+          <!-- Balão indicador de processamento enquanto aguarda a resposta da Teacher Tati -->
           <div
             v-if="state === 'processing' && !isTranscribing && (messages.length === 0 || messages[messages.length - 1].role === 'user')"
             class="flex flex-col gap-1.5 max-w-[85%] md:max-w-[75%] animate-in fade-in slide-in-from-bottom-2 duration-300 mr-auto text-left">

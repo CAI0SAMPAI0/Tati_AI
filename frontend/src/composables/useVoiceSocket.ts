@@ -596,12 +596,12 @@ export function useVoiceSocket(
     socket?.send(msg);
   }
 
-  // Load history when conversationId changes
+  // Carrega o histórico quando o conversationId mudar
   async function loadInitialHistory(cId: string) {
     activeConvId.value = cId;
     completedObjectives.value = [];
 
-    // 1. IndexedDB cache load
+    // 1. Carregamento a partir do cache IndexedDB
     try {
       const cached = await getMessagesLocal(cId);
       if (cached.length > 0) {
@@ -614,7 +614,7 @@ export function useVoiceSocket(
       }
     } catch (_) {}
 
-    // 2. Fetch from backend
+    // 2. Busca os dados no backend
     try {
       const history = await apiGet<Message[]>(ENDPOINTS.CONVERSATION_MESSAGES(cId));
       if (history && history.length > 0) {
@@ -631,7 +631,7 @@ export function useVoiceSocket(
     }
   }
 
-  // Sync to IndexedDB on messages change
+  // Sincroniza com o IndexedDB quando as mensagens mudarem
   watch(
     () => messages.value.length,
     () => {

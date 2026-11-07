@@ -79,7 +79,7 @@ export const useAuthStore = defineStore('auth', () => {
       saveStoredAccent(normalized.preferred_accent);
     }
 
-    // Immediately fetch full fresh profile in background so avatar, name, and level are always populated
+    // Busca imediatamente o perfil atualizado em segundo plano para preencher avatar, nome e nível
     apiGet<User>(ENDPOINTS.PROFILE)
       .then((fresh) => {
         if (fresh) {

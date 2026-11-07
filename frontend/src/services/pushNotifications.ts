@@ -5,7 +5,7 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
     return null;
   }
 
-  // Never register service worker in Capacitor native platform to avoid reload loops
+  // Nunca registra service worker no ambiente nativo do Capacitor para evitar loops de recarregamento
   const w = window as any;
   if (w.Capacitor?.isNativePlatform?.()) return null;
 
@@ -66,7 +66,7 @@ export async function subscribeToPush(): Promise<boolean> {
           });
           return true;
         } catch {
-          // If expired, unsubscribe and re-create
+          // Se expirada, cancela a assinatura e cria novamente
           try {
             await subscription.unsubscribe();
           } catch {}

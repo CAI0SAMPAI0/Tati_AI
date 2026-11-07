@@ -236,7 +236,7 @@ async function handleSendReportEmail() {
       '/users/progress/report/send-email',
       {}
     ).catch(async () => {
-      // Fallback endpoint if specific one is different
+      // Ponto de contingência caso o endpoint específico esteja indisponível
       return await apiPost<{ success?: boolean; message?: string; email?: string }>(
         ENDPOINTS.CHAT_DOWNLOAD_REPORT,
         { lang: 'en' }

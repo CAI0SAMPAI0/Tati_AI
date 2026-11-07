@@ -228,9 +228,9 @@ def delete_student(request: HttpRequest, username: str):
     return DashboardService.delete_student(username)
 
 
-# ---------------------------------------------------------------------------
-#  LEARNING TRAILS (TRILHAS DE APRENDIZADO & BOSS FIGHT)
-# ---------------------------------------------------------------------------
+
+# Trilhas de aprendizado e exame da fase
+
 
 
 class TrailSaveInput(BaseModel):

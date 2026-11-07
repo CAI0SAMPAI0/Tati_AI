@@ -239,7 +239,7 @@ function checkCompletionFromSubmissions(subs: any[]) {
 async function loadDeck() {
   if (!deckId.value) return;
 
-  // 1. Instant 0ms cache check for deck
+  // 1. Verificação instantânea no cache local em memória (latência zero)
   const cachedDeck = peekActivityCache<Deck>(deckCacheKey.value);
   if (cachedDeck) {
     deck.value = cachedDeck;
@@ -597,7 +597,7 @@ function handleKeydown(e: KeyboardEvent) {
       handleSkip();
     }
   } else {
-    // Proceed on Enter or Space
+    // Avança ao pressionar Enter ou Barra de espaço
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       handleNext();
@@ -771,11 +771,11 @@ onUnmounted(() => {
           <h1 class="text-xl md:text-2xl font-black text-text mt-2">{{ deck.title }}</h1>
         </div>
 
-        <!-- Question Prompt / Context Container -->
+        <!-- Contêiner de enunciado e contexto pedagógico -->
         <div class="bg-surface border-2 border-border rounded-3xl shadow-xl overflow-hidden">
-          <!-- Illustration / Question Header (Never spoils the answer) -->
+          <!-- Ilustração e cabeçalho da questão sem revelar a resposta -->
           <div class="p-6 md:p-8 text-center space-y-4 bg-gradient-to-b from-primary/5 to-transparent border-b border-border/50">
-            <!-- If card has an image, the image is the visual clue -->
+            <!-- Quando o card possui imagem, ela serve de pista visual -->
             <div v-if="currentCard?.image_url && !imageError" class="space-y-3">
               <span class="text-xs uppercase font-black text-primary tracking-widest block">
                 Look at the image

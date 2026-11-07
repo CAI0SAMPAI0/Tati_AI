@@ -333,7 +333,7 @@ function handleMouseLeave() {
           : 'translateX(-50%)',
       }"
     >
-      <!-- Pointer arrow when positioned at bottom -->
+      <!-- Seta indicadora quando posicionada na parte inferior -->
       <div
         v-if="props.tooltipPosition === 'bottom'"
         class="absolute -top-1.5 w-3 h-3 bg-surface border-t border-l border-border rotate-45 pointer-events-none"

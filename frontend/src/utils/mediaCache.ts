@@ -1,6 +1,6 @@
 /**
- * Media Cache Utility using the browser Cache Storage API.
- * Provides offline & persistent 30-day caching for protected materials, documents, and media.
+ * Utilitário de cache de mídia utilizando a Cache Storage API do navegador.
+ * Fornece armazenamento persistente por 30 dias para materiais protegidos, documentos e mídias.
  */
 
 const CACHE_NAME = 'tati_materials_pages_v1';
@@ -11,7 +11,7 @@ export async function getCachedMediaUrl(originalUrl: string): Promise<string> {
     return originalUrl;
   }
 
-  // If already mapped to an object URL in this session, return it
+  // Se já mapeado para uma object URL nesta sessão, retorna diretamente
   if (blobUrlMap.has(originalUrl)) {
     return blobUrlMap.get(originalUrl)!;
   }
@@ -27,7 +27,7 @@ export async function getCachedMediaUrl(originalUrl: string): Promise<string> {
       return objectUrl;
     }
 
-    // Fetch and store in cache
+    // Baixa a mídia e armazena no cache
     const response = await fetch(originalUrl, { mode: 'cors' });
     if (response.ok) {
       await cache.put(originalUrl, response.clone());
@@ -37,7 +37,7 @@ export async function getCachedMediaUrl(originalUrl: string): Promise<string> {
       return objectUrl;
     }
   } catch (err) {
-    // If CORS or CacheStorage fails, fallback gracefully to original URL
+    // Em caso de falha de CORS ou CacheStorage, utiliza a URL original como contingência
     console.debug('[mediaCache] Fallback to direct URL for:', originalUrl);
   }
 

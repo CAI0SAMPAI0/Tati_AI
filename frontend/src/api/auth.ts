@@ -81,7 +81,7 @@ export function saveStoredSession(session: StoredSession): void {
     if (session.refreshToken) {
       localStorage.setItem(REFRESH_TOKEN_KEY, session.refreshToken);
     }
-    // set cookie for SSR / interoperability
+    // Define cookie para renderização no servidor (SSR) e interoperabilidade
     document.cookie = `auth_token=${session.token}; path=/; max-age=2592000; SameSite=Lax`;
   } catch {}
 }
