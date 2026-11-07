@@ -33,26 +33,54 @@ class Migration(migrations.Migration):
                 'managed': False,
             },
         ),
-        migrations.CreateModel(
-            name='PronunciationHistory',
-            fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('username', models.CharField(db_index=True, max_length=150)),
-                ('target_phrase', models.TextField()),
-                ('spoken_phrase', models.TextField(blank=True, default='')),
-                ('score', models.FloatField(default=0.0)),
-                ('accuracy_score', models.FloatField(default=0.0)),
-                ('fluency_score', models.FloatField(default=0.0)),
-                ('words_result', models.JSONField(blank=True, default=list)),
-                ('feedback', models.TextField(blank=True, default='')),
-                ('accent', models.CharField(default='en-US', max_length=50)),
-                ('mode', models.CharField(default='preset', max_length=50)),
-                ('user_audio_b64', models.TextField(blank=True, default='')),
-                ('created_at', models.DateTimeField(auto_now_add=True, db_index=True)),
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.CreateModel(
+                    name='PronunciationHistory',
+                    fields=[
+                        ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
+                        ('username', models.CharField(db_index=True, max_length=150)),
+                        ('target_phrase', models.TextField()),
+                        ('spoken_phrase', models.TextField(blank=True, default='')),
+                        ('score', models.FloatField(default=0.0)),
+                        ('accuracy_score', models.FloatField(default=0.0)),
+                        ('fluency_score', models.FloatField(default=0.0)),
+                        ('words_result', models.JSONField(blank=True, default=list)),
+                        ('feedback', models.TextField(blank=True, default='')),
+                        ('accent', models.CharField(default='en-US', max_length=50)),
+                        ('mode', models.CharField(default='preset', max_length=50)),
+                        ('user_audio_b64', models.TextField(blank=True, default='')),
+                        ('created_at', models.DateTimeField(auto_now_add=True, db_index=True)),
+                    ],
+                    options={
+                        'db_table': 'pronunciation_history',
+                        'ordering': ['-created_at'],
+                    },
+                ),
             ],
-            options={
-                'db_table': 'pronunciation_history',
-                'ordering': ['-created_at'],
-            },
+            database_operations=[
+                migrations.RunSQL(
+                    sql="""
+                    CREATE TABLE IF NOT EXISTS "pronunciation_history" (
+                        "id" uuid NOT NULL PRIMARY KEY,
+                        "username" varchar(150) NOT NULL,
+                        "target_phrase" text NOT NULL,
+                        "spoken_phrase" text NOT NULL,
+                        "score" double precision NOT NULL,
+                        "accuracy_score" double precision NOT NULL,
+                        "fluency_score" double precision NOT NULL,
+                        "words_result" jsonb NOT NULL,
+                        "feedback" text NOT NULL,
+                        "accent" varchar(50) NOT NULL,
+                        "mode" varchar(50) NOT NULL,
+                        "user_audio_b64" text NOT NULL,
+                        "created_at" timestamp with time zone NOT NULL
+                    );
+                    CREATE INDEX IF NOT EXISTS "pronunciation_history_username_idx" ON "pronunciation_history" ("username");
+                    CREATE INDEX IF NOT EXISTS "pronunciation_history_created_at_idx" ON "pronunciation_history" ("created_at");
+                    """,
+                    reverse_sql="DROP TABLE IF EXISTS pronunciation_history CASCADE;",
+                ),
+            ],
         ),
     ]

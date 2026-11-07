@@ -34,6 +34,7 @@ from .schemas import (
 from apps.users.services import XPService, StreakService
 
 User = get_user_model()
+DEFAULT_AVATAR_URL = "/images/default-avatar.png"
 logger = logging.getLogger(__name__)
 
 from shared.prompt_manager import PromptManager
@@ -634,7 +635,7 @@ class RankingService:
                 if raw_avatar and isinstance(raw_avatar, str) and raw_avatar.startswith("data:image/") and len(raw_avatar) > 2048:
                     clean_avatar = DEFAULT_AVATAR_URL
                 else:
-                    clean_avatar = raw_avatar
+                    clean_avatar = raw_avatar if (raw_avatar and str(raw_avatar).strip()) else DEFAULT_AVATAR_URL
 
                 students.append(
                     {
