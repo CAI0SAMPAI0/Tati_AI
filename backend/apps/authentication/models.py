@@ -205,7 +205,18 @@ class User(AbstractBaseUser):
 
     @property
     def is_staff(self) -> bool:
-        return self.role in (UserRole.PROGRAMADOR, UserRole.PROFESSOR, "admin", "Admin")
+        role_clean = str(self.role or "").lower().strip()
+        return role_clean in (
+            UserRole.PROGRAMADOR.value,
+            UserRole.PROFESSOR.value,
+            "admin",
+            "administrator",
+            "teacher",
+            "professor",
+            "professora",
+            "programmer",
+            "programador",
+        )
 
     @is_staff.setter
     def is_staff(self, val: bool):
@@ -213,7 +224,14 @@ class User(AbstractBaseUser):
 
     @property
     def is_superuser(self) -> bool:
-        return self.role in (UserRole.PROGRAMADOR, "admin", "Admin")
+        role_clean = str(self.role or "").lower().strip()
+        return role_clean in (
+            UserRole.PROGRAMADOR.value,
+            "admin",
+            "administrator",
+            "programmer",
+            "programador",
+        )
 
 
     @is_superuser.setter

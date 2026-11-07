@@ -8,7 +8,11 @@ cd "$REPO_DIR"
 # 1. Garante permissão nos scripts
 chmod +x scripts/*.sh backend/*.sh 2>/dev/null || true
 
-# 2. Localiza os containers ativos do serviço app e celery
+# 2. Reconcilia o Docker Stack para aplicar novas labels de WebSockets do Traefik e limites
+echo ">>> Sincronizando definicao da Stack no Docker Swarm..."
+./scripts/deploy.sh --skip-build || true
+
+# 3. Localiza os containers ativos do serviço app e celery
 APP_CONTAINERS="$(docker ps --filter "name=tati_ai_app" --filter "status=running" -q || true)"
 WORKER_CONTAINERS="$(docker ps --filter "name=tati_ai_celery_worker" --filter "status=running" -q || true)"
 
