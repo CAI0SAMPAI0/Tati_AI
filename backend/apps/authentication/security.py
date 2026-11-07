@@ -8,7 +8,22 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from ninja.errors import HttpError
 
-User = get_user_model()
+class _LazyUserModel:
+    """
+    Carregador preguiçoso do modelo de usuário para evitar exceções
+    AppRegistryNotReady quando este módulo for importado antes do Django inicializar.
+    """
+
+    def __getattr__(self, name: str):
+        from django.contrib.auth import get_user_model
+        return getattr(get_user_model(), name)
+
+    def __call__(self, *args, **kwargs):
+        from django.contrib.auth import get_user_model
+        return get_user_model()(*args, **kwargs)
+
+
+User = _LazyUserModel()
 
 JWT_SECRET_KEY = getattr(settings, "SECRET_KEY", "default-jwt-secret-key-2026")
 JWT_ALGORITHM = getattr(settings, "JWT_ALGORITHM", "HS256")
@@ -17,7 +32,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(
 )  # 90 dias (3 meses)
 
 
-#    CRIPTO & HASH DE SENHA                                             
+# Criptografia e hash de senha                                             
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -72,7 +87,7 @@ def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
 
 
-#    JWT TOKENS                                                         
+# Tokens JWT                                                         
 
 
 def create_access_token(
@@ -142,7 +157,7 @@ def decode_token(token: str) -> Optional[Dict[str, Any]]:
 decode_jwt_token = decode_token
 
 
-#    AUTENTICAÇÃO NINJA (HTTPBEARER)                                    
+# Autenticação Ninja (HttpBearer)                                    
 
 
 class AuthBearer(HttpBearer):
@@ -227,13 +242,13 @@ auth_required = AuthBearer()
 auth_optional = OptionalAuthBearer()
 
 
-def require_programmer(user: User):
+def require_programmer(user: Any):
     """Garante que o usuário é um programador/superadmin."""
     if not user or isinstance(user, bool) or not getattr(user, "is_programmer", False):
         raise HttpError(403, "Acesso restrito apenas ao programador / superadmin.")
 
 
-def require_teacher(user: User):
+def require_teacher(user: Any):
     """Garante que o usuário é a professora Tatiana ou o programador."""
     if not user or isinstance(user, bool) or not getattr(user, "is_teacher", False):
         raise HttpError(
