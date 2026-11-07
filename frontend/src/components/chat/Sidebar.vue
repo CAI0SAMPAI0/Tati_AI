@@ -127,6 +127,7 @@ defineExpose({
             alt="Avatar"
             class="w-full h-full object-cover"
             @error="(e: any) => { e.currentTarget.src = DEFAULT_AVATAR_URL; }"
+            referrerpolicy="no-referrer"
           />
         </div>
         <div class="flex-1 min-w-0">

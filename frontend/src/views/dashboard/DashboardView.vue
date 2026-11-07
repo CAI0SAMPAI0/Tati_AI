@@ -169,21 +169,63 @@ async function loadDashboardData(isSilent = false) {
   }
 }
 
+function isStudentOnline(s: any): boolean {
+  if (!s) return false;
+  if (s.is_online !== undefined && s.is_online !== null) {
+    return Boolean(s.is_online);
+  }
+  return isUserActiveNow(s.last_active, currentNow.value);
+}
+
+function handlePresenceChanged(event: any) {
+  const data = event?.detail || event;
+  if (!data?.username) return;
+  const s = students.value.find((item: any) => item.username === data.username);
+  if (s) {
+    s.is_online = Boolean(data.is_online);
+    if (data.last_active) {
+      s.last_active = data.last_active;
+    }
+    students.value = [...students.value];
+    if (selectedStudent.value && selectedStudent.value.username === data.username) {
+      selectedStudent.value.is_online = s.is_online;
+      if (data.last_active) {
+        selectedStudent.value.last_active = data.last_active;
+      }
+      selectedStudent.value = { ...selectedStudent.value };
+    }
+  }
+}
+
+function handlePresenceSync(event: any) {
+  const data = event?.detail || event;
+  const onlineUsers = new Set(data?.online_users || []);
+  for (const s of students.value) {
+    s.is_online = onlineUsers.has(s.username);
+  }
+}
+
 onMounted(() => {
   if (window.innerWidth < 768) {
     isSidebarOpen.value = false;
   }
   loadDashboardData();
 
-  // Atualiza o relógio a cada 10s para o indicador reativo 'Using now'
+  // Atualiza o relógio a cada 10s para o indicador reativo 'Online'
   clockInterval = setInterval(() => {
     currentNow.value = Date.now();
   }, 10000);
 
-  // Atualiza a cada 10 segundos para presença e métricas em tempo real
+  // Fallback em segundo plano estendido para 5 minutos (presença e dados sincronizados via WebSocket)
   pollInterval = setInterval(() => {
     loadDashboardData(true);
-  }, 10000);
+  }, 5 * 60 * 1000);
+
+  // Escuta presença e conexões em tempo real via WebSocket
+  window.addEventListener('user_presence_changed', handlePresenceChanged);
+  window.addEventListener('user-presence-changed', handlePresenceChanged);
+  window.addEventListener('presence_sync', handlePresenceSync);
+  window.addEventListener('presence-sync', handlePresenceSync);
 
   // Revalida imediatamente ao focar / reconectar / aba visível
   window.addEventListener('focus', handleRevalidate);
@@ -200,6 +242,10 @@ onUnmounted(() => {
   if (clockInterval) clearInterval(clockInterval);
   window.removeEventListener('focus', handleRevalidate);
   window.removeEventListener('online', handleRevalidate);
+  window.removeEventListener('user_presence_changed', handlePresenceChanged);
+  window.removeEventListener('user-presence-changed', handlePresenceChanged);
+  window.removeEventListener('presence_sync', handlePresenceSync);
+  window.removeEventListener('presence-sync', handlePresenceSync);
 });
 
 const filteredStudents = computed(() => {
@@ -368,6 +414,7 @@ const sectionTitles: Record<DashSection, { title: string; subtitle: string }> = 
                             :src="s.avatar_url"
                             :alt="s.name || s.username"
                             class="w-full h-full rounded-full object-cover"
+                            referrerpolicy="no-referrer"
                             @error="(e: any) => { e.currentTarget.style.display = 'none'; }"
                           />
                           <span v-else>{{ (s.name || s.username || '?').charAt(0).toUpperCase() }}</span>
@@ -393,14 +440,14 @@ const sectionTitles: Record<DashSection, { title: string; subtitle: string }> = 
                     </td>
                     <td class="px-5 py-3 text-text-muted">
                       <span
-                        v-if="isUserActiveNow(s.last_active, currentNow)"
+                        v-if="isStudentOnline(s)"
                         class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[0.7rem] font-bold bg-success/15 text-success border border-success/30"
                       >
                         <span class="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-                        Using now
+                        Online
                       </span>
                       <span v-else>
-                        {{ s.last_active ? formatLastActive(s.last_active, currentNow) : '—' }}
+                        {{ s.last_active ? formatLastActive(s.last_active, currentNow, false) : '—' }}
                       </span>
                     </td>
                   </tr>
@@ -452,6 +499,7 @@ const sectionTitles: Record<DashSection, { title: string; subtitle: string }> = 
                           :src="s.avatar_url"
                           :alt="s.name || s.username"
                           class="w-full h-full rounded-full object-cover"
+                          referrerpolicy="no-referrer"
                           @error="(e: any) => { e.currentTarget.style.display = 'none'; }"
                         />
                         <span v-else>{{ (s.name || s.username || '?').charAt(0).toUpperCase() }}</span>
@@ -480,14 +528,14 @@ const sectionTitles: Record<DashSection, { title: string; subtitle: string }> = 
                   </td>
                   <td class="px-5 py-3 text-text-muted">
                     <span
-                      v-if="isUserActiveNow(s.last_active, currentNow)"
+                      v-if="isStudentOnline(s)"
                       class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[0.7rem] font-bold bg-success/15 text-success border border-success/30"
                     >
                       <span class="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-                      Using now
+                      Online
                     </span>
                     <span v-else>
-                      {{ s.last_active ? formatLastActive(s.last_active, currentNow) : '—' }}
+                      {{ s.last_active ? formatLastActive(s.last_active, currentNow, false) : '—' }}
                     </span>
                   </td>
                   <td class="px-5 py-3 font-semibold text-text">

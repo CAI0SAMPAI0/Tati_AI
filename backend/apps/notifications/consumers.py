@@ -1,7 +1,9 @@
 import logging
 import urllib.parse
+from django.utils import timezone
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from apps.authentication.security import decode_token
+from apps.notifications.presence import PresenceService
 from apps.notifications.websocket import get_user_group
 from shared.async_db import aget_user_by_username
 
@@ -57,8 +59,26 @@ class NotificationConsumer(AsyncJsonWebsocketConsumer):
             self.username,
             is_teacher,
         )
-    
+
+        # Registra presença online e notifica o dashboard da Tatiana em tempo real
+        await PresenceService.amark_online(self.channel_name, self.username)
+
+        # Se for professora/admin, envia a lista inicial completa de quem está online agora
+        if is_teacher:
+            online_users = await PresenceService.aget_online_usernames()
+            await self.send_json(
+                {
+                    "type": "presence_sync",
+                    "data": {
+                        "online_users": list(online_users),
+                    },
+                }
+            )
+
     async def disconnect(self, close_code):
+        if hasattr(self, "username") and getattr(self, "user", None):
+            await PresenceService.amark_offline(self.channel_name, self.username)
+
         if hasattr(self, "user_group"):
             await self.channel_layer.group_discard(
                 self.user_group,
@@ -76,6 +96,19 @@ class NotificationConsumer(AsyncJsonWebsocketConsumer):
                     "teachers",
                     self.channel_name,
                 )
+
+    async def receive_json(self, content, **kwargs):
+        """Recebe heartbeats leves e pings do cliente sem bater no banco relacional."""
+        msg_type = content.get("type")
+        if msg_type in ("heartbeat", "ping"):
+            if hasattr(self, "username"):
+                await PresenceService.arecord_activity(self.username)
+            await self.send_json(
+                {
+                    "type": "pong",
+                    "timestamp": timezone.now().isoformat(),
+                }
+            )
 
     async def send_notification(self, event):
         await self.send_json(

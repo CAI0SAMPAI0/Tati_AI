@@ -159,7 +159,7 @@ async function handleToggleDone() {
             v-if="activity.image"
             class="h-36 sm:h-44 rounded-2xl overflow-hidden bg-bg-secondary border border-border/50 shrink-0"
           >
-            <img :src="activity.image" :alt="activity.title" class="w-full h-full object-cover" />
+            <img :src="activity.image" :alt="activity.title" class="w-full h-full object-cover"  referrerpolicy="no-referrer" />
           </div>
 
           <!-- Musics Game Modes -->

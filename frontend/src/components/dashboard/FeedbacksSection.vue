@@ -173,6 +173,7 @@ onMounted(() => {
               :src="item.student_avatar_url || DEFAULT_AVATAR_URL"
               :alt="item.student_name || item.student_username"
               class="w-10 h-10 rounded-full border border-border object-cover bg-bg-secondary shrink-0"
+              referrerpolicy="no-referrer"
               @error="($event.target as HTMLImageElement).src = DEFAULT_AVATAR_URL"
             />
             <div>

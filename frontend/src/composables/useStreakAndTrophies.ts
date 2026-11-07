@@ -51,7 +51,15 @@ export function useStreakAndTrophies() {
     } catch {}
   }
 
-  function handleEventUpdate() {
+  function handleEventUpdate(event?: any) {
+    const data = event?.detail;
+    if (data && typeof data.current_streak === 'number') {
+      currentStreak.value = data.current_streak;
+      isStreakActive.value = data.current_streak > 0;
+    }
+    if (data && typeof data.trophies_earned === 'number') {
+      trophiesEarned.value = data.trophies_earned;
+    }
     fetchStats();
   }
 
@@ -61,6 +69,7 @@ export function useStreakAndTrophies() {
       window.addEventListener('tati_streak_updated', handleEventUpdate);
       window.addEventListener('tati_chat_activity', handleEventUpdate);
       window.addEventListener('tati_activity_completed', handleEventUpdate);
+      window.addEventListener('learning-trail-step-updated', handleEventUpdate);
       window.addEventListener('storage', handleEventUpdate);
     }
   });
@@ -70,6 +79,7 @@ export function useStreakAndTrophies() {
       window.removeEventListener('tati_streak_updated', handleEventUpdate);
       window.removeEventListener('tati_chat_activity', handleEventUpdate);
       window.removeEventListener('tati_activity_completed', handleEventUpdate);
+      window.removeEventListener('learning-trail-step-updated', handleEventUpdate);
       window.removeEventListener('storage', handleEventUpdate);
     }
   });

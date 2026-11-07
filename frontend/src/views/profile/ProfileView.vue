@@ -404,7 +404,7 @@ async function handleDeleteAccount() {
               :src="avatarUrl"
               alt="Profile avatar"
               class="w-full h-full rounded-full object-cover"
-            />
+             referrerpolicy="no-referrer" />
           </div>
           <label class="absolute bottom-0 right-0 w-7 h-7 bg-primary text-white rounded-full flex items-center justify-center cursor-pointer shadow-md hover:bg-primary-hover transition-colors border-2 border-surface">
             <Camera class="w-3.5 h-3.5" />
@@ -662,6 +662,7 @@ async function handleDeleteAccount() {
             >
               <img
                 :src="currentStreak > 0 ? '/images/streak-active.svg' : '/images/streak-inactive.svg'"
+                referrerpolicy="no-referrer"
                 alt="Streak"
                 class="w-6 h-6 object-contain transition-transform hover:scale-110"
                 :class="{ 'opacity-40 grayscale': currentStreak === 0 }"

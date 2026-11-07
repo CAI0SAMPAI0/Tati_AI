@@ -179,6 +179,7 @@ function handleLogout() {
                 :src="avatarUrl"
                 alt="Avatar"
                 class="w-full h-full object-cover"
+                referrerpolicy="no-referrer"
                 @error="($event.target as HTMLImageElement).src = DEFAULT_AVATAR_URL"
               />
             </div>

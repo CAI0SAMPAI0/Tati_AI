@@ -7,7 +7,7 @@ import { useNotificationStore } from './stores/notifications';
 import { usePresence } from './composables/usePresence';
 import { registerServiceWorker, subscribeToPush } from './services/pushNotifications';
 import { isApkOrStandalone } from './router';
-import { NotificationWebSocket } from './ws/notificationSocket';
+import { NotificationWebSocket, setGlobalNotificationSocket } from './ws/notificationSocket';
 
 const authStore = useAuthStore();
 const themeStore = useThemeStore();
@@ -33,10 +33,59 @@ function startNotificationWebSocket() {
       );
     }
 
+    if (message.type === 'user_presence_changed') {
+      window.dispatchEvent(
+        new CustomEvent('user-presence-changed', {
+          detail: message.data,
+        })
+      );
+    }
+
+    if (message.type === 'presence_sync') {
+      window.dispatchEvent(
+        new CustomEvent('presence-sync', {
+          detail: message.data,
+        })
+      );
+    }
+
     if (message.type === 'learning_trail_step_updated') {
-      console.log('[NotificationWS] Etapa da trilha atualizada:', message.data);
       window.dispatchEvent(
         new CustomEvent('learning-trail-step-updated', {
+          detail: message.data,
+        })
+      );
+      window.dispatchEvent(
+        new CustomEvent('tati_streak_updated', {
+          detail: message.data,
+        })
+      );
+      window.dispatchEvent(
+        new CustomEvent('tati_activity_completed', {
+          detail: message.data,
+        })
+      );
+    }
+
+    if (message.type === 'learning_trail_updated') {
+      window.dispatchEvent(
+        new CustomEvent('learning-trail-updated', {
+          detail: message.data,
+        })
+      );
+    }
+
+    if (message.type === 'user_stats_updated' || message.type === 'streak_updated') {
+      window.dispatchEvent(
+        new CustomEvent('tati_streak_updated', {
+          detail: message.data,
+        })
+      );
+    }
+
+    if (message.type === 'competition_updated') {
+      window.dispatchEvent(
+        new CustomEvent('competition-updated', {
           detail: message.data,
         })
       );
@@ -44,11 +93,13 @@ function startNotificationWebSocket() {
   });
 
   notificationSocket.connect();
+  setGlobalNotificationSocket(notificationSocket);
 }
 
 function stopNotificationWebSocket() {
   notificationSocket?.disconnect();
   notificationSocket = null;
+  setGlobalNotificationSocket(null);
 }
 
 function handleGoogleMessage(event: MessageEvent) {

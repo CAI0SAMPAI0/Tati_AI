@@ -199,7 +199,7 @@ onUnmounted(() => {
             draggable="false"
             @load="handleImageLoad($event, index)"
             @error="handleImageError($event, url)"
-          />
+           referrerpolicy="no-referrer" />
 
           <!-- Links Interativos Mapeados ("Click here", botões de áudio e exercícios) -->
           <a

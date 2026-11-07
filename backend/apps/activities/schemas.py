@@ -14,6 +14,12 @@ class FlashcardOut(BaseModel):
     topic: Optional[str] = None
 
 
+class FlashcardProgressInput(BaseModel):
+    deck_id: Optional[str] = ""
+    card_front: Optional[str] = ""
+    status: Optional[str] = "correct"
+
+
 class FlashcardReviewInput(BaseModel):
     card_id: str
     quality: int = Field(..., ge=0, le=5)  # 0 to 5 for SuperMemo SRS

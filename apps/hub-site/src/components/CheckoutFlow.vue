@@ -379,7 +379,7 @@ onUnmounted(() => {
                 :src="qrCodeSrc"
                 alt="QR Code Pix"
                 class="h-48 w-48 rounded-xl border border-line p-2 shadow-sm"
-              />
+               referrerpolicy="no-referrer" />
               <button
                 type="button"
                 class="btn-secondary mt-3 text-xs"

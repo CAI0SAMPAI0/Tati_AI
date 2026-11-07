@@ -60,12 +60,32 @@ export function isUserActiveNow(isoString?: string | null, referenceTime: number
   return diffMs >= -300000 && diffMs <= 5 * 60 * 1000;
 }
 
-export function formatLastActive(isoString?: string | null, referenceTime: number = Date.now()): string {
+export function formatLastActive(
+  isoString?: string | null,
+  referenceTime: number = Date.now(),
+  isOnline?: boolean
+): string {
   if (!isoString || isoString === '—' || isoString === '-' || isoString === 'None' || isoString === '') {
     return '—';
   }
+  // Se o estado online/offline for informado explicitamente via WebSocket
+  if (isOnline === true) {
+    return 'Online';
+  }
+  if (isOnline === false) {
+    const date = parseDisplayDate(isoString);
+    if (!date) return isoString;
+    return date.toLocaleString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+  // Fallback tradicional caso isOnline não esteja disponível
   if (isUserActiveNow(isoString, referenceTime)) {
-    return 'Using now';
+    return 'Online';
   }
   const date = parseDisplayDate(isoString);
   if (!date) return isoString;

@@ -179,8 +179,9 @@ class BackgroundNotificationRunner:
 
         try:
             from apps.notifications.waha_service import WahaService
-            logger.info("[Scheduler] Aquecendo container WAHA na Railway às 17h50 BRT...")
-            res = WahaService.start_session("default")
+            sess_name = os.getenv("WAHA_SESSION", "default")
+            logger.info(f"[Scheduler] Aquecendo sessão WAHA '{sess_name}' às 17h50 BRT...")
+            res = WahaService.start_session(sess_name)
             logger.info(f"[Scheduler] Aquecimento WAHA concluído: {res}")
         except Exception as e:
             logger.warning(f"[Scheduler] Falha ao aquecer WAHA: {e}")
@@ -214,17 +215,15 @@ class BackgroundNotificationRunner:
             res = NotificationSchedulerService.send_daily_streak_reminders_to_all_active_students()
             logger.info(f"[Scheduler] Streak concluído: {res}")
 
-            # Desliga a sessão do WAHA apenas em ambiente SERVERLESS (Railway) para permitir sleep
-            if os.getenv("SERVERLESS", "false").lower() in ("true", "1", "yes"):
-                try:
-                    from apps.notifications.waha_service import WahaService
-                    logger.info("[Scheduler] Finalizando sessão WAHA para liberar o container ao modo sleep na Railway...")
-                    stop_res = WahaService.stop_session("default")
-                    logger.info(f"[Scheduler] Sessão WAHA parada: {stop_res}")
-                except Exception as waha_err:
-                    logger.warning(f"[Scheduler] Falha ao parar sessão WAHA pós-streak: {waha_err}")
-            else:
-                logger.info("[Scheduler] Ambiente VPS dedicado (SERVERLESS=false): mantendo sessão do WAHA permanentemente ativa.")
+            # Desliga a sessão do WAHA pós-streak para liberar imediatamente a memória RAM do Chromium
+            try:
+                from apps.notifications.waha_service import WahaService
+                sess_name = os.getenv("WAHA_SESSION", "default")
+                logger.info(f"[Scheduler] Finalizando sessão WAHA '{sess_name}' para liberar memória RAM do Chromium...")
+                stop_res = WahaService.stop_session(sess_name)
+                logger.info(f"[Scheduler] Sessão WAHA parada: {stop_res}")
+            except Exception as waha_err:
+                logger.warning(f"[Scheduler] Falha ao parar sessão WAHA pós-streak: {waha_err}")
         except Exception as e:
             logger.error(f"[Scheduler] Erro ao enviar lembretes de streak: {e}")
         finally:

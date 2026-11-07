@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRoute } from 'vue-router';
 import {
   Trophy,
@@ -113,12 +113,28 @@ function getAvatar(url?: string | null): string {
   return url;
 }
 
+function handleRealtimeUpdate() {
+  loadRankings();
+}
+
 onMounted(() => {
   const cycleParam = route.query.cycle as string;
   if (cycleParam === 'previous' || cycleParam === 'prev') {
     selectedCycle.value = 'previous';
   }
   loadRankings();
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('competition-updated', handleRealtimeUpdate);
+    window.addEventListener('tati_activity_completed', handleRealtimeUpdate);
+  }
+});
+
+onUnmounted(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('competition-updated', handleRealtimeUpdate);
+    window.removeEventListener('tati_activity_completed', handleRealtimeUpdate);
+  }
 });
 </script>
 
@@ -289,6 +305,7 @@ onMounted(() => {
                 :src="getAvatar(currentRanking[1]?.avatar_url)"
                 alt=""
                 class="w-full h-full object-cover"
+                referrerpolicy="no-referrer"
                 @error="(e: any) => { e.currentTarget.src = DEFAULT_AVATAR_URL; }"
               />
               <div class="absolute -top-1 -right-1 w-6 h-6 md:w-7 md:h-7 rounded-full bg-slate-200 border-2 border-slate-400 flex items-center justify-center text-slate-800 font-black text-xs shadow-xs">
@@ -310,6 +327,7 @@ onMounted(() => {
                 :src="getAvatar(currentRanking[0]?.avatar_url)"
                 alt=""
                 class="w-full h-full object-cover"
+                referrerpolicy="no-referrer"
                 @error="(e: any) => { e.currentTarget.src = DEFAULT_AVATAR_URL; }"
               />
               <div class="absolute -top-1 -right-1 w-7 h-7 md:w-8 md:h-8 rounded-full bg-yellow-400 border-2 border-yellow-500 flex items-center justify-center text-yellow-950 font-black text-xs shadow-xs">
@@ -334,6 +352,7 @@ onMounted(() => {
                 :src="getAvatar(currentRanking[2]?.avatar_url)"
                 alt=""
                 class="w-full h-full object-cover"
+                referrerpolicy="no-referrer"
                 @error="(e: any) => { e.currentTarget.src = DEFAULT_AVATAR_URL; }"
               />
               <div class="absolute -top-1 -right-1 w-6 h-6 md:w-7 md:h-7 rounded-full bg-amber-600 border-2 border-amber-700 flex items-center justify-center text-white font-black text-xs shadow-xs">
@@ -366,6 +385,7 @@ onMounted(() => {
                   :src="getAvatar(entry.avatar_url)"
                   alt=""
                   class="w-full h-full object-cover"
+                referrerpolicy="no-referrer"
                   @error="(e: any) => { e.currentTarget.src = DEFAULT_AVATAR_URL; }"
                 />
               </div>

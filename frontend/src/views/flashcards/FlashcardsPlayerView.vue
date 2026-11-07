@@ -789,7 +789,7 @@ onUnmounted(() => {
                   alt="Context illustration"
                   @error="imageError = true"
                   class="max-h-56 md:max-h-64 max-w-full rounded-2xl object-contain border border-border/80 shadow-md bg-bg/50 select-none"
-                />
+                 referrerpolicy="no-referrer" />
               </div>
             </div>
 

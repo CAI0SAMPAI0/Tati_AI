@@ -749,6 +749,7 @@ onUnmounted(() => {
                 :src="stu.avatar_url"
                 :alt="stu.name"
                 class="w-full h-full object-cover"
+                referrerpolicy="no-referrer"
                 @error="(e: any) => { e.currentTarget.style.display = 'none'; }"
               />
               <span v-else>{{ (stu.name || stu.username || '?').charAt(0).toUpperCase() }}</span>

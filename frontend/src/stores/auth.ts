@@ -10,6 +10,7 @@ import { apiGet, apiPut, registerUnauthorizedHandler } from '../api/client';
 import { ENDPOINTS } from '../api/endpoints';
 import { DEFAULT_ACCENT, getStoredAccent, saveStoredAccent } from '../constants/accents';
 import { DEFAULT_AVATAR_URL } from '../constants/user';
+import { getGlobalNotificationSocket } from '../ws/notificationSocket';
 
 function normalizeUserAvatar(source: User): User {
   if (!source || typeof source !== 'object') {
@@ -99,6 +100,9 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function logout() {
+    try {
+      getGlobalNotificationSocket()?.disconnect();
+    } catch {}
     token.value = null;
     user.value = null;
     refreshToken.value = null;

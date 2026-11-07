@@ -248,8 +248,13 @@ class DashboardService:
         except Exception:
             pass
 
+        # Mapeia presenca em tempo real via WebSockets
+        from apps.notifications.presence import PresenceService
+        online_usernames = PresenceService.get_online_usernames()
+
         results = []
         for u in users:
+            is_online = u.username in online_usernames
             st = u.streak_data if isinstance(u.streak_data, dict) else {}
             prof = u.profile if isinstance(u.profile, dict) else {}
             last_prof_active = prof.get("last_active") or prof.get("last_seen")
@@ -316,6 +321,8 @@ class DashboardService:
                     "streak_freeze_count": st.get("freeze_count", 0) or 0,
                     "is_exempt": bool(u.is_exempt),
                     "is_premium_active": bool(u.is_premium_active),
+                    "is_online": is_online,
+                    "is_using_now": is_online or (latest_dt and max(0, (datetime.now(timezone.utc) - latest_dt.astimezone(timezone.utc)).total_seconds()) < 300),
                     "last_active": last_active_iso,
                     "last_activity": last_active_iso,
                     "messages_count": msg_counts.get(u.username, 0),
@@ -2120,7 +2127,7 @@ class DashboardService:
                 sender_role == "programador" or sender_uname == "programador"
             )
             from apps.notifications.waha_service import WahaService
-            target_session = "professor"
+            target_session = os.getenv("WAHA_SESSION", "default")
             if is_prog:
                 # Se o programador estiver com sua sessão conectada no WAHA, usa ela
                 prog_active = any(
@@ -2130,6 +2137,12 @@ class DashboardService:
                 if prog_active:
                     target_session = "programador"
 
+            # Acorda o WAHA sob demanda caso a sessão esteja parada
+            try:
+                WahaService.start_session(target_session)
+            except Exception as start_err:
+                logger.warning(f"[WAHA Nudge] Aviso ao iniciar sessão {target_session}: {start_err}")
+
             whatsapp_sent = WahaWhatsAppService.send_message(
                 phone_number=str(phone),
                 message=f"*Teacher Tati:*\n\n{message}\n\nAcesse para responder: https://tati-ai.vercel.app/chat",
@@ -2137,6 +2150,20 @@ class DashboardService:
                 recipient_user=u,
                 session=target_session,
             )
+
+            # Coloca o WAHA para dormir após o disparo para liberar a RAM do Chromium
+            import threading
+            import time
+
+            def _delayed_stop_session(sess_name: str):
+                time.sleep(5.0)
+                try:
+                    logger.info(f"[WAHA Nudge] Colocando sessão '{sess_name}' para dormir após envio do nudge...")
+                    WahaService.stop_session(sess_name)
+                except Exception as stop_err:
+                    logger.warning(f"[WAHA Nudge] Falha ao colocar sessão '{sess_name}' em repouso: {stop_err}")
+
+            threading.Thread(target=_delayed_stop_session, args=(target_session,), daemon=True).start()
 
         return {
             "success": True,

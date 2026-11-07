@@ -477,8 +477,13 @@ class GoalService:
                 )
             )
 
-        cache.set(cache_key, results, 30)
+        cache.set(cache_key, results, 3600)
         return results
+
+    @classmethod
+    def invalidate_user_goals(cls, username: str):
+        cache.delete(f"user_goals_{username}")
+        cache.delete(f"user_trail_{username}")
 
     @staticmethod
     def create_goal(user: User, data: GoalInput) -> GoalOut:
@@ -515,6 +520,7 @@ class GoalService:
 
         user.study_goals = goals_data
         user.save(update_fields=["study_goals"])
+        GoalService.invalidate_user_goals(user.username)
 
         return GoalOut(
             id=uuid.UUID(target_item["id"]),
@@ -535,6 +541,7 @@ class GoalService:
         ]
         user.study_goals = filtered
         user.save(update_fields=["study_goals"])
+        GoalService.invalidate_user_goals(user.username)
         return {"ok": True, "message": "Meta removida com sucesso."}
 
 

@@ -802,6 +802,7 @@ onMounted(() => {
                     alt="Card preview"
                     class="w-full h-full object-cover"
                     @error="(e: any) => { e.currentTarget.style.display = 'none'; }"
+                    referrerpolicy="no-referrer"
                   />
                   <button
                     type="button"

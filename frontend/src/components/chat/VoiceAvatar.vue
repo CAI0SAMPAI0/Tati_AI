@@ -263,7 +263,7 @@ onUnmounted(() => {
         :src="currentFrame"
         alt="Teacher Tatiana"
         class="w-full h-full object-cover object-top select-none pointer-events-none transition-opacity duration-150"
-      />
+       referrerpolicy="no-referrer" />
     </div>
   </div>
 </template>

@@ -76,7 +76,7 @@ function handleLogout() {
               :alt="authStore.user.name || 'User'"
               class="h-full w-full object-cover"
               @error="imgError = true"
-            />
+             referrerpolicy="no-referrer" />
           </span>
           <span
             v-else

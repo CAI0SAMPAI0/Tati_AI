@@ -261,10 +261,43 @@ def get_weekly_plan_progress(request: HttpRequest):
 @users_router.get("/trail", auth=auth_required)
 def get_student_trail(request: HttpRequest):
     """
-    Retorna a trilha gamificada do aluno com fases, etapas e status do Boss Fight.
+    Retorna a trilha gamificada do aluno com fases, etapas e status do Exame.
+    Suporta cache e controle de liberação por feature flag (LEARNING_TRAILS_ALLOWED_USERS).
     """
+    from django.conf import settings
+    from django.core.cache import cache
     from .learning_trails import LearningTrailService
-    return LearningTrailService.get_student_trail(request.auth)
+
+    allowed_raw = getattr(settings, "LEARNING_TRAILS_ALLOWED_USERS", "professor,programador").strip()
+    user = request.auth
+    username = getattr(user, "username", "").lower()
+    role = getattr(user, "role", "").lower()
+
+    is_allowed = False
+    if allowed_raw.lower() == "all":
+        is_allowed = True
+    else:
+        allowed_list = [u.strip().lower() for u in allowed_raw.split(",") if u.strip()]
+        if username in allowed_list or role in ("admin", "teacher"):
+            is_allowed = True
+
+    if not is_allowed:
+        return {
+            "is_in_testing": True,
+            "title": "Learning Trail (Under Testing)",
+            "level": getattr(user, "level", "B1") or "B1",
+            "teacher_notes": "A Trilha de Aprendizagem está em fase de testes e calibração pedagógica. Em breve estará liberada para o seu perfil!",
+            "phases": [],
+        }
+
+    cache_key = f"user_trail_{user.username}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    trail = LearningTrailService.get_student_trail(request.auth)
+    cache.set(cache_key, trail, 3600)
+    return trail
 
 
 class StepToggleInput(BaseModel):
@@ -279,13 +312,17 @@ def toggle_trail_step(request: HttpRequest, payload: StepToggleInput):
     Alterna o status de conclusão de uma etapa da trilha.
     """
     from .learning_trails import LearningTrailService
-    return LearningTrailService.toggle_step(
+    res = LearningTrailService.toggle_step(
         user=request.auth,
         student_username=request.auth.username,
         phase_id=payload.phase_id or "",
         step_id=payload.step_id,
         is_completed=payload.is_completed,
     )
+    from django.core.cache import cache
+    cache.delete(f"user_trail_{request.auth.username}")
+    cache.delete(f"user_goals_{request.auth.username}")
+    return res
 
 
 #  ONBOARDING 

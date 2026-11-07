@@ -112,7 +112,7 @@ onUnmounted(() => {
             :src="isStreakActive ? '/images/streak-active.svg' : '/images/streak-inactive.svg'"
             alt="Streak"
             class="w-4 h-5 object-contain"
-          />
+           referrerpolicy="no-referrer" />
         </div>
         <span
           class="min-w-[1ch] inline-block text-[11px] sm:text-xs"

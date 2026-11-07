@@ -684,12 +684,30 @@ def get_profile(request: HttpRequest):
     return AuthService._build_user_out(user)
 
 
+@auth_router.post("/presence/offline", auth=None)
+def user_presence_offline(request: HttpRequest):
+    """
+    Recebe beacon rapido do navegador ao fechar aba/navegador (navigator.sendBeacon)
+    garantindo que o status fique offline instantaneamente (0ms) mesmo ao fechar a janela.
+    """
+    try:
+        import json
+        body = json.loads(request.body.decode("utf-8")) if request.body else {}
+        username = body.get("username")
+        if username:
+            from apps.notifications.presence import PresenceService
+            PresenceService.force_offline(username)
+    except Exception as e:
+        logger.debug(f"[PresenceBeacon] Erro: {e}")
+    return {"ok": True}
+
+
 @profile_router.post("/heartbeat", auth=auth_required)
 @auth_router.post("/heartbeat", auth=auth_required)
 def user_heartbeat(request: HttpRequest):
     """
     Heartbeat leve enviado periodicamente pelo frontend enquanto o aluno
-    está ativo para manter o status 'Using now' no dashboard em tempo real.
+    está ativo para manter o status 'Online' no dashboard em tempo real.
     """
     user: User = request.auth
     now = django_timezone.now()

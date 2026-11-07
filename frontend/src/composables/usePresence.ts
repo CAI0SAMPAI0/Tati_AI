@@ -1,6 +1,7 @@
 import { onMounted, onUnmounted, watch } from 'vue';
 import { apiPost } from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
+import { getGlobalNotificationSocket } from '@/ws/notificationSocket';
 
 let lastPing = 0;
 const PING_INTERVAL = 30000; // 30 seconds
@@ -13,6 +14,14 @@ export function usePresence() {
     if (!authStore.isAuthenticated) return;
     const now = Date.now();
     lastPing = now;
+
+    // Preferencia absoluta: envia heartbeat leve via WebSocket sem overhead HTTP / DB
+    const ws = getGlobalNotificationSocket();
+    if (ws && ws.send({ type: 'heartbeat', client_time: now })) {
+      return;
+    }
+
+    // Fallback gracioso HTTP apenas se o WebSocket estiver offline
     try {
       await apiPost('/auth/heartbeat', {});
     } catch {

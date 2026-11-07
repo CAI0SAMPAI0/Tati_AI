@@ -47,7 +47,7 @@ const currentStatusStyle = computed(() => {
         :alt="title"
         class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
         loading="lazy"
-      />
+       referrerpolicy="no-referrer" />
       <div
         class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-xs"
       >

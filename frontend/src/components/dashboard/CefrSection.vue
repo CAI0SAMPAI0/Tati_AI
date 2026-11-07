@@ -1388,7 +1388,7 @@ onMounted(() => {
               class="p-2.5 rounded-xl bg-bg/50 border border-border/80 flex items-center gap-2.5"
             >
               <div v-if="card.image_url" class="w-10 h-10 rounded-lg overflow-hidden shrink-0 border border-border bg-surface">
-                <img :src="card.image_url" alt="" class="w-full h-full object-cover" />
+                <img :src="card.image_url" alt="" class="w-full h-full object-cover"  referrerpolicy="no-referrer" />
               </div>
               <div class="min-w-0 flex-1">
                 <div class="font-bold text-xs text-text truncate">{{ card.front }}</div>

@@ -130,6 +130,11 @@ class WahaService:
         url = f"{cls._get_api_url()}/api/{session_name}/auth/qr"
         headers = cls._get_headers()
         try:
+            # Acorda a sessão se estiver parada para gerar o QR code no WAHA
+            try:
+                cls.start_session(session_name)
+            except Exception:
+                pass
             with httpx.Client(timeout=15.0) as client:
                 res = client.get(url, headers=headers)
                 if res.status_code == 200 and res.content and len(res.content) > 100:

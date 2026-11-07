@@ -21,6 +21,7 @@ import {
   Check,
   ChevronDown,
   Loader2,
+  X,
 } from 'lucide-vue-next';
 import { apiGet, apiPost } from '@/api/client';
 import { useToast } from '@/composables/useToast';
@@ -160,6 +161,18 @@ function handleLearningTrailUpdate(event?: any) {
   }
 }
 
+function handleFullTrailUpdate(event?: any) {
+  const data = event?.detail || event;
+  if (!data) return;
+  if (selectedUsername.value && data.student_username === selectedUsername.value) {
+    if (data.trail) {
+      trail.value = data.trail;
+    } else {
+      loadTrail(selectedUsername.value);
+    }
+  }
+}
+
 onMounted(() => {
   loadStudents();
 
@@ -167,12 +180,20 @@ onMounted(() => {
     'learning-trail-step-updated',
     handleLearningTrailUpdate
   );
+  window.addEventListener(
+    'learning-trail-updated',
+    handleFullTrailUpdate
+  );
 });
 
 onUnmounted(() => {
   window.removeEventListener(
     'learning-trail-step-updated',
     handleLearningTrailUpdate
+  );
+  window.removeEventListener(
+    'learning-trail-updated',
+    handleFullTrailUpdate
   );
 });
 
@@ -585,7 +606,7 @@ function handleDeletePhase(phaseIdx: number) {
               <div
                 class="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-[0.65rem] font-bold shrink-0 overflow-hidden">
                 <img v-if="s.avatar_url && s.avatar_url !== DEFAULT_AVATAR_URL" :src="s.avatar_url"
-                  :alt="s.name || s.username" class="w-full h-full object-cover" />
+                  :alt="s.name || s.username" class="w-full h-full object-cover" referrerpolicy="no-referrer" />
                 <span v-else>{{ (s.name || s.username || '?').charAt(0).toUpperCase() }}</span>
               </div>
               <div class="min-w-0">
@@ -610,7 +631,7 @@ function handleDeletePhase(phaseIdx: number) {
             <div
               class="w-11 h-11 rounded-2xl bg-primary/15 flex items-center justify-center font-bold text-primary text-sm shrink-0 overflow-hidden">
               <img v-if="currentStudent.avatar_url && currentStudent.avatar_url !== DEFAULT_AVATAR_URL"
-                :src="currentStudent.avatar_url" :alt="currentStudent.name" class="w-full h-full object-cover" />
+                :src="currentStudent.avatar_url" :alt="currentStudent.name" class="w-full h-full object-cover" referrerpolicy="no-referrer" />
               <span v-else>{{ (currentStudent.name || currentStudent.username || '?').charAt(0).toUpperCase() }}</span>
             </div>
             <div>
@@ -824,15 +845,28 @@ function handleDeletePhase(phaseIdx: number) {
 
     <!-- Modal de Adicionar / Editar Atividade à Fase (Teleported directly to body to avoid container scroll cutoff) -->
     <Teleport to="body">
-      <div v-if="isStepModalOpen"
-        class="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm overflow-y-auto"
-        @click.self="isStepModalOpen = false">
-        <div role="dialog" aria-modal="true"
-          class="relative w-full max-w-lg bg-surface border border-border rounded-3xl shadow-2xl p-6 space-y-4 max-h-[85vh] overflow-y-auto mx-auto my-auto animate-in fade-in zoom-in-95 duration-150"
-          @click.stop>
-          <h3 class="text-base font-bold text-text">
-            {{ isEditingStep ? 'Edit Phase Activity' : 'Add Activity to Phase' }}
-          </h3>
+      <div v-if="isStepModalOpen" class="fixed inset-0 z-[99999] overflow-y-auto" role="dialog" aria-modal="true">
+        <!-- Backdrop overlay -->
+        <div class="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity" @click="isStepModalOpen = false"></div>
+
+        <!-- Centering container: guarantees modal never touches edges or clips -->
+        <div class="flex min-h-full items-center justify-center p-4 sm:p-6 text-center">
+          <div
+            class="relative w-full max-w-lg transform overflow-visible rounded-3xl bg-surface border border-border p-6 text-left shadow-2xl transition-all sm:my-8 space-y-4 animate-in fade-in zoom-in-95 duration-150"
+            @click.stop
+          >
+            <div class="flex items-center justify-between pb-2 border-b border-border">
+              <h3 class="text-base font-bold text-text">
+                {{ isEditingStep ? 'Edit Phase Activity' : 'Add Activity to Phase' }}
+              </h3>
+              <button
+                type="button"
+                @click="isStepModalOpen = false"
+                class="p-1.5 rounded-xl text-text-muted hover:text-text hover:bg-surface-hover transition-colors cursor-pointer"
+              >
+                <X class="w-4 h-4" />
+              </button>
+            </div>
 
           <!-- Categoria -->
           <div class="space-y-1.5">
@@ -902,6 +936,7 @@ function handleDeletePhase(phaseIdx: number) {
           </div>
         </div>
       </div>
+    </div>
     </Teleport>
   </div>
 </template>

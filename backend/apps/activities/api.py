@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 from apps.authentication.security import auth_required, auth_optional, require_teacher
 from .schemas import (
     FlashcardReviewInput,
+    FlashcardProgressInput,
     FlashcardReviewOut,
     PodcastOut,
     HubMaterialOut,
@@ -76,11 +77,11 @@ def get_friday_review(request: HttpRequest):
 
 @activities_router.post("/flashcards/progress", auth=auth_required)
 @activities_router.post("/flashcards/flashcard-progress", auth=auth_required)
-def save_flashcard_progress(request: HttpRequest, payload: dict):
+def save_flashcard_progress(request: HttpRequest, payload: FlashcardProgressInput):
     """
     Salva o resultado de revisão de um card (correct, wrong, unknown).
     """
-    return FlashcardService.save_flashcard_progress(request.auth.username, payload)
+    return FlashcardService.save_flashcard_progress(request.auth.username, payload.dict())
 
 
 @activities_router.get("/flashcards/{deck_id}", auth=auth_optional)

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import {
   X,
   User,
@@ -83,6 +83,27 @@ const pronunciationCounts = computed(() => {
     else preset++;
   }
   return { all: list.length, preset, write, free };
+});
+
+function handlePresenceChanged(event: any) {
+  const data = event?.detail || event;
+  if (!data?.username || !localStudent.value) return;
+  if (localStudent.value.username === data.username) {
+    localStudent.value.is_online = Boolean(data.is_online);
+    if (data.last_active) {
+      localStudent.value.last_active = data.last_active;
+    }
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('user_presence_changed', handlePresenceChanged);
+  window.addEventListener('user-presence-changed', handlePresenceChanged);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('user_presence_changed', handlePresenceChanged);
+  window.removeEventListener('user-presence-changed', handlePresenceChanged);
 });
 
 watch(
@@ -364,6 +385,7 @@ const progressTabs = [
               class="w-10 h-10 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold overflow-hidden shrink-0">
               <img v-if="localStudent.avatar_url && localStudent.avatar_url !== DEFAULT_AVATAR_URL"
                 :src="localStudent.avatar_url" alt="Avatar" class="w-full h-full object-cover"
+                referrerpolicy="no-referrer"
                 @error="(e: any) => { e.currentTarget.style.display = 'none'; }" />
               <span v-else>{{ (localStudent.name || localStudent.username || '?').charAt(0).toUpperCase() }}</span>
             </div>
@@ -436,6 +458,7 @@ const progressTabs = [
                 class="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-xl font-bold text-primary overflow-hidden shrink-0">
                 <img v-if="localStudent.avatar_url && localStudent.avatar_url !== DEFAULT_AVATAR_URL"
                   :src="localStudent.avatar_url" alt="" class="w-full h-full rounded-full object-cover"
+                  referrerpolicy="no-referrer"
                   @error="(e: any) => { e.currentTarget.style.display = 'none'; }" />
                 <span v-else>{{ (localStudent.name || localStudent.username || '?').charAt(0).toUpperCase() }}</span>
               </div>
@@ -462,12 +485,12 @@ const progressTabs = [
                 <p class="text-xs text-text-muted flex items-center gap-1.5 mt-0.5">
                   <Clock class="w-3.5 h-3.5" />
                   <span>Last active:</span>
-                  <span v-if="isUserActiveNow(localStudent.last_active)"
+                  <span v-if="localStudent.is_online === true || (localStudent.is_online === undefined && isUserActiveNow(localStudent.last_active))"
                     class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[0.65rem] font-bold bg-success/15 text-success border border-success/30">
                     <span class="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-                    Using now
+                    Online
                   </span>
-                  <span v-else>{{ formatLastActive(localStudent.last_active) }}</span>
+                  <span v-else>{{ formatLastActive(localStudent.last_active, undefined, false) }}</span>
                 </p>
               </div>
             </div>

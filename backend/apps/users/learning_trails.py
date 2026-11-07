@@ -661,11 +661,43 @@ class LearningTrailService:
 
         all_prior_phases_done = True
         import re
+
+        PT_TO_EN_PHASE_MAP = {
+            "Experiências de Vida & Present Perfect": "Life Experiences & Present Perfect",
+            "Experiências de Vida": "Life Experiences",
+            "Apresentações Pessoais & Rotina Diária": "Personal Introductions & Daily Routine",
+            "Vida na Cidade & Alimentação": "City Life & Food",
+            "Últimas Férias & Passado Simples": "Last Holidays & Simple Past",
+            "Planos Futuros & Estilo de Vida": "Future Plans & Lifestyle",
+            "Condicionais, Argumentos & Debates": "Conditionals, Arguments & Debates",
+            "Comunicação Profissional & Liderança": "Professional Communication & Leadership",
+            "Discurso Fluente & Temas Contemporâneos": "Fluent Speech & Contemporary Topics",
+        }
+
+        PT_TO_EN_STEP_MAP = {
+            "Vocabulário: Carreira, Entrevistas e Soft Skills": "More daily routines - B1 English Vocabulary",
+            "Simulação: Entrevista de Emprego em Inglês": "Simulation: Job Interview in English",
+            "Expressões corporativas para falar de responsabilidades e metas.": "Expand your vocabulary to discuss routines, tasks, and responsibilities.",
+        }
+
+        t_title = str(trail.get("title", ""))
+        for pt_k, en_v in [
+            ("Trilha Intermediária", "Intermediate Trail: Fluency & Career (B1)"),
+            ("Trilha Iniciante", "Beginner Journey: Foundations & Daily Life (A1)"),
+            ("Trilha Autonomia", "Autonomy Path: Past Events & Travel (A2)"),
+            ("Trilha Avançada", "Advanced Path: Leadership & Mastery (B2)"),
+            ("Trilha Fluência", "Full Fluency: Complex Expression (C1)"),
+        ]:
+            if pt_k in t_title:
+                trail["title"] = en_v
+                break
+
         for idx, phase in enumerate(phases):
             p_num = phase.get("number", idx + 1)
             # Sanitiza título e descrição da fase (remove prefixo redundante Phase X: ou Fase X:)
             raw_p_title = str(phase.get("title", ""))
             cleaned_p_title = re.sub(r'^(Phase|Fase)\s*\d+\s*:\s*', '', raw_p_title, flags=re.IGNORECASE).strip()
+            cleaned_p_title = PT_TO_EN_PHASE_MAP.get(cleaned_p_title, cleaned_p_title)
             phase["title"] = (
                 cleaned_p_title
                 .replace("👑", "")
@@ -675,8 +707,10 @@ class LearningTrailService:
                 .replace("👩‍🏫", "")
                 .strip()
             )
+            raw_p_desc = str(phase.get("description", ""))
+            cleaned_p_desc = PT_TO_EN_PHASE_MAP.get(raw_p_desc, raw_p_desc)
             phase["description"] = (
-                str(phase.get("description", ""))
+                cleaned_p_desc
                 .replace("👑", "")
                 .replace("⚔️", "")
                 .replace("🏆", "")
@@ -690,8 +724,21 @@ class LearningTrailService:
 
             for step in steps:
                 cat = step.get("category", "").lower()
+                raw_st_title = str(step.get("title", ""))
+                cleaned_st_title = PT_TO_EN_STEP_MAP.get(raw_st_title, raw_st_title)
                 step["title"] = (
-                    str(step.get("title", ""))
+                    cleaned_st_title
+                    .replace("👑", "")
+                    .replace("⚔️", "")
+                    .replace("🏆", "")
+                    .replace("🔒", "")
+                    .replace("👩‍🏫", "")
+                    .strip()
+                )
+                raw_st_desc = str(step.get("description", ""))
+                cleaned_st_desc = PT_TO_EN_STEP_MAP.get(raw_st_desc, raw_st_desc)
+                step["description"] = (
+                    cleaned_st_desc
                     .replace("👑", "")
                     .replace("⚔️", "")
                     .replace("🏆", "")
@@ -805,11 +852,47 @@ class LearningTrailService:
 
         student.weekly_plan["learning_trail"] = trail_data
         student.save(update_fields=["weekly_plan"])
+        from django.core.cache import cache
+        cache.delete(f"user_trail_{student_username}")
+        cache.delete(f"user_goals_{student_username}")
 
         logger.info(
             f"[LearningTrail] Trilha do aluno {student_username} atualizada por {teacher_user.username}."
         )
-        return cls.get_student_trail(student)
+        updated_trail = cls.get_student_trail(student)
+
+        event_data = {
+            "student_id": getattr(student, "id", None),
+            "student_username": student.username,
+            "student_name": getattr(student, "name", student.username),
+            "trail": updated_trail,
+            "action": "saved",
+        }
+
+        def broadcast_trail_save():
+            try:
+                notify_teacher(
+                    event_type="learning_trail_updated",
+                    data=event_data,
+                )
+                if student and getattr(student, "id", None):
+                    notify_user(
+                        user_id=student.id,
+                        event_type="learning_trail_updated",
+                        data=event_data,
+                    )
+            except Exception as err:
+                logger.warning(f"[LearningTrail] Erro ao emitir evento WS save_trail: {err}")
+
+        try:
+            if transaction.get_connection().in_atomic_block:
+                transaction.on_commit(broadcast_trail_save)
+            else:
+                broadcast_trail_save()
+        except Exception:
+            broadcast_trail_save()
+
+        return updated_trail
 
     @classmethod
     def apply_template_to_student(
@@ -927,6 +1010,13 @@ class LearningTrailService:
         # 4. Notifica via WebSocket sempre que o status de uma etapa mudar (Completed ou Pending)
         status_changed = was_completed != new_status
         if status_changed:
+            try:
+                student.refresh_from_db(fields=["streak_data", "xp_data"])
+            except Exception:
+                pass
+            streak_count = getattr(student, "streak_count", 0) or 0
+            total_xp = getattr(student, "total_xp", 0) or 0
+
             phase_obj = next((p for p in phases if p.get("id") == phase_id or not phase_id), None)
             phase_steps = phase_obj.get("steps", []) if phase_obj else []
             completed_count = sum(1 for s in phase_steps if s.get("is_completed"))
@@ -945,6 +1035,8 @@ class LearningTrailService:
                 "completed_count": completed_count,
                 "total_steps": total_steps,
                 "boss_unlocked": bool(boss.get("is_unlocked") or (total_steps > 0 and completed_count == total_steps)),
+                "current_streak": streak_count,
+                "total_xp": total_xp,
             }
 
             def broadcast_trail_update():

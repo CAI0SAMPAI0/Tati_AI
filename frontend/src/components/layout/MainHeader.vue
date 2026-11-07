@@ -143,6 +143,7 @@ const avatarUrl = computed(() => {
             :src="avatarUrl"
             alt="Avatar"
             class="w-full h-full object-cover"
+            referrerpolicy="no-referrer"
             @error="(e: any) => { e.currentTarget.src = DEFAULT_AVATAR_URL; }"
           />
         </div>

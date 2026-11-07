@@ -379,7 +379,7 @@ onMounted(() => {
 
           <!-- Thumbnail preview if present -->
           <div v-if="item.thumbnail_url" class="h-28 w-full rounded-xl overflow-hidden bg-bg-secondary">
-            <img :src="item.thumbnail_url" alt="" class="w-full h-full object-cover" />
+            <img :src="item.thumbnail_url" alt="" class="w-full h-full object-cover"  referrerpolicy="no-referrer" />
           </div>
 
           <!-- Title & Description -->

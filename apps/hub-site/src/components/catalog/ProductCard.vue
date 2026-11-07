@@ -91,7 +91,7 @@ const preview = computed(() => {
           :alt="item.title"
           class="h-full w-full object-cover"
           @error="imageError = true"
-        />
+         referrerpolicy="no-referrer" />
         <div v-else :class="['flex h-full items-center justify-center', styles.icon]">
           <component :is="currentIcon" :size="40" :stroke-width="1.5" />
         </div>
@@ -113,7 +113,7 @@ const preview = computed(() => {
           :alt="item.title"
           class="h-full w-full object-cover"
           @error="imageError = true"
-        />
+         referrerpolicy="no-referrer" />
         <div v-else :class="['flex h-full items-center justify-center', styles.icon]">
           <component :is="currentIcon" :size="40" :stroke-width="1.5" />
         </div>

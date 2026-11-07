@@ -283,6 +283,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.activities.tasks.run_cefr_schedules_task",
         "schedule": 900.0,  # A cada 15 minutos checa e executa agendamentos CEFR
     },
+    "warmup-waha-17h50": {
+        "task": "apps.notifications.tasks.warmup_waha_session_task",
+        "schedule": crontab(hour=17, minute=50),  # 17:50 Horário de Brasília (aquece WAHA)
+    },
     "daily-streak-reminders-18h": {
         "task": "apps.notifications.tasks.send_daily_streak_reminders_task",
         "schedule": crontab(hour=18, minute=0),  # 18:00 Horário de Brasília
@@ -458,6 +462,7 @@ ADMIN_USERNAMES = [
     for u in os.getenv("ADMIN_USERNAMES", "").split(",")
     if u.strip()
 ]
+LEARNING_TRAILS_ALLOWED_USERS = os.getenv("LEARNING_TRAILS_ALLOWED_USERS", "professor,programador").strip()
 
 #    MODELAGEM DE IA E PROVEDORES                                       
 LLM_MODEL = os.getenv("LLM_MODEL", "meta-llama/Llama-3.1-8B-Instruct:novita")

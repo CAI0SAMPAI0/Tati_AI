@@ -510,6 +510,7 @@ onUnmounted(() => {
             >
               <img
                 :src="((streakData?.current_streak ?? xpData?.current_streak ?? 0) > 0) ? '/images/streak-active.svg' : '/images/streak-inactive.svg'"
+                referrerpolicy="no-referrer"
                 alt="Streak"
                 class="w-12 h-12 object-contain transition-transform hover:scale-110"
                 :class="{ 'opacity-40 grayscale': ((streakData?.current_streak ?? xpData?.current_streak ?? 0) === 0) }"

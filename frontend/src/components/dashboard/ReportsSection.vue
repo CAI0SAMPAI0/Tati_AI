@@ -445,6 +445,7 @@ onMounted(() => {
                       :src="s.avatar_url"
                       alt=""
                       class="w-full h-full object-cover rounded-full"
+                      referrerpolicy="no-referrer"
                     />
                     <span v-else>{{ (s.name || s.username || '?').charAt(0).toUpperCase() }}</span>
                   </div>

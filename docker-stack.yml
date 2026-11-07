@@ -332,10 +332,11 @@ services:
           memory: 96M
 
   waha:
-    image: devlikeapro/waha:latest
+    image: devlikeapro/waha:noweb
     env_file: .env
     environment:
       PORT: "3000"
+      WHATSAPP_DEFAULT_ENGINE: "NOWEB"
       WHATSAPP_RESTART_ALL_SESSIONS: "True"
       WAHA_PRINT_QR: "false"
     volumes:
@@ -356,10 +357,10 @@ services:
       resources:
         limits:
           cpus: "1.0"
-          memory: 1024M
+          memory: 512M
         reservations:
           cpus: "0.1"
-          memory: 256M
+          memory: 96M
 
 networks:
   traefik_public:
