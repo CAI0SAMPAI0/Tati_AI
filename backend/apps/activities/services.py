@@ -3045,8 +3045,6 @@ class SubmissionService:
             except Exception:
                 pass
 
-        from django.core.cache import cache
-        cache.delete(f"user_goals_{username}")
         cache.delete(f"user_trail_{username}")
 
         return {
