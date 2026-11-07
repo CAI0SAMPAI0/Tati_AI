@@ -4,7 +4,7 @@ import { canAccessDashboard } from '../utils';
 import { API_BASE } from '../api/client';
 
 const routes: RouteRecordRaw[] = [
-  // Public Landing & Leveling Test
+  // Landing page pública e teste de nivelamento CEFR
   {
     path: '/',
     name: 'landing',
@@ -22,7 +22,7 @@ const routes: RouteRecordRaw[] = [
     redirect: '/cefr-test',
   },
 
-  // Auth Routes
+  // Rotas de autenticação
   {
     path: '/login',
     name: 'login',
@@ -64,7 +64,7 @@ const routes: RouteRecordRaw[] = [
     meta: { public: true },
   },
 
-  // Public Catalog
+  // Catálogo público de materiais e atividades
   {
     path: '/activities/hub',
     name: 'hub-catalog',
@@ -98,7 +98,7 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
   },
 
-  // Authenticated App Routes (COM Sidebar e Topbar via AuthenticatedLayout)
+  // Rotas autenticadas da aplicação (com sidebar e cabeçalho)
   {
     path: '/',
     component: () => import('../components/layout/AuthenticatedLayout.vue'),
@@ -403,6 +403,31 @@ router.beforeEach((to, from, next) => {
 
 
   next();
+});
+
+
+// Recuperação automática contra falhas de carregamento de chunks dinâmicos (ex: novos deploys no Vercel)
+router.onError((error: any, to) => {
+  const errorMessage = String(error?.message || error || '');
+  const errorName = String(error?.name || '');
+
+  const isChunkError =
+    errorMessage.includes('Failed to fetch dynamically imported module') ||
+    errorMessage.includes('Loading chunk') ||
+    errorMessage.includes('Importing a module script failed') ||
+    errorName === 'ChunkLoadError';
+
+  if (isChunkError && typeof window !== 'undefined') {
+    console.warn('[Router] Falha no carregamento dinâmico de rota. Recarregando destino:', to?.fullPath);
+    const targetUrl = to?.fullPath || window.location.href;
+    const reloadKey = 'chunk_reload_' + targetUrl;
+    const lastReload = sessionStorage.getItem(reloadKey);
+    const now = Date.now();
+    if (!lastReload || now - Number(lastReload) > 5000) {
+      sessionStorage.setItem(reloadKey, String(now));
+      window.location.assign(targetUrl);
+    }
+  }
 });
 
 export default router;

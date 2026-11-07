@@ -434,7 +434,7 @@ const fullTrailLayout = computed(() => {
         quote: 'Great ear! 🎧',
         icon: '🎧',
         side: 'right',
-        x: 405,
+        x: 375,
         y: currentY - 50,
       });
     }
@@ -993,6 +993,7 @@ onUnmounted(() => {
                   :alt="m.name"
                   class="w-full h-full rounded-full object-cover"
                   referrerpolicy="no-referrer"
+                  @error="(e: any) => e.target.src = '/avatar/avatar_tati_normal.webp'"
                 />
                 <div class="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-xs shadow-xs font-black">
                   {{ m.icon }}

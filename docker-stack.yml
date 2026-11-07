@@ -84,7 +84,7 @@ services:
     command: >
       gunicorn app.asgi:application
       --bind 0.0.0.0:8000
-      --workers 1
+      --workers 2
       --worker-class uvicorn.workers.UvicornWorker
       --timeout 120
       --graceful-timeout 30
@@ -155,6 +155,7 @@ services:
         - "traefik.http.services.tati-api.loadbalancer.server.port=8000"
         - "traefik.http.services.tati-api.loadbalancer.healthcheck.path=/health"
         - "traefik.http.services.tati-api.loadbalancer.healthcheck.interval=15s"
+        - "traefik.http.services.tati-api.loadbalancer.healthcheck.timeout=5s"
         - "traefik.http.services.tati-api.loadbalancer.healthcheck.hostname=${DOMAIN}"
       resources:
         limits:

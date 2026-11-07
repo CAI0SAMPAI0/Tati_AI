@@ -25,6 +25,7 @@ interface RequestOptions extends Omit<RequestInit, 'headers'> {
   auth?: boolean;
   retry401?: boolean;
   _retried?: boolean;
+  timeoutMs?: number;
 }
 
 export const API_BASE =
@@ -78,12 +79,34 @@ async function request<T>(
     finalBody = JSON.stringify(body);
   }
 
-  const response = await fetch(url, {
-    method,
-    headers,
-    body: finalBody,
-    ...options,
-  });
+  let signal = options.signal;
+  let timeoutId: any = null;
+  const timeoutMs = options.timeoutMs ?? 20000;
+
+  if (!signal) {
+    if (typeof AbortSignal !== 'undefined' && typeof (AbortSignal as any).timeout === 'function') {
+      signal = (AbortSignal as any).timeout(timeoutMs);
+    } else if (typeof AbortController !== 'undefined') {
+      const controller = new AbortController();
+      signal = controller.signal;
+      timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    }
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method,
+      headers,
+      body: finalBody,
+      ...options,
+      signal,
+    });
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
 
   if (response.status === 401 && options.auth !== false && !options._retried) {
     const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refresh_token') : null;

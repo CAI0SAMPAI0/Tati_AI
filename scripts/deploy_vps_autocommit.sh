@@ -47,24 +47,39 @@ FIRST_APP="$(echo "$APP_CONTAINERS" | head -n1)"
 echo ">>> Verificando e aplicando migrations..."
 docker exec "$FIRST_APP" python manage.py migrate --noinput || echo "[AVISO] Erro ao rodar migrate, continuando..."
 
-# 4. Atualiza o código backend nos containers de produção (Zero Downtime)
+# 4. Atualiza o código backend nos containers de produção com Rolling Update real (Zero Downtime)
 for cid in $APP_CONTAINERS; do
-    echo ">>> Atualizando codigo no container de aplicacao $cid..."
+    echo ">>> Atualizando código no container de aplicação $cid..."
     docker cp "$REPO_DIR/backend/." "$cid:/app/"
+    docker exec -u 0 "$cid" chown -R 1000:1000 /app 2>/dev/null || true
     docker exec "$cid" python -m compileall /app/apps/ >/dev/null 2>&1 || true
     docker exec "$cid" kill -HUP 1 2>/dev/null || docker kill -s HUP "$cid" 2>/dev/null || true
-    echo ">>> Container $cid recarregado com gunicorn HUP!"
+    echo ">>> Container $cid recebeu sinal HUP. Aguardando convergir e responder /health..."
+
+    CONTAINER_READY=0
+    for attempt in $(seq 1 12); do
+        sleep 2
+        if docker exec "$cid" curl -fsS http://localhost:8000/health >/dev/null 2>&1; then
+            echo ">>> Container $cid está saudável e respondendo 200 OK (tentativa $attempt)!"
+            CONTAINER_READY=1
+            break
+        fi
+    done
+    if [ "$CONTAINER_READY" -eq 0 ]; then
+        echo "[AVISO] Container $cid demorou para responder ao healthcheck interno."
+    fi
 done
 
-# 5. Atualiza e recicla o celery worker para liberar memoria e swap
+# 5. Atualiza e recicla o celery worker para liberar memória e swap
 if [ -n "$WORKER_CONTAINERS" ]; then
     for wid in $WORKER_CONTAINERS; do
-        echo ">>> Atualizando codigo no worker $wid..."
+        echo ">>> Atualizando código no worker $wid..."
         docker cp "$REPO_DIR/backend/." "$wid:/app/"
+        docker exec -u 0 "$wid" chown -R 1000:1000 /app 2>/dev/null || true
         docker exec "$wid" python -m compileall /app/apps/ >/dev/null 2>&1 || true
         echo ">>> Celery worker $wid atualizado!"
     done
-    echo ">>> Reciclando o servico tati_ai_celery_worker no Swarm para liberar RAM e Swap..."
+    echo ">>> Reciclando o serviço tati_ai_celery_worker no Swarm para liberar RAM e Swap..."
     docker service update --force tati_ai_celery_worker || true
 fi
 

@@ -629,6 +629,13 @@ class RankingService:
                 continue
             score = scores.get(username, 0)
             if score > 0:
+                raw_avatar = user.avatar_url
+                # Se for avatar em base64 inline pesado, substitui pelo avatar padrão para economizar payload
+                if raw_avatar and isinstance(raw_avatar, str) and raw_avatar.startswith("data:image/") and len(raw_avatar) > 2048:
+                    clean_avatar = DEFAULT_AVATAR_URL
+                else:
+                    clean_avatar = raw_avatar
+
                 students.append(
                     {
                         "username": username,
@@ -636,7 +643,7 @@ class RankingService:
                         "score": score,
                         "total_xp": score,
                         "level": (user.level or "A1").upper(),
-                        "avatar_url": user.avatar_url,
+                        "avatar_url": clean_avatar,
                         "streak_count": user.streak_count,
                         "email": user.email or "",
                         "phone": getattr(user, "phone", "") or "",
@@ -2943,6 +2950,7 @@ class SubmissionService:
             ).delete()
 
             cache.delete(f"user_goals_{username}")
+            cache.delete(f"user_trail_{username}")
 
             total_xp = user.total_xp if user and isinstance(user, User) else 0
             streak_count = user.streak_count if user and isinstance(user, User) else 0
@@ -3016,8 +3024,9 @@ class SubmissionService:
             metadata=metadata,
         )
 
-        # Invalida cache de metas do usuário
+        # Invalida cache de metas e trilha do usuário
         cache.delete(f"user_goals_{username}")
+        cache.delete(f"user_trail_{username}")
 
         # Bônus único de conclusão do Objetivo da Semana
         weekly_bonus_awarded = False
