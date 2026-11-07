@@ -6,7 +6,7 @@ REPO_DIR="/home/deploy/Tati_AI"
 cd "$REPO_DIR"
 
 # 1. Garante permissão nos scripts
-chmod +x scripts/*.sh 2>/dev/null || true
+chmod +x scripts/*.sh backend/*.sh 2>/dev/null || true
 
 # 2. Localiza os containers ativos do serviço app e celery
 APP_CONTAINERS="$(docker ps --filter "name=tati_ai_app" --filter "status=running" -q)"
@@ -28,9 +28,8 @@ for cid in $APP_CONTAINERS; do
     echo ">>> Atualizando codigo no container de aplicacao $cid..."
     docker cp "$REPO_DIR/backend/." "$cid:/app/"
     docker exec "$cid" python -m compileall /app/apps/ >/dev/null 2>&1 || true
-    docker restart "$cid" >/dev/null 2>&1 || true
-    echo ">>> Container $cid reiniciado com sucesso!"
-    sleep 3
+    docker exec "$cid" kill -HUP 1 2>/dev/null || docker kill -s HUP "$cid" 2>/dev/null || true
+    echo ">>> Container $cid recarregado com gunicorn HUP!"
 done
 
 # 5. Atualiza o celery worker se estiver rodando
@@ -44,11 +43,24 @@ done
 
 # 6. Teste de saude (Healthcheck)
 echo ">>> Testando /health no container..."
-sleep 2
-if docker exec "$FIRST_APP" curl -fsS http://localhost:8000/health >/dev/null 2>&1; then
-    echo ">>> [SUCESSO] API esta respondendo perfeitamente (Healthcheck OK)!"
-else
-    echo ">>> [AVISO] Healthcheck ainda aquecendo..."
+sleep 3
+HEALTH_OK=0
+for _ in $(seq 1 10); do
+    CURRENT_APP="$(docker ps --filter "name=tati_ai_app" --filter "status=running" -q | head -n1 || true)"
+    if [ -n "$CURRENT_APP" ] && docker exec "$CURRENT_APP" curl -fsS http://localhost:8000/health >/dev/null 2>&1; then
+        echo ">>> [SUCESSO] API esta respondendo perfeitamente (Healthcheck OK)!"
+        HEALTH_OK=1
+        break
+    fi
+    sleep 2
+done
+
+if [ "$HEALTH_OK" -eq 0 ]; then
+    echo ">>> [AVISO] Healthcheck falhou no container. Reconciliando servicos via deploy.sh..."
+    ./scripts/deploy.sh --skip-build || true
 fi
+
+echo ">>> Status das tarefas Swarm:"
+docker service ps tati_ai_app --no-trunc | head -n 5 || true
 
 echo "=== Deploy automatico finalizado com sucesso! ==="
