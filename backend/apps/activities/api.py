@@ -117,7 +117,7 @@ def review_flashcard(request: HttpRequest, payload: FlashcardReviewInput):
     """
     Registra a avaliação do flashcard e computa o próximo intervalo SRS.
     """
-    # Fallback endpoint
+    # Ponto de contingência (fallback)
     return FlashcardReviewOut(
         success=True, next_review_days=1, xp_earned=10, total_xp=request.auth.total_xp
     )

@@ -1189,7 +1189,7 @@ class MonthlyCompetitionService:
 
 class TrophyService:
     SYSTEM_TROPHIES = [
-        # Streaks (3, 7, 14, 21, 30, 45, 50, 100)
+        # Sequências de ofensiva (Streaks: 3, 7, 14, 21, 30, 45, 50, 100)
         {
             "id": "streak-3",
             "name": "3-Day Streak",
@@ -1262,7 +1262,7 @@ class TrophyService:
             "requirement_type": "streak",
             "requirement_value": 100,
         },
-        # Daily Messages
+        # Mensagens diárias
         {
             "id": "msg-day-10",
             "name": "Quick Chat",
@@ -1299,7 +1299,7 @@ class TrophyService:
             "requirement_type": "msg_day",
             "requirement_value": 100,
         },
-        # Weekly Messages
+        # Mensagens semanais
         {
             "id": "msg-week-50",
             "name": "Chatty Week",
@@ -1327,7 +1327,7 @@ class TrophyService:
             "requirement_type": "msg_week",
             "requirement_value": 200,
         },
-        # Monthly Messages
+        # Mensagens mensais
         {
             "id": "msg-month-200",
             "name": "Monthly Conversationalist",
@@ -1355,7 +1355,7 @@ class TrophyService:
             "requirement_type": "msg_month",
             "requirement_value": 1000,
         },
-        # Grammar (1, 5, 15, 50, 100, 198)
+        # Atividades de Gramática
         {
             "id": "grammar-1",
             "name": "Grammar Starter",
@@ -1410,7 +1410,7 @@ class TrophyService:
             "requirement_type": "grammar",
             "requirement_value": 198,
         },
-        # Vocabulary
+        # Atividades de Vocabulário
         {
             "id": "vocab-1",
             "name": "Word Explorer",
@@ -1456,7 +1456,7 @@ class TrophyService:
             "requirement_type": "vocabulary",
             "requirement_value": 50,
         },
-        # Listening
+        # Atividades de Listening
         {
             "id": "listening-1",
             "name": "First Listen",
@@ -1502,7 +1502,7 @@ class TrophyService:
             "requirement_type": "listening",
             "requirement_value": 50,
         },
-        # Reading
+        # Atividades de Reading
         {
             "id": "reading-1",
             "name": "First Reader",
@@ -1539,7 +1539,7 @@ class TrophyService:
             "requirement_type": "reading",
             "requirement_value": 30,
         },
-        # Flashcards
+        # Atividades de Flashcards
         {
             "id": "flashcards-1",
             "name": "Card Flipper",
@@ -1576,7 +1576,7 @@ class TrophyService:
             "requirement_type": "flashcards",
             "requirement_value": 50,
         },
-        # Simulations
+        # Atividades de Simulações
         {
             "id": "sim-1",
             "name": "First Simulation",
@@ -1613,7 +1613,7 @@ class TrophyService:
             "requirement_type": "simulations",
             "requirement_value": 25,
         },
-        # Games
+        # Atividades de Jogos Pedagógicos
         {
             "id": "games-1",
             "name": "First Game",
@@ -1679,7 +1679,7 @@ class TrophyService:
 
         username = getattr(user, "username", "aluno")
 
-        # 1. Streak stats
+        # 1. Estatísticas de ofensiva (Streak)
         streak_data = (
             user.streak_data
             if isinstance(getattr(user, "streak_data", None), dict)
@@ -1694,7 +1694,7 @@ class TrophyService:
             streak_data.get("longest_streak", 0) or 0, current_streak
         )
 
-        # 2. Messages stats
+        # 2. Estatísticas de mensagens no chat
         msgs_today = Message.objects.filter(
             username=username, role="user", created_at__gte=today_start
         ).count()
@@ -1705,7 +1705,7 @@ class TrophyService:
             username=username, role="user", created_at__gte=month_start
         ).count()
 
-        # 3. Activity counts by category
+        # 3. Contagem de atividades por categoria pedagógica
         cat_counts = defaultdict(int)
         user_subs = ActivitySubmission.objects.filter(
             username=username, status="completed"
@@ -1731,7 +1731,7 @@ class TrophyService:
             elif "game" in act_type or "wordwall" in act_type:
                 cat_counts["games"] += 1
 
-        # Also count user flashcard progress if available
+        # Também contabiliza o progresso do usuário em flashcards quando disponível
         try:
             from apps.activities.models import UserFlashcardProgress
             fc_prog = UserFlashcardProgress.objects.filter(user_id=username).count()
@@ -1752,7 +1752,7 @@ class TrophyService:
         newly_unlocked_ids = []
         results: list[TrophyOut] = []
 
-        # Process system trophies (100% in English, covering all 7 activities, streaks & messages)
+        # Processa troféus do sistema (100% em inglês para os alunos)
         for t in cls.SYSTEM_TROPHIES:
             t_id = t["id"]
             target = t["requirement_value"]
@@ -3362,7 +3362,7 @@ class StudentFeedbackService:
 
         fb.save()
 
-        # If a reply was provided/updated, notify the student via Push, Email and In-App
+        # Se uma resposta foi fornecida ou atualizada, notifica o aluno via Notificação Interna, E-mail e Push
         if reply_added and fb.student_username:
             try:
                 student = User.objects.filter(username=fb.student_username).first()

@@ -267,7 +267,7 @@ class DashboardService:
             created_at_dt = parse_dt_to_sp(u.created_at)
             updated_at_dt = parse_dt_to_sp(u.updated_at)
 
-            # Dates to compare
+            # Datas para comparação
             dt_candidates = [
                 d
                 for d in [
@@ -627,7 +627,7 @@ class DashboardService:
             return {"success": True, "deleted": deck_id}
         raise HttpError(404, "Baralho não encontrado.")
 
-    #    SIMULATIONS ADMIN                                                  
+    # Gerenciamento de simulações (Admin)
 
     @staticmethod
     def get_all_simulations(limit: int = 200, offset: int = 0) -> list[dict]:
@@ -836,7 +836,7 @@ class DashboardService:
         SimulationScenario.objects.filter(id=sim_id).delete()
         return {"success": True, "deleted": sim_id}
 
-    #    GAMES ADMIN                                                        
+    # Gerenciamento de jogos pedagógicos (Admin)
 
     @staticmethod
     def _clean_levels(raw_levels) -> list[str]:
@@ -938,7 +938,7 @@ class DashboardService:
             return {"success": True, "deleted": game_id}
         raise HttpError(404, "Game não encontrado.")
 
-    #    NEWS ADMIN                                                         
+    # Gerenciamento de notícias (Admin)
 
     @staticmethod
     def get_news_admin() -> list[dict]:
@@ -1039,7 +1039,7 @@ class DashboardService:
             return {"success": True, "deleted": news_id}
         raise HttpError(404, "Notícia não encontrada.")
 
-    #    DETALHAMENTO E ANÁLISE DE ALUNOS                                
+    # Detalhamento e análise de alunos
 
     @staticmethod
     def get_student_detail(username: str) -> dict:

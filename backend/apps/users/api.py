@@ -39,7 +39,7 @@ users_router = Router(tags=["Users & Gamification"])
 avatar_router = Router(tags=["Avatar & Customization"])
 
 
-#  ACCESS CONTROL & PERMISSIONS 
+# Controle de acesso e permissões 
 
 
 @users_router.get("/permissions/access", response=AccessControlOut, auth=auth_required)
@@ -70,7 +70,7 @@ def get_subscription_permissions(request: HttpRequest):
     }
 
 
-#  STREAK & DIAS CONSECUTIVOS 
+# Sequência e dias consecutivos de estudo (Streak) 
 
 
 @users_router.get("/streak", response=StreakDataOut, auth=auth_required)
@@ -102,7 +102,7 @@ def purchase_streak_freeze(request: HttpRequest):
     return StreakService.purchase_freeze(request.auth)
 
 
-#  XP & NÍVEIS
+# Experiência (XP) e níveis de proficiência
 
 
 @users_router.get("/xp", response=XPOut, auth=auth_required)
@@ -124,7 +124,7 @@ def award_xp(request: HttpRequest, payload: XPAwardInput):
     return XPService.award_xp(request.auth, payload.amount, payload.reason)
 
 
-#  METAS DE ESTUDO (GOALS)
+# Metas de estudo semanais e diárias
 
 
 @users_router.get("/goals", response=List[GoalOut], auth=auth_required)
@@ -159,7 +159,7 @@ def delete_goal(request: HttpRequest, goal_id: str):
     return GoalService.delete_goal(request.auth, goal_id)
 
 
-#  VOCABULÁRIO & DICIONÁRIO PESSOAL 
+# Vocabulário e dicionário pessoal 
 
 
 @users_router.get("/vocabulary", auth=auth_optional)
@@ -212,7 +212,7 @@ def get_due_vocabulary(request: HttpRequest):
     return VocabularyService.list_vocabulary(username)
 
 
-#  PLANO SEMANAL DE ESTUDOS (WEEKLY PLAN) 
+# Plano semanal pedagógico de estudos 
 
 
 @users_router.get("/weekly-plan", auth=auth_optional)
@@ -255,7 +255,7 @@ def get_weekly_plan_progress(request: HttpRequest):
     }
 
 
-#  TRILHA DE APRENDIZADO GAMIFICADA (LEARNING TRAILS & BOSS FIGHT)
+# Trilha de aprendizado gamificada e exames
 
 
 @users_router.get("/trail", auth=auth_required)
@@ -325,7 +325,7 @@ def toggle_trail_step(request: HttpRequest, payload: StepToggleInput):
     return res
 
 
-#  ONBOARDING 
+# Integração inicial do aluno (Onboarding) 
 
 
 @users_router.get("/onboarding", response=OnboardingStatusOut, auth=auth_required)
@@ -346,7 +346,7 @@ def complete_onboarding(request: HttpRequest, payload: OnboardingDoneInput):
     )
 
 
-#  PROGRESSO & RELATÓRIOS 
+# Progresso pedagógico e relatórios de desempenho 
 
 
 @users_router.get("/progress", auth=auth_required)
@@ -548,7 +548,7 @@ def get_daily_summary(request: HttpRequest):
     )
 
 
-#  NOTIFICATION PREFERENCES 
+# Preferências de notificações e lembretes 
 
 
 @users_router.get("/notification-preferences", auth=auth_required)
@@ -669,7 +669,7 @@ def update_notification_preferences(
     return {"success": True, "preferences": profile}
 
 
-#  AVATAR FRAMES & VOICE ANIMATION 
+# Molduras do avatar e animação por voz 
 
 
 @avatar_router.get("/frames", auth=auth_optional)

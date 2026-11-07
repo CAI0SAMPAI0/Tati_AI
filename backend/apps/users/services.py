@@ -265,7 +265,7 @@ class GoalService:
             tz = timezone.utc
         now = datetime.now(tz)
         today_start = datetime(now.year, now.month, now.day, 0, 0, 0, tzinfo=tz)
-        # Python weekday(): Monday is 0, Sunday is 6
+        # weekday() do Python: segunda-feira é 0, domingo é 6
         days_since_sunday = (now.weekday() + 1) % 7
         return today_start - timedelta(days=days_since_sunday)
 
@@ -487,7 +487,7 @@ class GoalService:
 
     @staticmethod
     def create_goal(user: User, data: GoalInput) -> GoalOut:
-        # Custom goal creation is deprecated; return the first matching system goal
+        # Criação de meta personalizada descontinuada; retorna a primeira meta de sistema correspondente
         goals = GoalService.list_goals(user)
         for g in goals:
             if g.type == data.type:
@@ -701,7 +701,7 @@ class ProgressReportService:
             ).only("id", "created_at", "content")
         )
 
-        # Messages grouped by week of the month (Week 1: days 1-7, Week 2: 8-14, Week 3: 15-21, Week 4: 22-28, Week 5: 29+)
+        # Mensagens agrupadas por semana do mês (Semana 1: dias 1-7, Semana 2: 8-14, Semana 3: 15-21, Semana 4: 22-28, Semana 5: 29+)
         messages_by_week = [0, 0, 0, 0]
         import calendar
 

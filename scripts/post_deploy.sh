@@ -19,4 +19,6 @@ done
 
 echo ">>> [AVISO] O container ainda esta inicializando migrations ou aguardando o banco."
 docker stack services "$STACK_NAME" || true
+docker service ps "${STACK_NAME}_app" --no-trunc | head -n 10 || true
+docker service logs --tail 30 "${STACK_NAME}_app" || true
 exit 0

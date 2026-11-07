@@ -11,7 +11,7 @@ from apps.authentication.models import User
 
 logger = logging.getLogger(__name__)
 
-# Standard learning trail templates by CEFR level with direct URLs and English content
+# Modelos padrão de trilhas de aprendizagem por nível CEFR com URLs diretas e conteúdo em inglês
 TRAIL_TEMPLATES: Dict[str, Dict[str, Any]] = {
     "A1": {
         "template_id": "a1_beginner_quest",
