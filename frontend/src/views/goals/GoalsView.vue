@@ -523,8 +523,15 @@ async function loadTrail() {
   try {
     const res = await apiGet<LearningTrail>('/users/trail');
     trail.value = res;
-  } catch (err) {
+  } catch (err: any) {
     console.error('Erro ao carregar trilha de aprendizagem:', err);
+    // Ativa a tela de testes caso a trilha ainda esteja em calibração para o usuário
+    trail.value = {
+      title: 'Learning Trail (Under Testing)',
+      level: 'B1',
+      is_in_testing: true,
+      phases: [],
+    };
   } finally {
     isLoadingTrail.value = false;
   }
@@ -748,7 +755,7 @@ onUnmounted(() => {
 
       <!-- Tela de Recurso em Fase de Teste quando bloqueado por feature flag -->
       <div
-        v-else-if="trail?.is_in_testing"
+        v-else-if="trail?.is_in_testing || !trail || !trail.phases || trail.phases.length === 0"
         class="w-full max-w-xl mx-auto py-12 px-6 bg-surface border border-border rounded-3xl text-center space-y-6 shadow-sm animate-fade-in"
       >
         <div class="relative w-28 h-28 mx-auto">

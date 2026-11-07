@@ -28,8 +28,9 @@ for cid in $APP_CONTAINERS; do
     echo ">>> Atualizando codigo no container de aplicacao $cid..."
     docker cp "$REPO_DIR/backend/." "$cid:/app/"
     docker exec "$cid" python -m compileall /app/apps/ >/dev/null 2>&1 || true
-    docker kill -s HUP "$cid"
-    echo ">>> Container $cid recarregado com gunicorn HUP!"
+    docker restart "$cid" >/dev/null 2>&1 || true
+    echo ">>> Container $cid reiniciado com sucesso!"
+    sleep 3
 done
 
 # 5. Atualiza o celery worker se estiver rodando
