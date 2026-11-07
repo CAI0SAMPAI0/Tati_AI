@@ -1,20 +1,18 @@
 import os
 from django.core.asgi import get_asgi_application
-from channels.routing import ProtocolTypeRouter, URLRouter
-from channels.security.websocket import AllowedHostsOriginValidator
-from channels.auth import AuthMiddlewareStack
-from apps.notifications.routing import (
-    websocket_urlpatterns as notifications_ws_patterns,
-)
-from apps.chat.routing import websocket_urlpatterns as chat_ws_patterns
-
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "app.settings.development")
 
-# Inicializa o Django ASGI antes de carregar routing de WebSockets
+# Inicializa o Django ASGI antes de carregar routing de WebSockets (requisito do Django Channels)
 django_asgi_app = get_asgi_application()
 
+from channels.routing import ProtocolTypeRouter, URLRouter
+from channels.security.websocket import AllowedHostsOriginValidator
+from channels.auth import AuthMiddlewareStack
 from apps.chat.routing import websocket_urlpatterns as chat_ws_patterns
+from apps.notifications.routing import (
+    websocket_urlpatterns as notifications_ws_patterns,
+)
 
 websocket_urlpatterns = [
     *chat_ws_patterns,

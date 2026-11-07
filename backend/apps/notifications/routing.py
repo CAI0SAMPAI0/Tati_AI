@@ -6,4 +6,8 @@ websocket_urlpatterns = [
         r"^notifications/ws/?$",
         NotificationConsumer.as_asgi(),
     ),
+    re_path(
+        r"^ws/notifications/?$",
+        NotificationConsumer.as_asgi(),
+    ),
 ]
