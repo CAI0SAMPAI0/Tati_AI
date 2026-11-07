@@ -154,13 +154,6 @@ services:
         - "traefik.http.services.tati-api.loadbalancer.healthcheck.interval=15s"
         - "traefik.http.services.tati-api.loadbalancer.healthcheck.timeout=5s"
         - "traefik.http.services.tati-api.loadbalancer.healthcheck.hostname=${DOMAIN}"
-        # Roteador dedicado de alta prioridade para WebSockets bidirecionais (sem buffer de retry)
-        - "traefik.http.routers.tati-ws.rule=Host(`${DOMAIN}`) && (PathPrefix(`/notifications/ws`) || PathPrefix(`/chat/ws`) || PathPrefix(`/ws`))"
-        - "traefik.http.routers.tati-ws.entrypoints=websecure"
-        - "traefik.http.routers.tati-ws.tls=true"
-        - "traefik.http.routers.tati-ws.tls.certresolver=letsencrypt"
-        - "traefik.http.routers.tati-ws.service=tati-api"
-        - "traefik.http.routers.tati-ws.priority=100"
       resources:
         limits:
           cpus: "1.5"
