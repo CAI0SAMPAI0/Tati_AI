@@ -106,11 +106,31 @@ function handleSelectCycle(cycle: 'current' | 'previous') {
   loadRankings();
 }
 
-function getAvatar(url?: string | null): string {
-  if (!url || url.includes('/avatar/avatar_tati')) {
+function getInitialsAvatar(name?: string): string {
+  const initial = (name || '?').trim().charAt(0).toUpperCase() || '?';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128"><rect width="128" height="128" rx="64" fill="#2563eb"/><text x="50%" y="54%" font-family="system-ui, -apple-system, sans-serif" font-size="56" font-weight="bold" fill="#ffffff" dominant-baseline="middle" text-anchor="middle">${initial}</text></svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+function getAvatar(url?: string | null, name?: string): string {
+  if (!url || url === DEFAULT_AVATAR_URL || url.includes('/avatar/avatar_tati')) {
+    if (name && name.trim()) {
+      return getInitialsAvatar(name);
+    }
     return DEFAULT_AVATAR_URL;
   }
   return url;
+}
+
+function handleAvatarError(event: Event, name?: string) {
+  const target = event.currentTarget as HTMLImageElement | null;
+  if (!target) return;
+  if (!target.dataset.fallback) {
+    target.dataset.fallback = 'true';
+    target.src = getInitialsAvatar(name);
+  } else {
+    target.src = DEFAULT_AVATAR_URL;
+  }
 }
 
 function handleRealtimeUpdate() {
@@ -302,11 +322,11 @@ onUnmounted(() => {
           <div class="flex flex-col items-center gap-3">
             <div class="w-14 h-14 md:w-20 md:h-20 rounded-full border-4 border-slate-300 relative bg-bg-secondary overflow-hidden shadow-md">
               <img
-                :src="getAvatar(currentRanking[1]?.avatar_url)"
+                :src="getAvatar(currentRanking[1]?.avatar_url, currentRanking[1]?.name || currentRanking[1]?.username)"
                 alt=""
                 class="w-full h-full object-cover"
                 referrerpolicy="no-referrer"
-                @error="(e: any) => { e.currentTarget.src = DEFAULT_AVATAR_URL; }"
+                @error="handleAvatarError($event, currentRanking[1]?.name || currentRanking[1]?.username)"
               />
               <div class="absolute -top-1 -right-1 w-6 h-6 md:w-7 md:h-7 rounded-full bg-slate-200 border-2 border-slate-400 flex items-center justify-center text-slate-800 font-black text-xs shadow-xs">
                 2
@@ -324,11 +344,11 @@ onUnmounted(() => {
           <div class="flex flex-col items-center gap-4">
             <div class="w-20 h-20 md:w-28 md:h-28 rounded-full border-4 border-yellow-400 relative shadow-glow shadow-yellow-400/30 scale-110 bg-bg-secondary overflow-hidden">
               <img
-                :src="getAvatar(currentRanking[0]?.avatar_url)"
+                :src="getAvatar(currentRanking[0]?.avatar_url, currentRanking[0]?.name || currentRanking[0]?.username)"
                 alt=""
                 class="w-full h-full object-cover"
                 referrerpolicy="no-referrer"
-                @error="(e: any) => { e.currentTarget.src = DEFAULT_AVATAR_URL; }"
+                @error="handleAvatarError($event, currentRanking[0]?.name || currentRanking[0]?.username)"
               />
               <div class="absolute -top-1 -right-1 w-7 h-7 md:w-8 md:h-8 rounded-full bg-yellow-400 border-2 border-yellow-500 flex items-center justify-center text-yellow-950 font-black text-xs shadow-xs">
                 1
@@ -349,11 +369,11 @@ onUnmounted(() => {
           <div class="flex flex-col items-center gap-3">
             <div class="w-14 h-14 md:w-20 md:h-20 rounded-full border-4 border-amber-600/70 relative bg-bg-secondary overflow-hidden shadow-md">
               <img
-                :src="getAvatar(currentRanking[2]?.avatar_url)"
+                :src="getAvatar(currentRanking[2]?.avatar_url, currentRanking[2]?.name || currentRanking[2]?.username)"
                 alt=""
                 class="w-full h-full object-cover"
                 referrerpolicy="no-referrer"
-                @error="(e: any) => { e.currentTarget.src = DEFAULT_AVATAR_URL; }"
+                @error="handleAvatarError($event, currentRanking[2]?.name || currentRanking[2]?.username)"
               />
               <div class="absolute -top-1 -right-1 w-6 h-6 md:w-7 md:h-7 rounded-full bg-amber-600 border-2 border-amber-700 flex items-center justify-center text-white font-black text-xs shadow-xs">
                 3
@@ -382,18 +402,17 @@ onUnmounted(() => {
               </span>
               <div class="w-9 h-9 rounded-full bg-primary/10 overflow-hidden shrink-0 border border-border">
                 <img
-                  :src="getAvatar(entry.avatar_url)"
+                  :src="getAvatar(entry.avatar_url, entry.name || entry.username)"
                   alt=""
                   class="w-full h-full object-cover"
-                referrerpolicy="no-referrer"
-                  @error="(e: any) => { e.currentTarget.src = DEFAULT_AVATAR_URL; }"
+                  referrerpolicy="no-referrer"
+                  @error="handleAvatarError($event, entry.name || entry.username)"
                 />
               </div>
               <div class="min-w-0">
                 <p class="text-xs font-bold text-text truncate">
                   {{ entry.name || entry.username }}
                 </p>
-                <span class="text-[0.65rem] text-text-muted">@{{ entry.username }}</span>
               </div>
             </div>
 

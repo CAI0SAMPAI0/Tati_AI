@@ -631,8 +631,8 @@ class RankingService:
             score = scores.get(username, 0)
             if score > 0:
                 raw_avatar = user.avatar_url
-                # Se for avatar em base64 inline pesado, substitui pelo avatar padrão para economizar payload
-                if raw_avatar and isinstance(raw_avatar, str) and raw_avatar.startswith("data:image/") and len(raw_avatar) > 2048:
+                # Permite fotos de perfil em base64 ou URLs válidas, descartando apenas se exceder 500KB para proteger o payload
+                if raw_avatar and isinstance(raw_avatar, str) and raw_avatar.startswith("data:image/") and len(raw_avatar) > 500_000:
                     clean_avatar = DEFAULT_AVATAR_URL
                 else:
                     clean_avatar = raw_avatar if (raw_avatar and str(raw_avatar).strip()) else DEFAULT_AVATAR_URL
