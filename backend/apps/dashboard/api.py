@@ -438,13 +438,19 @@ from pydantic import BaseModel
 
 
 class FlashcardDeckInput(BaseModel):
-    title: Optional[str] = "Novo Baralho"
+    title: Optional[str] = None
     level: Optional[str] = None
     levels: Optional[Any] = None
-    description: Optional[str] = ""
-    flashcards: Optional[List[Dict[str, Any]]] = []
-    cards: Optional[List[Dict[str, Any]]] = []
-    is_published: Optional[bool] = True
+    description: Optional[str] = None
+    flashcards: Optional[List[Dict[str, Any]]] = None
+    cards: Optional[List[Dict[str, Any]]] = None
+    is_published: Optional[bool] = None
+
+
+class FlashcardBulkActionInput(BaseModel):
+    deck_ids: List[str] = []
+    action: Optional[str] = None
+    is_published: Optional[bool] = None
 
 
 #    FLASHCARDS ADMIN                                                   
@@ -565,7 +571,30 @@ def generate_dashboard_flashcards_ai(request: HttpRequest, payload: FlashcardAIG
     return {"success": True, "flashcards": results}
 
 
+@dashboard_router.post("/flashcards/bulk", auth=auth_required)
+@dashboard_router.put("/flashcards/bulk", auth=auth_required)
+@dashboard_router.patch("/flashcards/bulk", auth=auth_required)
+def bulk_flashcard_decks(request: HttpRequest, payload: FlashcardBulkActionInput):
+    """
+    Atualiza status (publicado/rascunho) ou exclui múltiplos baralhos de flashcards em lote.
+    """
+    require_staff_user(request)
+    is_del = (payload.action or "").lower() == "delete"
+    is_pub = (
+        payload.is_published
+        if payload.is_published is not None
+        else ((payload.action or "").lower() == "publish")
+    )
+    return DashboardService.bulk_flashcard_decks(
+        deck_ids=payload.deck_ids,
+        is_published=None if is_del else bool(is_pub),
+        delete=is_del,
+    )
+
+
 @dashboard_router.put("/flashcards/{deck_id}", auth=auth_required)
+@dashboard_router.patch("/flashcards/{deck_id}", auth=auth_required)
+@dashboard_router.post("/flashcards/{deck_id}", auth=auth_required)
 def update_flashcard_deck(
     request: HttpRequest, deck_id: str, payload: FlashcardDeckInput
 ):
@@ -573,7 +602,9 @@ def update_flashcard_deck(
     Atualiza um baralho de flashcards existente.
     """
     require_staff_user(request)
-    return DashboardService.update_flashcard_deck(deck_id, payload.dict())
+    return DashboardService.update_flashcard_deck(
+        deck_id, payload.dict(exclude_unset=True)
+    )
 
 
 @dashboard_router.delete("/flashcards/{deck_id}", auth=auth_required)

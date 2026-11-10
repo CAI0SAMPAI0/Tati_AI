@@ -182,7 +182,8 @@ class DashboardService:
 
     @staticmethod
     def get_students_list(search: str = None, level: str = None) -> list[dict]:
-        cache_key = f"dashboard_students_list_{search or 'all'}_{level or 'all'}"
+        ver = cache.get("dashboard_students_list_ver", 1)
+        cache_key = f"dashboard_students_list_v{ver}_{search or 'all'}_{level or 'all'}"
         cached = cache.get(cache_key)
         if cached is not None:
             return cached
@@ -499,6 +500,7 @@ class DashboardService:
     @staticmethod
     def update_flashcard_deck(deck_id: str, data: dict) -> dict:
         import re
+        import uuid
 
         def normalize_slug(s: str) -> str:
             return re.sub(
@@ -506,7 +508,8 @@ class DashboardService:
             ).strip("_")
 
         if deck_id.startswith("cefr_fc_"):
-            parts = deck_id.split("_")
+            clean_deck_id = re.sub(r"(__draft|_draft|_pub)$", "", deck_id)
+            parts = clean_deck_id.split("_")
             if len(parts) >= 4:
                 level = parts[2].upper()
                 topic_slug = normalize_slug("_".join(parts[3:]))
@@ -520,28 +523,70 @@ class DashboardService:
                     raise HttpError(404, "Baralho CEFR não encontrado.")
 
                 matched_ids = [c.id for c in matched_cards]
+                current_topic = matched_cards[0].topic or "General Vocabulary"
                 was_published = matched_cards[0].is_published
-                if "is_published" in data:
-                    Flashcard.objects.filter(id__in=matched_ids).update(
-                        is_published=data["is_published"]
-                    )
-                if data.get("title"):
-                    new_title = re.sub(r"^CEFR\s+[A-Z0-9]+:\s*", "", data["title"])
-                    Flashcard.objects.filter(id__in=matched_ids).update(topic=new_title)
-                if data.get("level"):
-                    Flashcard.objects.filter(id__in=matched_ids).update(
-                        level=data["level"].upper()
-                    )
+                now_published = (
+                    bool(data["is_published"])
+                    if "is_published" in data and data["is_published"] is not None
+                    else was_published
+                )
+                target_level = (
+                    str(data["level"]).strip().upper()
+                    if data.get("level") and str(data["level"]).strip().lower() != "all"
+                    else level
+                )
+                raw_title = (data.get("title") or "").strip()
+                target_topic = (
+                    re.sub(r"^CEFR\s+[A-Z0-9]+:\s*", "", raw_title).strip()
+                    if raw_title and raw_title != "Novo Baralho"
+                    else current_topic
+                )
 
-                now_published = data.get("is_published", was_published)
+                incoming_cards = (
+                    data.get("flashcards")
+                    if data.get("flashcards") is not None
+                    else data.get("cards")
+                )
+                if isinstance(incoming_cards, list) and len(incoming_cards) > 0:
+                    Flashcard.objects.filter(id__in=matched_ids).delete()
+                    created_count = 0
+                    for item in incoming_cards:
+                        front = str(item.get("front") or "").strip()
+                        if not front:
+                            continue
+                        Flashcard.objects.create(
+                            id=uuid.uuid4(),
+                            level=target_level,
+                            topic=target_topic,
+                            front=front,
+                            back=str(item.get("back") or "").strip(),
+                            explanation=str(item.get("explanation") or "").strip(),
+                            image_url=str(item.get("image_url") or "").strip(),
+                            options=item.get("options") if isinstance(item.get("options"), list) else [],
+                            is_published=now_published,
+                        )
+                        created_count += 1
+                    card_total = created_count
+                else:
+                    update_fields = {}
+                    if "is_published" in data and data["is_published"] is not None:
+                        update_fields["is_published"] = now_published
+                    if raw_title and raw_title != "Novo Baralho":
+                        update_fields["topic"] = target_topic
+                    if data.get("level") and str(data["level"]).strip().lower() != "all":
+                        update_fields["level"] = target_level
+                    if update_fields:
+                        Flashcard.objects.filter(id__in=matched_ids).update(**update_fields)
+                    card_total = len(matched_cards)
+
                 if now_published and not was_published:
                     try:
                         from apps.notifications.services import NotificationDispatcher
 
                         NotificationDispatcher.notify_students_for_activity(
                             activity_type="Flashcards CEFR",
-                            title=data.get("title", matched_cards[0].topic),
-                            levels=data.get("level", level),
+                            title=target_topic,
+                            levels=target_level,
                             is_published=True,
                             url="/activities",
                         )
@@ -551,8 +596,8 @@ class DashboardService:
                 return {
                     "success": True,
                     "id": deck_id,
-                    "title": data.get("title", matched_cards[0].topic),
-                    "card_count": len(matched_cards),
+                    "title": target_topic,
+                    "card_count": card_total,
                 }
             raise HttpError(400, "ID do baralho CEFR inválido.")
 
@@ -560,18 +605,22 @@ class DashboardService:
         if not m:
             raise HttpError(404, "Baralho não encontrado.")
         was_published = m.is_published
-        if "title" in data:
-            m.title = data["title"]
-        if "level" in data:
-            m.level = data["level"].upper()
-        if "levels" in data:
+        if data.get("title") and str(data["title"]).strip() != "Novo Baralho":
+            m.title = str(data["title"]).strip()
+        if data.get("level"):
+            m.level = str(data["level"]).upper()
+        if data.get("levels") is not None:
             m.levels = data["levels"]
-        if "description" in data:
+        if data.get("description") is not None:
             m.description = data["description"]
-        if "flashcards" in data or "cards" in data:
-            m.flashcards = data.get("flashcards") or data.get("cards") or []
-        if "is_published" in data:
-            m.is_published = data["is_published"]
+        if data.get("flashcards") is not None or data.get("cards") is not None:
+            m.flashcards = (
+                data.get("flashcards")
+                if data.get("flashcards") is not None
+                else data.get("cards")
+            )
+        if "is_published" in data and data["is_published"] is not None:
+            m.is_published = bool(data["is_published"])
         m.save()
 
         if m.is_published and not was_published:
@@ -605,7 +654,8 @@ class DashboardService:
             ).strip("_")
 
         if deck_id.startswith("cefr_fc_"):
-            parts = deck_id.split("_")
+            clean_deck_id = re.sub(r"(__draft|_draft|_pub)$", "", deck_id)
+            parts = clean_deck_id.split("_")
             if len(parts) >= 4:
                 level = parts[2].upper()
                 topic_slug = normalize_slug("_".join(parts[3:]))
@@ -626,6 +676,33 @@ class DashboardService:
             m.delete()
             return {"success": True, "deleted": deck_id}
         raise HttpError(404, "Baralho não encontrado.")
+
+    @staticmethod
+    def bulk_flashcard_decks(
+        deck_ids: list[str],
+        is_published: Optional[bool] = None,
+        delete: bool = False,
+    ) -> dict:
+        processed = 0
+        errors = []
+        for did in deck_ids or []:
+            if not did:
+                continue
+            try:
+                if delete:
+                    DashboardService.delete_flashcard_deck(str(did))
+                elif is_published is not None:
+                    DashboardService.update_flashcard_deck(
+                        str(did), {"is_published": bool(is_published)}
+                    )
+                processed += 1
+            except Exception as exc:
+                errors.append({"id": did, "error": str(exc)})
+        return {
+            "success": True,
+            "processed": processed,
+            "errors": errors,
+        }
 
     # Gerenciamento de simulações (Admin)
 
@@ -1849,12 +1926,26 @@ class DashboardService:
     
     @staticmethod
     def update_student(username: str, data: dict) -> dict:
-        u = User.objects.filter(username=username).first()
+        u = (
+            User.objects.filter(username=username).first()
+            or User.objects.filter(username__iexact=username).first()
+        )
         if not u:
             raise HttpError(404, "Estudante não encontrado.")
+        prof = dict(u.profile) if isinstance(u.profile, dict) else {}
         if data.get("level"):
-            u.level = str(data["level"]).upper()
-        prof = u.profile if isinstance(u.profile, dict) else {}
+            new_lvl = str(data["level"]).strip().upper()
+            u.level = new_lvl
+            prof["level"] = new_lvl
+            prof["cefr_level"] = new_lvl
+            if isinstance(u.weekly_plan, dict) and isinstance(
+                u.weekly_plan.get("learning_trail"), dict
+            ):
+                wp = dict(u.weekly_plan)
+                trail = dict(wp["learning_trail"])
+                trail["level"] = new_lvl
+                wp["learning_trail"] = trail
+                u.weekly_plan = wp
         if "custom_prompt" in data:
             prof["custom_prompt"] = data["custom_prompt"]
         if "whatsapp_number" in data or "phone" in data:
@@ -1868,6 +1959,21 @@ class DashboardService:
             prof["allow_whatsapp_notifications"] = bool(data["allow_whatsapp_notifications"])
         u.profile = prof
         u.save()
+
+        # Invalida imediatamente os caches de listagem de alunos, estatísticas de nível e trilhas
+        try:
+            ver = int(cache.get("dashboard_students_list_ver", 1) or 1) + 1
+            cache.set("dashboard_students_list_ver", ver, 86400)
+            cache.delete_many(
+                [
+                    "dashboard_students_list_all_all",
+                    "dashboard_difficulties_stats",
+                    f"user_trail_{u.username}",
+                    f"user_goals_{u.username}",
+                ]
+            )
+        except Exception:
+            pass
 
         from apps.notifications.services import WahaWhatsAppService
 

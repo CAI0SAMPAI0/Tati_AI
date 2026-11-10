@@ -235,10 +235,41 @@ class FlashcardService:
         raise HttpError(404, "Deck de flashcards não encontrado.")
 
     @staticmethod
+    def _ensure_flashcard_progress_schema() -> None:
+        from django.db import connection
+
+        if connection.vendor != "postgresql":
+            return
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                ALTER TABLE user_flashcard_progress
+                    DROP CONSTRAINT IF EXISTS user_flashcard_progress_flashcard_id_fkey,
+                    DROP CONSTRAINT IF EXISTS user_flashcard_progress_user_id_fkey;
+                ALTER TABLE user_flashcard_progress
+                    ALTER COLUMN user_id TYPE VARCHAR(150) USING user_id::text,
+                    ALTER COLUMN flashcard_id TYPE VARCHAR(255) USING flashcard_id::text;
+                """
+            )
+
+    @staticmethod
     def get_friday_review(username: str) -> dict:
-        progress_rows = UserFlashcardProgress.objects.filter(
-            user_id=username, status__in=["wrong", "unknown"]
-        )
+        from django.db import DataError
+
+        try:
+            progress_rows = list(
+                UserFlashcardProgress.objects.filter(
+                    user_id=username, status__in=["wrong", "unknown"]
+                )
+            )
+        except DataError:
+            FlashcardService._ensure_flashcard_progress_schema()
+            progress_rows = list(
+                UserFlashcardProgress.objects.filter(
+                    user_id=username, status__in=["wrong", "unknown"]
+                )
+            )
+
         review_cards = []
         for r in progress_rows:
             try:
@@ -256,9 +287,14 @@ class FlashcardService:
 
     @staticmethod
     def save_flashcard_progress(username: str, payload: dict) -> dict:
-        deck_id = payload.get("deck_id", "")
+        from django.db import DataError
+
+        deck_id = str(payload.get("deck_id", "") or "").strip()
         card_front = payload.get("card_front", "")
         status = payload.get("status", "correct")
+
+        if not deck_id:
+            return {"ok": True}
 
         now = datetime.now(timezone.utc)
         next_review = (
@@ -267,15 +303,27 @@ class FlashcardService:
             else (now + timedelta(days=1) if status == "unknown" else None)
         )
 
-        UserFlashcardProgress.objects.update_or_create(
-            user_id=username,
-            flashcard_id=deck_id,
-            defaults={
-                "status": status,
-                "next_review_date": next_review,
-                "reviewed_at": now,
-            },
-        )
+        try:
+            UserFlashcardProgress.objects.update_or_create(
+                user_id=username,
+                flashcard_id=deck_id,
+                defaults={
+                    "status": status,
+                    "next_review_date": next_review,
+                    "reviewed_at": now,
+                },
+            )
+        except DataError:
+            FlashcardService._ensure_flashcard_progress_schema()
+            UserFlashcardProgress.objects.update_or_create(
+                user_id=username,
+                flashcard_id=deck_id,
+                defaults={
+                    "status": status,
+                    "next_review_date": next_review,
+                    "reviewed_at": now,
+                },
+            )
         return {"ok": True}
 
 

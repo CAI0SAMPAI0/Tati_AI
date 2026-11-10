@@ -1433,8 +1433,21 @@ class CEFRFlashcardGroupSaveSchema(BaseModel):
     old_topic: str
     new_level: str
     new_topic: str
-    flashcards: List[Dict[str, Any]]
+    flashcards: Optional[List[Dict[str, Any]]] = None
+    cards: Optional[List[Dict[str, Any]]] = None
+    is_published: Optional[bool] = None
     old_is_published: Optional[bool] = None
+
+
+class CEFRSingleFlashcardUpdateSchema(BaseModel):
+    is_published: Optional[bool] = None
+    front: Optional[str] = None
+    back: Optional[str] = None
+    image_url: Optional[str] = None
+    topic: Optional[str] = None
+    level: Optional[str] = None
+    explanation: Optional[str] = None
+    options: Optional[List[str]] = None
 
 
 @cefr_admin_router.post("/schedules", auth=auth_required)
@@ -1836,11 +1849,13 @@ def delete_cefr_reference(request: HttpRequest, reference_id: str):
 
 
 @cefr_admin_router.put("/flashcards/group", auth=auth_required)
+@cefr_admin_router.patch("/flashcards/group", auth=auth_required)
+@cefr_admin_router.post("/flashcards/group", auth=auth_required)
 def toggle_publish_flashcard_group(
     request: HttpRequest,
-    level: str,
-    topic: str,
-    is_published: bool,
+    level: Optional[str] = None,
+    topic: Optional[str] = None,
+    is_published: Optional[bool] = None,
     current_is_published: Optional[bool] = None,
 ):
     """
@@ -1850,24 +1865,40 @@ def toggle_publish_flashcard_group(
     from .models import Flashcard
     from django.db.models import Q
 
-    qs = Flashcard.objects.filter(level__iexact=level)
-    if topic.strip().lower() in ("general", "general practice", "general vocabulary"):
-        qs = qs.filter(Q(topic__iexact=topic) | Q(topic__isnull=True) | Q(topic=""))
+    body_data = {}
+    if request.body:
+        try:
+            body_data = json.loads(request.body.decode("utf-8")) or {}
+        except Exception:
+            body_data = {}
+
+    eff_level = str(level if level is not None else body_data.get("level", "")).strip()
+    eff_topic = str(topic if topic is not None else body_data.get("topic", "")).strip()
+    eff_pub = is_published if is_published is not None else bool(body_data.get("is_published", False))
+    eff_curr = (
+        current_is_published
+        if current_is_published is not None
+        else body_data.get("current_is_published", None)
+    )
+
+    qs = Flashcard.objects.filter(level__iexact=eff_level)
+    if eff_topic.lower() in ("general", "general practice", "general vocabulary"):
+        qs = qs.filter(Q(topic__iexact=eff_topic) | Q(topic__isnull=True) | Q(topic=""))
     else:
-        qs = qs.filter(topic__iexact=topic)
+        qs = qs.filter(topic__iexact=eff_topic)
 
-    if current_is_published is not None:
-        qs = qs.filter(is_published=current_is_published)
+    if eff_curr is not None:
+        qs = qs.filter(is_published=bool(eff_curr))
 
-    updated = qs.update(is_published=is_published)
+    updated = qs.update(is_published=bool(eff_pub))
     return {"success": True, "updated": updated}
 
 
 @cefr_admin_router.delete("/flashcards/group", auth=auth_required)
 def delete_flashcard_group(
     request: HttpRequest,
-    level: str,
-    topic: str,
+    level: Optional[str] = None,
+    topic: Optional[str] = None,
     current_is_published: Optional[bool] = None,
 ):
     """
@@ -1877,57 +1908,36 @@ def delete_flashcard_group(
     from .models import Flashcard
     from django.db.models import Q
 
-    qs = Flashcard.objects.filter(level__iexact=level)
-    if topic.strip().lower() in ("general", "general practice", "general vocabulary"):
-        qs = qs.filter(Q(topic__iexact=topic) | Q(topic__isnull=True) | Q(topic=""))
-    else:
-        qs = qs.filter(topic__iexact=topic)
+    body_data = {}
+    if request.body:
+        try:
+            body_data = json.loads(request.body.decode("utf-8")) or {}
+        except Exception:
+            body_data = {}
 
-    if current_is_published is not None:
-        qs = qs.filter(is_published=current_is_published)
+    eff_level = str(level if level is not None else body_data.get("level", "")).strip()
+    eff_topic = str(topic if topic is not None else body_data.get("topic", "")).strip()
+    eff_curr = (
+        current_is_published
+        if current_is_published is not None
+        else body_data.get("current_is_published", None)
+    )
+
+    qs = Flashcard.objects.filter(level__iexact=eff_level)
+    if eff_topic.lower() in ("general", "general practice", "general vocabulary"):
+        qs = qs.filter(Q(topic__iexact=eff_topic) | Q(topic__isnull=True) | Q(topic=""))
+    else:
+        qs = qs.filter(topic__iexact=eff_topic)
+
+    if eff_curr is not None:
+        qs = qs.filter(is_published=bool(eff_curr))
 
     deleted = qs.delete()
-    return {"success": True, "message": f"Deleted group {topic}"}
-
-
-@cefr_admin_router.put("/flashcards/{card_id}", auth=auth_required)
-def update_single_cefr_flashcard(request: HttpRequest, card_id: str, payload: dict):
-    """
-    Atualiza status de publicação ou conteúdo de um card CEFR individual.
-    """
-    require_teacher(request.auth)
-    from .models import Flashcard
-
-    fc = Flashcard.objects.filter(id=card_id).first()
-    if not fc:
-        raise HttpError(404, "Flashcard não encontrado.")
-    if "is_published" in payload:
-        fc.is_published = bool(payload["is_published"])
-    if "front" in payload and str(payload["front"]).strip():
-        fc.front = str(payload["front"]).strip()
-    if "image_url" in payload:
-        fc.image_url = str(payload["image_url"] or "").strip()
-    if "topic" in payload and str(payload["topic"]).strip():
-        fc.topic = str(payload["topic"]).strip()
-    if "level" in payload and str(payload["level"]).strip():
-        fc.level = str(payload["level"]).strip().upper()
-    fc.save()
-    return {"success": True, "id": str(fc.id), "is_published": fc.is_published}
-
-
-@cefr_admin_router.delete("/flashcards/{card_id}", auth=auth_required)
-def delete_single_cefr_flashcard(request: HttpRequest, card_id: str):
-    """
-    Exclui um card CEFR individual.
-    """
-    require_teacher(request.auth)
-    from .models import Flashcard
-
-    Flashcard.objects.filter(id=card_id).delete()
-    return {"success": True, "deleted": card_id}
+    return {"success": True, "message": f"Deleted group {eff_topic}"}
 
 
 @cefr_admin_router.post("/flashcards/group/save", auth=auth_required)
+@cefr_admin_router.put("/flashcards/group/save", auth=auth_required)
 def save_flashcard_group(request: HttpRequest, body: CEFRFlashcardGroupSaveSchema):
     """
     Salva as edições feitas em um grupo de flashcards pelo curador.
@@ -1950,13 +1960,15 @@ def save_flashcard_group(request: HttpRequest, body: CEFRFlashcardGroupSaveSchem
     old_qs.delete()
 
     # Cria novos cards
+    raw_cards = body.flashcards if body.flashcards is not None else (body.cards or [])
+    default_pub = body.is_published if body.is_published is not None else False
     inserted = []
     has_published = False
-    for card in body.flashcards:
-        is_pub = card.get("is_published", True)
+    for card in raw_cards:
+        is_pub = bool(card.get("is_published", default_pub))
         if is_pub:
             has_published = True
-        card_front = card.get("front", "").strip()
+        card_front = str(card.get("front", "") or "").strip()
         if not card_front:
             continue
 
@@ -1965,10 +1977,10 @@ def save_flashcard_group(request: HttpRequest, body: CEFRFlashcardGroupSaveSchem
             level=body.new_level.upper(),
             topic=body.new_topic,
             front=card_front,
-            back="",
-            explanation="",
-            image_url=card.get("image_url", "").strip(),
-            options=[],
+            back=str(card.get("back", "") or "").strip(),
+            explanation=str(card.get("explanation", "") or "").strip(),
+            image_url=str(card.get("image_url", "") or "").strip(),
+            options=card.get("options") if isinstance(card.get("options"), list) else [],
             is_published=is_pub,
         )
         inserted.append(str(fc.id))
@@ -1990,6 +2002,59 @@ def save_flashcard_group(request: HttpRequest, body: CEFRFlashcardGroupSaveSchem
             )
 
     return {"success": True, "inserted": len(inserted)}
+
+
+@cefr_admin_router.put("/flashcards/{card_id}", auth=auth_required)
+@cefr_admin_router.patch("/flashcards/{card_id}", auth=auth_required)
+@cefr_admin_router.post("/flashcards/{card_id}", auth=auth_required)
+def update_single_cefr_flashcard(
+    request: HttpRequest,
+    card_id: str,
+    payload: Optional[CEFRSingleFlashcardUpdateSchema] = None,
+):
+    """
+    Atualiza status de publicação ou conteúdo de um card CEFR individual.
+    """
+    require_teacher(request.auth)
+    from .models import Flashcard
+
+    fc = Flashcard.objects.filter(id=card_id).first()
+    if not fc:
+        raise HttpError(404, "Flashcard não encontrado.")
+
+    data = payload.dict(exclude_unset=True) if payload else {}
+    if not data and request.body:
+        try:
+            data = json.loads(request.body.decode("utf-8")) or {}
+        except Exception:
+            data = {}
+
+    if "is_published" in data and data["is_published"] is not None:
+        fc.is_published = bool(data["is_published"])
+    if "front" in data and str(data["front"] or "").strip():
+        fc.front = str(data["front"]).strip()
+    if "back" in data and data["back"] is not None:
+        fc.back = str(data["back"]).strip()
+    if "image_url" in data and data["image_url"] is not None:
+        fc.image_url = str(data["image_url"] or "").strip()
+    if "topic" in data and str(data["topic"] or "").strip():
+        fc.topic = str(data["topic"]).strip()
+    if "level" in data and str(data["level"] or "").strip():
+        fc.level = str(data["level"]).strip().upper()
+    fc.save()
+    return {"success": True, "id": str(fc.id), "is_published": fc.is_published}
+
+
+@cefr_admin_router.delete("/flashcards/{card_id}", auth=auth_required)
+def delete_single_cefr_flashcard(request: HttpRequest, card_id: str):
+    """
+    Exclui um card CEFR individual.
+    """
+    require_teacher(request.auth)
+    from .models import Flashcard
+
+    Flashcard.objects.filter(id=card_id).delete()
+    return {"success": True, "deleted": card_id}
 
 
 @cefr_admin_router.put("/simulations/{sim_id}", auth=auth_required)

@@ -259,7 +259,7 @@ async function handleSaveDeck() {
       levels: formData.value.levels,
       card_count: validCards.length,
       flashcards: validCards,
-      is_published: true,
+      is_published: editingDeck.value ? Boolean(editingDeck.value.is_published) : false,
     };
 
     if (editingDeck.value) {
@@ -267,7 +267,7 @@ async function handleSaveDeck() {
       toast.success('Deck updated successfully!');
     } else {
       await apiPost('/dashboard/flashcards', payload);
-      toast.success('Deck created successfully!');
+      toast.success('Deck created in drafts!');
     }
     isModalOpen.value = false;
     await loadDecks();
@@ -280,7 +280,7 @@ async function handleSaveDeck() {
 
 async function handleTogglePublish(deck: FlashcardDeck) {
   try {
-    await apiPut(`/dashboard/flashcards/${deck.id}`, { is_published: !deck.is_published });
+    await apiPut(`/dashboard/flashcards/${encodeURIComponent(deck.id)}`, { is_published: !deck.is_published });
     toast.success(deck.is_published ? 'Deck moved to drafts.' : 'Deck published!');
     await loadDecks();
   } catch {
@@ -291,7 +291,7 @@ async function handleTogglePublish(deck: FlashcardDeck) {
 async function handleDelete(id: string) {
   if (!confirm('Are you sure you want to delete this deck?')) return;
   try {
-    await apiDelete(`/dashboard/flashcards/${id}`);
+    await apiDelete(`/dashboard/flashcards/${encodeURIComponent(id)}`);
     toast.success('Deck deleted.');
     await loadDecks();
   } catch {
@@ -318,11 +318,20 @@ function toggleSelect(id: string) {
 async function handleBulkPublish(publish: boolean) {
   if (selectedDeckIds.value.length === 0) return;
   isBulkProcessing.value = true;
+  const ids = [...selectedDeckIds.value];
   try {
-    await Promise.all(
-      selectedDeckIds.value.map((id) => apiPut(`/dashboard/flashcards/${id}`, { is_published: publish }))
-    );
-    toast.success(publish ? `${selectedDeckIds.value.length} decks published!` : `${selectedDeckIds.value.length} decks moved to drafts.`);
+    try {
+      await apiPost('/dashboard/flashcards/bulk', {
+        deck_ids: ids,
+        action: publish ? 'publish' : 'draft',
+        is_published: publish,
+      });
+    } catch {
+      for (const id of ids) {
+        await apiPut(`/dashboard/flashcards/${encodeURIComponent(id)}`, { is_published: publish });
+      }
+    }
+    toast.success(publish ? `${ids.length} decks published!` : `${ids.length} decks moved to drafts.`);
     selectedDeckIds.value = [];
     await loadDecks();
   } catch {
@@ -336,9 +345,19 @@ async function handleBulkDelete() {
   if (selectedDeckIds.value.length === 0) return;
   if (!confirm(`Delete ${selectedDeckIds.value.length} selected decks?`)) return;
   isBulkProcessing.value = true;
+  const ids = [...selectedDeckIds.value];
   try {
-    await Promise.all(selectedDeckIds.value.map((id) => apiDelete(`/dashboard/flashcards/${id}`)));
-    toast.success(`${selectedDeckIds.value.length} decks deleted.`);
+    try {
+      await apiPost('/dashboard/flashcards/bulk', {
+        deck_ids: ids,
+        action: 'delete',
+      });
+    } catch {
+      for (const id of ids) {
+        await apiDelete(`/dashboard/flashcards/${encodeURIComponent(id)}`);
+      }
+    }
+    toast.success(`${ids.length} decks deleted.`);
     selectedDeckIds.value = [];
     await loadDecks();
   } catch {

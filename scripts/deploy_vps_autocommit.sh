@@ -42,21 +42,38 @@ if [ -z "$APP_CONTAINERS" ]; then
     exit 1
 fi
 
-# 4. Executa migrações pendentes dentro do primeiro contêiner ativo
+# 4. Atualiza o código backend nos contêineres de produção ANTES das migrações
 FIRST_APP="$(echo "$APP_CONTAINERS" | head -n1)"
-echo "Verificando e aplicando migrações de banco de dados..."
-docker exec "$FIRST_APP" python manage.py migrate --noinput || echo "Aviso: Erro ao rodar migrate, continuando..."
+CURRENT_IMG="$(docker service inspect tati_ai_app --format '{{.Spec.TaskTemplate.ContainerSpec.Image}}' 2>/dev/null || echo 'ghcr.io/cai0sampai0/tati_ai:latest')"
+CURRENT_IMG="${CURRENT_IMG%%@*}"
 
-# 5. Atualiza o código backend nos contêineres de produção com atualização progressiva
 for cid in $APP_CONTAINERS; do
     if ! docker inspect --format '{{.State.Running}}' "$cid" 2>/dev/null | grep -q "true"; then
         echo "Contêiner $cid não está mais em execução. Pulando..."
         continue
     fi
-    echo "Atualizando código no contêiner de aplicação $cid..."
+    echo "Copiando código atualizado para o contêiner de aplicação $cid..."
     docker cp "$REPO_DIR/backend/." "$cid:/app/" || continue
     docker exec -u 0 "$cid" chown -R 1000:1000 /app 2>/dev/null || true
     docker exec "$cid" python -m compileall /app/apps/ >/dev/null 2>&1 || true
+done
+
+# 5. Persiste o código atualizado na imagem local do Swarm para evitar regressão em restarts
+if [ -n "$FIRST_APP" ]; then
+    echo "Persistindo código atualizado na imagem local ($CURRENT_IMG e ghcr.io/cai0sampai0/tati_ai:latest)..."
+    docker commit "$FIRST_APP" "$CURRENT_IMG" >/dev/null 2>&1 || true
+    docker commit "$FIRST_APP" "ghcr.io/cai0sampai0/tati_ai:latest" >/dev/null 2>&1 || true
+fi
+
+# 6. Executa migrações pendentes dentro do primeiro contêiner já atualizado
+echo "Verificando e aplicando migrações de banco de dados..."
+docker exec "$FIRST_APP" python manage.py migrate --noinput || echo "Aviso: Erro ao rodar migrate, continuando..."
+
+# 7. Recarrega os workers Gunicorn/Uvicorn com atualização progressiva (zero-downtime)
+for cid in $APP_CONTAINERS; do
+    if ! docker inspect --format '{{.State.Running}}' "$cid" 2>/dev/null | grep -q "true"; then
+        continue
+    fi
     docker exec "$cid" kill -HUP 1 2>/dev/null || docker kill -s HUP "$cid" 2>/dev/null || true
     echo "Contêiner $cid recebeu sinal HUP. Aguardando resposta saudável..."
 
@@ -74,7 +91,7 @@ for cid in $APP_CONTAINERS; do
     fi
 done
 
-# 6. Atualiza e recicla o celery worker para liberar memória e swap
+# 8. Atualiza e recicla o celery worker usando a imagem local já atualizada
 WORKER_CONTAINERS="$(docker ps --filter "name=tati_ai_celery_worker" --filter "status=running" -q || true)"
 if [ -n "$WORKER_CONTAINERS" ]; then
     for wid in $WORKER_CONTAINERS; do
@@ -88,8 +105,8 @@ if [ -n "$WORKER_CONTAINERS" ]; then
         docker exec "$wid" python -m compileall /app/apps/ >/dev/null 2>&1 || true
         echo "Celery worker $wid atualizado!"
     done
-    echo "Reciclando o serviço tati_ai_celery_worker no Swarm para liberar memória RAM e Swap..."
-    docker service update --force tati_ai_celery_worker || true
+    echo "Reciclando o serviço tati_ai_celery_worker no Swarm (com imagem persistida) para liberar memória RAM e Swap..."
+    docker service update --force --detach=false tati_ai_celery_worker || docker service update --force tati_ai_celery_worker || true
 fi
 
 # 7. Teste de saúde da API

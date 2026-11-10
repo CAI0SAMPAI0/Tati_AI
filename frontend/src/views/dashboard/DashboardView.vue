@@ -121,6 +121,20 @@ function handleRevalidate() {
   loadDashboardData(true);
 }
 
+function handleStudentUpdated(patch?: Record<string, any>) {
+  const CACHE_STUDENTS_KEY = 'dashboard:students';
+  if (patch && patch.username) {
+    students.value = students.value.map((s: any) =>
+      s.username === patch.username ? { ...s, ...patch } : s,
+    );
+    if (selectedStudent.value && selectedStudent.value.username === patch.username) {
+      selectedStudent.value = { ...selectedStudent.value, ...patch };
+    }
+    setActivityCache(CACHE_STUDENTS_KEY, students.value, TTL_1_DAY_MS);
+  }
+  loadDashboardData(true);
+}
+
 async function loadDashboardData(isSilent = false) {
   const CACHE_STATS_KEY = 'dashboard:stats';
   const CACHE_STUDENTS_KEY = 'dashboard:students';
@@ -590,7 +604,7 @@ const sectionTitles: Record<DashSection, { title: string; subtitle: string }> = 
       :is-open="isStudentModalOpen"
       :student="selectedStudent"
       @close="isStudentModalOpen = false"
-      @update="loadDashboardData"
+      @update="handleStudentUpdated"
     />
   </div>
 </template>

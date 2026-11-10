@@ -29,7 +29,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'close'): void;
-  (e: 'update'): void;
+  (e: 'update', payload?: Record<string, any>): void;
 }>();
 
 const toast = useToast();
@@ -157,7 +157,7 @@ async function handleUpdateLevel(lvl: string) {
     });
     localStudent.value.level = lvl;
     toast.success('Level updated successfully!');
-    emit('update');
+    emit('update', { username: localStudent.value.username, level: lvl });
   } catch (err) {
     console.error('Error updating level:', err);
     toast.error('Failed to update level.');
@@ -171,7 +171,7 @@ async function handleSavePrompt() {
     });
     localStudent.value.custom_prompt = promptText.value;
     toast.success('Prompt saved! Takes effect on next message.');
-    emit('update');
+    emit('update', { username: localStudent.value.username, custom_prompt: promptText.value });
   } catch (err) {
     console.error('Error saving prompt:', err);
     toast.error('Failed to save prompt.');
