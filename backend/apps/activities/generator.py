@@ -587,20 +587,32 @@ Return ONLY a JSON object:
                         f"[CEFR Generator] Falha ao extrair PDF para {ref.filename}: {e}"
                     )
 
-            # 3. Extrai múltiplos tópicos específicos deste arquivo de referência
+            # 3. Extrai TODOS os tópicos e subtópicos/palavras relacionadas deste arquivo de referência
             ref_topics: List[Dict[str, Any]] = []
             if client and text_found:
-                prompt = f"""You are an expert ESL curriculum designer.
-Analyze the following pedagogical text from reference file '{ref.filename}' (CEFR Level {ref_level}):
+                window_size = 24000
+                text_windows = [
+                    text_found[i : i + window_size]
+                    for i in range(0, len(text_found), window_size)
+                    if text_found[i : i + window_size].strip()
+                ]
+                merged_by_topic: Dict[str, Dict[str, Any]] = {}
+
+                for win_idx, win_text in enumerate(text_windows):
+                    prompt = f"""You are an expert ESL curriculum designer.
+Analyze the following pedagogical text from reference file '{ref.filename}' (CEFR Level {ref_level}, part {win_idx + 1} of {len(text_windows)}):
 ---
-{text_found[:5000]}
+{win_text}
 ---
-Extract ALL distinct real-world topics, communicative functions, grammar points, or vocabulary themes directly present in this specific document.
-DO NOT limit to a single topic: provide 2 to 5 distinct, practical topics covered in this material.
-For each topic:
-1. "topic": A clear pedagogical title representing this topic or communicative goal.
-2. "items": 4 to 8 target vocabulary words, expressions or practice phrases from this section.
-3. "count": Number of items in the list.
+Extract EVERY SINGLE distinct topic, thematic category, communicative function, grammar point, or vocabulary section present in this text.
+CRITICAL INSTRUCTIONS:
+1. DO NOT limit the number of topics! Extract ALL topics present in the text from beginning to end.
+2. For each topic, extract ALL related target vocabulary words, subtopics, expressions, or practice phrases listed under or associated with that topic in the document.
+3. Keep everything in English.
+4. For each topic object provide:
+   - "topic": The clear pedagogical title representing this topic or category.
+   - "items": The complete list of related words, subtopics, expressions, or phrases belonging to this topic.
+   - "count": Number of items in the list.
 
 Format strictly as JSON:
 {{
@@ -612,22 +624,59 @@ Format strictly as JSON:
     }}
   ]
 }}"""
-                for candidate_model in [groq_model, "openai/gpt-oss-120b", "qwen/qwen3.8-27b"]:
-                    try:
-                        res = client.chat.completions.create(
-                            model=candidate_model,
-                            messages=[{"role": "user", "content": prompt}],
-                            response_format={"type": "json_object"},
-                            temperature=0.2,
-                        )
-                        parsed = json.loads(res.choices[0].message.content)
-                        if parsed and parsed.get("topics"):
-                            ref_topics = parsed.get("topics", [])
-                            break
-                    except Exception as exc:
-                        logger.warning(
-                            f"[CEFR Generator] Falha ao extrair tópicos de {ref.filename} com {candidate_model}: {exc}"
-                        )
+                    window_topics: List[Dict[str, Any]] = []
+                    for candidate_model in [groq_model, "openai/gpt-oss-120b", "qwen/qwen3.8-27b"]:
+                        try:
+                            res = client.chat.completions.create(
+                                model=candidate_model,
+                                messages=[{"role": "user", "content": prompt}],
+                                response_format={"type": "json_object"},
+                                temperature=0.15,
+                                max_tokens=4096,
+                            )
+                            parsed = json.loads(res.choices[0].message.content)
+                            if parsed and isinstance(parsed.get("topics"), list) and len(parsed["topics"]) > 0:
+                                window_topics = parsed["topics"]
+                                break
+                        except Exception as exc:
+                            logger.warning(
+                                f"[CEFR Generator] Falha ao extrair tópicos de {ref.filename} (janela {win_idx + 1}) com {candidate_model}: {exc}"
+                            )
+
+                    for wt in window_topics:
+                        if not isinstance(wt, dict):
+                            continue
+                        t_name = str(wt.get("topic") or wt.get("title") or "").strip()
+                        if not t_name:
+                            continue
+                        raw_items = wt.get("items") or wt.get("subtopics") or []
+                        clean_items = [
+                            str(it).strip()
+                            for it in raw_items
+                            if isinstance(it, (str, int, float)) and str(it).strip()
+                        ]
+                        norm_key = t_name.lower()
+                        if norm_key not in merged_by_topic:
+                            merged_by_topic[norm_key] = {
+                                "topic": t_name,
+                                "items": [],
+                                "_seen": set(),
+                            }
+                        for it in clean_items:
+                            it_low = it.lower()
+                            if it_low not in merged_by_topic[norm_key]["_seen"]:
+                                merged_by_topic[norm_key]["_seen"].add(it_low)
+                                merged_by_topic[norm_key]["items"].append(it)
+
+                for entry in merged_by_topic.values():
+                    ref_topics.append(
+                        {
+                            "topic": entry["topic"],
+                            "items": entry["items"],
+                            "subtopics": entry["items"],
+                            "count": len(entry["items"]),
+                        }
+                    )
 
             # Fallback por arquivo caso o LLM não responda ou não haja texto
             if not ref_topics:
@@ -668,10 +717,12 @@ Format strictly as JSON:
 
             # Enriquece cada tópico com a origem do arquivo de referência
             for t in ref_topics:
+                t_items = t.get("items") or t.get("subtopics") or []
                 enriched = {
                     "topic": t.get("topic", "General Topic").strip(),
-                    "items": t.get("items", []),
-                    "count": len(t.get("items", [])),
+                    "items": t_items,
+                    "subtopics": t_items,
+                    "count": len(t_items),
                     "source_file": ref.filename,
                     "reference_id": str(ref.id),
                     "level": ref_level,

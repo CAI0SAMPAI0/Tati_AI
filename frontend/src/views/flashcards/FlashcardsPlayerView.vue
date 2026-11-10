@@ -59,6 +59,28 @@ const deckId = computed(() => route.params.id as string);
 const progressKey = computed(() => `tati_flashcard_progress_${deckId.value}`);
 const deckCacheKey = computed(() => `tati_flashcard_deck_${deckId.value}`);
 
+const backUrl = computed(() => {
+  const fromParam = route.query.from;
+  if (typeof fromParam === 'string' && fromParam.startsWith('/')) {
+    return fromParam;
+  }
+  const historyBack = typeof window !== 'undefined' ? (window.history.state?.back as string | undefined) : undefined;
+  if (historyBack && typeof historyBack === 'string' && historyBack.startsWith('/') && !historyBack.startsWith('/flashcards')) {
+    return historyBack;
+  }
+  return '/activities';
+});
+
+const backButtonLabel = computed(() => {
+  if (backUrl.value.startsWith('/dashboard')) return 'Back to Dashboard';
+  if (backUrl.value.startsWith('/learning-trail')) return 'Back to Learning Trail';
+  return 'Back to Activities';
+});
+
+function handleBack() {
+  router.push(backUrl.value);
+}
+
 function saveProgress() {
   if (!deckId.value || typeof window === 'undefined' || finished.value) return;
   try {
@@ -647,7 +669,7 @@ onUnmounted(() => {
       <p class="text-sm text-text-muted max-w-sm">
         This deck does not have any active cards configured yet.
       </p>
-      <Button @click="router.push('/activities')">Back to Activities</Button>
+      <Button @click="handleBack">{{ backButtonLabel }}</Button>
     </div>
 
     <!-- Completion / Summary Screen -->
@@ -693,8 +715,8 @@ onUnmounted(() => {
             <Button variant="secondary" class="flex-1" @click="handleRestart">
               <RotateCcw class="w-4 h-4 mr-2" /> Practice Again
             </Button>
-            <Button class="flex-1" @click="router.push('/activities')">
-              Activities
+            <Button class="flex-1" @click="handleBack">
+              {{ backButtonLabel }}
               <ArrowRight class="w-4 h-4 ml-2" />
             </Button>
           </div>
@@ -720,10 +742,10 @@ onUnmounted(() => {
         <div class="flex items-center justify-between gap-3 flex-wrap">
           <button
             type="button"
-            @click="router.push('/activities')"
+            @click="handleBack"
             class="flex items-center gap-2 text-text-muted hover:text-text transition-colors text-sm font-medium cursor-pointer"
           >
-            <ArrowLeft class="w-4 h-4" /> Back to Activities
+            <ArrowLeft class="w-4 h-4" /> {{ backButtonLabel }}
           </button>
 
           <div v-if="isCompleted" class="flex items-center gap-2">

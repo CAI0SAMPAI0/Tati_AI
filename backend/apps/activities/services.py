@@ -141,28 +141,40 @@ class FlashcardService:
     @staticmethod
     def get_deck_details(deck_id: str) -> dict:
         if str(deck_id).startswith("cefr_fc_"):
-            parts = str(deck_id).split("_")
+            raw_deck_id = str(deck_id)
+            force_draft = False
+            if raw_deck_id.endswith("__draft"):
+                force_draft = True
+                raw_deck_id = raw_deck_id[: -len("__draft")]
+
+            parts = raw_deck_id.split("_")
             if len(parts) >= 4:
                 lvl = parts[2].upper()
                 target_slug = normalize_slug("_".join(parts[3:]))
 
                 cefr_cards = Flashcard.objects.filter(
-                    level__iexact=lvl, is_published=True
+                    level__iexact=lvl, is_published=not force_draft
                 )
                 matched = []
                 matched_topic = ""
                 for c in cefr_cards:
                     t = (c.topic or "General Vocabulary").strip()
-                    if normalize_slug(t) == target_slug:
+                    if normalize_slug(t) == target_slug or (
+                        target_slug in ("general", "general_vocabulary", "general_practice")
+                        and normalize_slug(t) in ("general", "general_vocabulary", "general_practice")
+                    ):
                         matched.append(c)
                         matched_topic = t
 
-                # Fallback: busca cards recém-gerados ainda em rascunho
+                # Fallback: busca cards recém-gerados de qualquer status caso nenhum coincida com o filtro inicial
                 if not matched:
-                    cefr_cards_draft = Flashcard.objects.filter(level__iexact=lvl)
-                    for c in cefr_cards_draft:
+                    cefr_cards_all = Flashcard.objects.filter(level__iexact=lvl)
+                    for c in cefr_cards_all:
                         t = (c.topic or "General Vocabulary").strip()
-                        if normalize_slug(t) == target_slug:
+                        if normalize_slug(t) == target_slug or (
+                            target_slug in ("general", "general_vocabulary", "general_practice")
+                            and normalize_slug(t) in ("general", "general_vocabulary", "general_practice")
+                        ):
                             matched.append(c)
                             matched_topic = t
 

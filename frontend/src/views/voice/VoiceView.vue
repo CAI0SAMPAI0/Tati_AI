@@ -449,7 +449,10 @@ async function handleStartSimulation() {
           lastAudio.value = simData.initial_message.audio;
         }
       }
-      router.replace(`/voice?conv_id=${simData.id}&simulation_id=${simulationId.value}`);
+      router.replace({
+        path: '/voice',
+        query: { ...route.query, conv_id: simData.id, simulation_id: simulationId.value },
+      });
       toast.success('Simulation started!');
     } else {
       error.value = 'Could not start on server. Check your connection.';
@@ -461,12 +464,26 @@ async function handleStartSimulation() {
   }
 }
 
+function handleGoBack() {
+  const fromParam = route.query.from;
+  if (typeof fromParam === 'string' && fromParam.startsWith('/')) {
+    router.push(fromParam);
+    return;
+  }
+  const historyBack = typeof window !== 'undefined' ? (window.history.state?.back as string | undefined) : undefined;
+  if (historyBack && typeof historyBack === 'string' && historyBack.startsWith('/') && !historyBack.startsWith('/voice')) {
+    router.push(historyBack);
+    return;
+  }
+  router.push('/activities');
+}
+
 async function handleFinishSimulation() {
   if (!simulationId.value) return;
   try {
     await apiPost(`/simulation/complete/${simulationId.value}`, {});
     toast.success('Simulation completed!');
-    router.push('/activities');
+    handleGoBack();
   } catch (e) {
     console.error(e);
   }
@@ -572,7 +589,7 @@ onUnmounted(() => {
         class="px-6 py-3 rounded-2xl bg-primary text-white font-bold hover:scale-105 transition-all flex items-center gap-2">
         <RefreshCcw class="w-4 h-4" /> Try Again
       </button>
-      <button type="button" @click="router.back()" class="text-sm text-text-muted hover:underline">
+      <button type="button" @click="handleGoBack" class="text-sm text-text-muted hover:underline">
         Back
       </button>
     </div>
@@ -582,7 +599,7 @@ onUnmounted(() => {
       class="w-full md:w-[42%] lg:w-[38%] h-[34vh] sm:h-[32vh] md:h-full shrink-0 relative flex flex-col items-center justify-center px-2.5 pt-2 pb-1.5 sm:p-8 bg-white/95 dark:bg-[#0f1120]/95 border-b md:border-b-0 md:border-r border-border z-20 shadow-xl transition-all animate-in fade-in slide-in-from-left-8 duration-300">
       <!-- Top Left: Back Button & New Conversation -->
       <div class="absolute top-2.5 sm:top-6 left-3 sm:left-6 flex items-center gap-2 sm:gap-3">
-        <button type="button" @click="router.back()"
+        <button type="button" @click="handleGoBack"
           class="flex items-center gap-2 px-2.5 sm:px-4 py-1 sm:py-2 rounded-xl bg-white dark:bg-[#1a1c2e] border border-border text-text hover:text-primary transition-all active:scale-95 shadow-sm group cursor-pointer">
           <ArrowLeft class="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
           <span class="text-[9px] sm:text-[10px] font-black uppercase tracking-widest">Back</span>

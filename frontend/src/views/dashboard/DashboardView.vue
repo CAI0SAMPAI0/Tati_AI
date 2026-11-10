@@ -299,7 +299,7 @@ const sectionTitles: Record<DashSection, { title: string; subtitle: string }> = 
       :class="isSidebarOpen ? 'md:pl-[280px]' : 'md:pl-0'"
     >
       <!-- Dashboard Top Header -->
-      <header class="h-16 border-b border-border bg-surface sticky top-0 z-40 px-4 md:px-8 flex items-center justify-between shrink-0">
+      <header class="h-16 border-b border-border bg-bg-secondary/30 sticky top-0 z-40 px-4 md:px-8 flex items-center justify-between shrink-0">
         <div class="flex items-center gap-4">
           <button
             type="button"

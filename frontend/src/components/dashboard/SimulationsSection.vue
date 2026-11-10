@@ -186,6 +186,7 @@ async function handleSave() {
 }
 
 async function handleStartSimulation(sim: SimulationRow) {
+  const fromUrl = encodeURIComponent('/dashboard?tab=simulations');
   try {
     toast.info('Starting simulation scenario...');
     const res = await apiPost<any>(ENDPOINTS.CONVERSATIONS, {
@@ -196,13 +197,13 @@ async function handleStartSimulation(sim: SimulationRow) {
     });
     const convId = (res as any)?.id || (res as any)?.data?.id;
     if (convId) {
-      router.push(`/voice?conv_id=${convId}&simulation_id=${sim.id}`);
+      router.push(`/voice?conv_id=${convId}&simulation_id=${sim.id}&from=${fromUrl}`);
     } else {
-      router.push(`/voice?simulation_id=${sim.id}`);
+      router.push(`/voice?simulation_id=${sim.id}&from=${fromUrl}`);
     }
   } catch (err) {
     console.error('Error starting simulation:', err);
-    router.push(`/voice?simulation_id=${sim.id}`);
+    router.push(`/voice?simulation_id=${sim.id}&from=${fromUrl}`);
   }
 }
 

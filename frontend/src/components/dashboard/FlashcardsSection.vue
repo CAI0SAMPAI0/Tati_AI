@@ -349,7 +349,8 @@ async function handleBulkDelete() {
 }
 
 function handlePlayDeck(deck: FlashcardDeck) {
-  router.push(`/flashcards/${deck.id}`);
+  const fromUrl = encodeURIComponent('/dashboard?tab=flashcards');
+  router.push(`/flashcards/${deck.id}?from=${fromUrl}`);
 }
 
 onMounted(() => {
