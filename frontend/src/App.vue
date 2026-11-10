@@ -90,6 +90,10 @@ function startNotificationWebSocket() {
         })
       );
     }
+
+    if (message.type === 'in_app_notification' && message.data) {
+      notifStore.pushLiveNotification(message.data as any);
+    }
   });
 
   notificationSocket.connect();
@@ -130,12 +134,12 @@ function handleFlutterReady() {
 function startNotificationPolling() {
   if (notifPollTimer) clearInterval(notifPollTimer);
   notifStore.fetchNotifications();
-  // Poll notifications (streaks, new activities, trophies, nudges) every 25 seconds
+  // Fallback lento (180s) apenas caso o WebSocket (/notifications/ws/) perca conexão temporariamente
   notifPollTimer = setInterval(() => {
     if (authStore.isAuthenticated && document.visibilityState === 'visible') {
       notifStore.fetchNotifications();
     }
-  }, 25000);
+  }, 180000);
 }
 
 onMounted(() => {

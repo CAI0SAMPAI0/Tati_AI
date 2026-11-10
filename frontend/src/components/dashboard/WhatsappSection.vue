@@ -19,6 +19,7 @@ import {
 } from 'lucide-vue-next';
 import { apiGet, apiPost, apiPut, apiFetch } from '@/api/client';
 import { useToast } from '@/composables/useToast';
+import { peekActivityCache, setActivityCache, TTL_1_DAY_MS } from '@/utils/activityCache';
 import WhatsAppIcon from '../icons/WhatsAppIcon.vue';
 
 interface SessionData {
@@ -173,12 +174,25 @@ async function handleRestartSession() {
 }
 
 // Students Directory
+const CACHE_WA_STUDENTS_KEY = 'dashboard:whatsapp_students_v1';
+
 async function loadStudents(silent = false) {
-  if (!silent) loadingStudents.value = true;
-  else isRefetchingStudents.value = true;
+  if (!silent) {
+    const cached = peekActivityCache<WhatsAppStudentsResponse>(CACHE_WA_STUDENTS_KEY);
+    if (cached && Array.isArray(cached.students)) {
+      studentsData.value = cached;
+      loadingStudents.value = false;
+      isRefetchingStudents.value = true;
+    } else {
+      loadingStudents.value = true;
+    }
+  } else {
+    isRefetchingStudents.value = true;
+  }
   try {
     const res = await apiGet<WhatsAppStudentsResponse>('/dashboard/whatsapp/students');
     studentsData.value = res;
+    setActivityCache(CACHE_WA_STUDENTS_KEY, res, TTL_1_DAY_MS);
   } catch (err) {
     console.error('Error fetching WhatsApp students:', err);
   } finally {
@@ -258,17 +272,39 @@ async function handleSendTestMessage(student: StudentWhatsAppData) {
   }
 }
 
+function handleWahaSessionRealtime() {
+  loadSessions(true);
+}
+
+function handleDashboardUpdated(event: any) {
+  const data = event?.detail || event;
+  if (!data?.section || data.section === 'students' || data.section === 'whatsapp') {
+    loadStudents(true);
+  }
+}
+
 onMounted(() => {
   loadSessions();
   loadStudents();
+  window.addEventListener('waha_session_updated', handleWahaSessionRealtime);
+  window.addEventListener('waha-session-updated', handleWahaSessionRealtime);
+  window.addEventListener('dashboard_updated', handleDashboardUpdated);
+  window.addEventListener('dashboard-updated', handleDashboardUpdated);
   pollTimer = setInterval(() => {
-    loadSessions(true);
-  }, 10000);
+    // Só faz polling frequente quando está aguardando leitura de QR Code ou inicializando
+    if (sessionStatus.value === 'SCAN_QR_CODE' || sessionStatus.value === 'STARTING') {
+      loadSessions(true);
+    }
+  }, 8000);
 });
 
 onUnmounted(() => {
   if (pollTimer) clearInterval(pollTimer);
   if (qrBlobUrl.value) URL.revokeObjectURL(qrBlobUrl.value);
+  window.removeEventListener('waha_session_updated', handleWahaSessionRealtime);
+  window.removeEventListener('waha-session-updated', handleWahaSessionRealtime);
+  window.removeEventListener('dashboard_updated', handleDashboardUpdated);
+  window.removeEventListener('dashboard-updated', handleDashboardUpdated);
 });
 </script>
 

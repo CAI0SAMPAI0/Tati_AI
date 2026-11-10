@@ -759,6 +759,24 @@ class NotificationDispatcher:
             )
             results["in_app"] = True
             results["notification_id"] = str(notif.id)
+
+            # Push real-time via WebSocket (/notifications/ws/) para evitar polling no banco
+            try:
+                from .websocket import notify_user
+                notify_user(
+                    username,
+                    "in_app_notification",
+                    {
+                        "id": str(notif.id),
+                        "category": notif.category,
+                        "title": notif.title,
+                        "body": notif.body,
+                        "created_at": notif.created_at.isoformat() if notif.created_at else datetime.now(timezone.utc).isoformat(),
+                        "is_read": False,
+                    },
+                )
+            except Exception:
+                pass
         except Exception as e:
             logger.warning(
                 f"[NotificationDispatcher] Erro ao criar in-app notification para {username}: {e}"
@@ -904,7 +922,24 @@ class NotificationDispatcher:
 
         if notifications_to_create:
             try:
-                Notification.objects.bulk_create(notifications_to_create, batch_size=200)
+                created_notifs = Notification.objects.bulk_create(notifications_to_create, batch_size=200)
+                from .websocket import notify_user
+                for cn in created_notifs:
+                    try:
+                        notify_user(
+                            cn.username,
+                            "in_app_notification",
+                            {
+                                "id": str(cn.id),
+                                "category": cn.category,
+                                "title": cn.title,
+                                "body": cn.body,
+                                "created_at": cn.created_at.isoformat() if cn.created_at else datetime.now(timezone.utc).isoformat(),
+                                "is_read": False,
+                            },
+                        )
+                    except Exception:
+                        pass
             except Exception as e:
                 logger.error(f"[Notify Activity] Erro no bulk_create de notificações: {e}")
 

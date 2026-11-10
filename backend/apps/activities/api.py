@@ -1336,14 +1336,49 @@ def delete_admin_premium(request: HttpRequest, content_id: str):
 cefr_admin_router = Router(tags=["CEFR & Scheduler Admin"])
 
 
+def _invalidate_cefr_admin_caches(reference_id: Optional[str] = None) -> None:
+    from django.core.cache import cache
+
+    try:
+        cache.delete("cefr_admin_references_v2")
+        cache.delete("cefr_admin_all_v2")
+        if reference_id:
+            cache.delete(f"cefr_ref_topics_v3_{reference_id}")
+    except Exception:
+        pass
+
+
+def _broadcast_cefr_content_updated(action: str, detail: Optional[dict] = None) -> None:
+    _invalidate_cefr_admin_caches()
+    try:
+        from apps.notifications.websocket import notify_teacher
+
+        payload = {"action": action, "section": "cefr"}
+        if detail:
+            payload.update(detail)
+        notify_teacher("dashboard_updated", payload)
+    except Exception:
+        pass
+
+
 @cefr_admin_router.get("/all", auth=auth_optional)
 def get_cefr_all(request: HttpRequest):
     from .models import Flashcard
     from apps.chat.models import CEFRSimulation
+    from django.core.cache import cache
+
+    force = request.GET.get("force") in ("1", "true")
+    if not force:
+        try:
+            cached = cache.get("cefr_admin_all_v2")
+            if cached:
+                return cached
+        except Exception:
+            pass
 
     fc = list(Flashcard.objects.all().order_by("level", "front"))
     sims = list(CEFRSimulation.objects.all().order_by("level", "topic"))
-    return {
+    result = {
         "success": True,
         "flashcards": [
             {
@@ -1369,28 +1404,100 @@ def get_cefr_all(request: HttpRequest):
             for s in sims
         ],
     }
+    try:
+        cache.set("cefr_admin_all_v2", result, timeout=180)
+    except Exception:
+        pass
+    return result
 
 
 @cefr_admin_router.get("/references", auth=auth_optional)
 def get_cefr_references(request: HttpRequest):
     from .models import CEFRReference
+    from django.core.cache import cache
+    from django.db import connection
+    import json
+
+    force = request.GET.get("force") in ("1", "true")
+    if not force:
+        try:
+            cached = cache.get("cefr_admin_references_v2")
+            if cached:
+                return cached
+        except Exception:
+            pass
 
     refs = list(CEFRReference.objects.all())
-    return {
-        "success": True,
-        "references": [
+
+    # Busca em uma única query todos os tópicos já extraídos e cacheados em cefr_documents
+    cached_topics_by_ref: Dict[str, List[Dict[str, Any]]] = {}
+    if refs:
+        try:
+            with connection.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT metadata->>'reference_id', content
+                    FROM cefr_documents
+                    WHERE metadata->>'type' = 'extracted_topics_cache'
+                    ORDER BY created_at ASC;
+                    """
+                )
+                for ref_id_val, content_str in cur.fetchall():
+                    if ref_id_val and content_str:
+                        try:
+                            parsed = json.loads(content_str)
+                            if isinstance(parsed, list):
+                                cached_topics_by_ref[str(ref_id_val)] = parsed
+                        except Exception:
+                            pass
+        except Exception:
+            pass
+
+    ref_list = []
+    for r in refs:
+        rid = str(r.id)
+        r_lvl = (r.cefr_level or "A1").strip().upper()
+        raw_cached_topics = cached_topics_by_ref.get(rid, [])
+        enriched_topics = []
+        for t in raw_cached_topics:
+            if not isinstance(t, dict):
+                continue
+            items_val = t.get("items") or t.get("subtopics") or []
+            enriched_topics.append(
+                {
+                    "topic": str(t.get("topic", "General Topic")).strip(),
+                    "items": items_val,
+                    "subtopics": items_val,
+                    "count": len(items_val),
+                    "source_file": r.filename,
+                    "reference_id": rid,
+                    "level": r_lvl,
+                }
+            )
+        ref_list.append(
             {
-                "id": str(r.id),
+                "id": rid,
                 "filename": r.filename,
                 "storage_url": r.storage_url,
                 "cefr_level": r.cefr_level,
                 "file_type": r.file_type,
                 "file_size": r.file_size,
                 "chunks_indexed": r.chunks_indexed,
+                "topics_cached": len(enriched_topics) > 0,
+                "cached_topics_count": len(enriched_topics),
+                "cached_topics": enriched_topics,
             }
-            for r in refs
-        ],
+        )
+
+    result = {
+        "success": True,
+        "references": ref_list,
     }
+    try:
+        cache.set("cefr_admin_references_v2", result, timeout=600)
+    except Exception:
+        pass
+    return result
 
 
 @cefr_admin_router.get("/schedules", auth=auth_optional)
@@ -1512,6 +1619,8 @@ def extract_cefr_topics(request: HttpRequest, reference_ids: Optional[str] = Non
     from .generator import CEFRGeneratorService
     from .models import CEFRReference
 
+    force_refresh = request.GET.get("force", "false").lower() in ("true", "1")
+
     # 1. Coleta IDs passados via múltiplos parâmetros (?reference_ids=A&reference_ids=B) ou string separada por vírgula
     raw_list = request.GET.getlist("reference_ids")
     all_ref_ids = []
@@ -1527,11 +1636,13 @@ def extract_cefr_topics(request: HttpRequest, reference_ids: Optional[str] = Non
     if require_selected and not all_ref_ids:
         return {"success": True, "level": "", "topics": []}
 
-    # 2. Se referências foram fornecidas, extrai tópicos diretamente dos arquivos usando IA
+    # 2. Se referências foram fornecidas, extrai tópicos diretamente dos arquivos usando IA / cache
     if all_ref_ids:
-        res = CEFRGeneratorService.extract_topics_from_references(all_ref_ids)
+        res = CEFRGeneratorService.extract_topics_from_references(
+            all_ref_ids, force_refresh=force_refresh
+        )
+        _invalidate_cefr_admin_caches()
         if res and isinstance(res.get("topics"), list):
-            # Garante que só retornem tópicos pertencentes aos arquivos selecionados
             cleaned_set = set(all_ref_ids)
             filtered_topics = [
                 t for t in res["topics"]
@@ -1545,12 +1656,91 @@ def extract_cefr_topics(request: HttpRequest, reference_ids: Optional[str] = Non
     level = request.GET.get("level") or "A1"
     refs = list(CEFRReference.objects.filter(cefr_level__iexact=level)[:3])
     if refs:
-        res = CEFRGeneratorService.extract_topics_from_references([str(r.id) for r in refs])
+        res = CEFRGeneratorService.extract_topics_from_references(
+            [str(r.id) for r in refs], force_refresh=force_refresh
+        )
+        _invalidate_cefr_admin_caches()
         if res and res.get("topics"):
             return res
 
     # 4. Fallback contextualizado se não houver referências
     return CEFRGeneratorService.extract_topics_from_references([], fallback_level=level)
+
+
+@cefr_admin_router.get("/extract-topics/stream", auth=auth_required)
+def extract_cefr_topics_stream(request: HttpRequest, reference_ids: Optional[str] = None):
+    """
+    Endpoint SSE (Server-Sent Events) que transmite o progresso e os tópicos extraídos arquivo por arquivo,
+    evitando timeouts de requisição HTTP.
+    """
+    require_teacher(request.auth)
+    from django.http import StreamingHttpResponse
+    from .generator import CEFRGeneratorService
+    import json
+    import queue
+    import threading
+
+    force_refresh = request.GET.get("force", "false").lower() in ("true", "1")
+    raw_list = request.GET.getlist("reference_ids")
+    all_ref_ids = []
+    for item in raw_list:
+        for part in str(item).split(","):
+            if part.strip():
+                all_ref_ids.append(part.strip())
+    if not all_ref_ids and reference_ids:
+        all_ref_ids = [r.strip() for r in reference_ids.split(",") if r.strip()]
+
+    def event_stream():
+        q: "queue.Queue[Optional[dict]]" = queue.Queue()
+
+        def on_progress(ev: dict):
+            q.put(ev)
+
+        def worker():
+            try:
+                res = CEFRGeneratorService.extract_topics_from_references(
+                    all_ref_ids,
+                    force_refresh=force_refresh,
+                    on_progress=on_progress,
+                )
+                _invalidate_cefr_admin_caches()
+                topics = res.get("topics", []) if isinstance(res, dict) else []
+                if all_ref_ids:
+                    cleaned_set = set(all_ref_ids)
+                    topics = [
+                        t for t in topics
+                        if not t.get("reference_id") or str(t.get("reference_id")) in cleaned_set
+                    ]
+                q.put(
+                    {
+                        "type": "done",
+                        "success": True,
+                        "level": res.get("level", "") if isinstance(res, dict) else "",
+                        "topics": topics,
+                    }
+                )
+            except Exception as exc:
+                q.put({"type": "error", "message": str(exc)})
+            finally:
+                q.put(None)
+
+        t = threading.Thread(target=worker, daemon=True)
+        t.start()
+
+        while True:
+            try:
+                item = q.get(timeout=2.5)
+                if item is None:
+                    break
+                yield f"data: {json.dumps(item, ensure_ascii=False)}\n\n"
+            except queue.Empty:
+                # Heartbeat SSE para manter conexão viva em proxies (Nginx/Cloudflare)
+                yield f"data: {json.dumps({'type': 'ping'})}\n\n"
+
+    response = StreamingHttpResponse(event_stream(), content_type="text/event-stream")
+    response["Cache-Control"] = "no-cache"
+    response["X-Accel-Buffering"] = "no"
+    return response
 
 
 @cefr_admin_router.post("/schedules/{schedule_id}/run-now", auth=auth_required)
@@ -1567,6 +1757,7 @@ def run_cefr_schedule_now(request: HttpRequest, schedule_id: str):
         raise HttpError(404, "Agendamento não encontrado.")
 
     res = CEFRGeneratorService.run_single_schedule(sched)
+    _broadcast_cefr_content_updated("schedule_executed", {"schedule_id": schedule_id})
     return res
 
 
@@ -1624,6 +1815,7 @@ def generate_cefr_flashcards(
         reference_ids=reference_ids,
         topic_context=topic_context,
     )
+    _broadcast_cefr_content_updated("flashcards_generated", {"cards_generated": len(cards), "level": level, "topic": title or topic})
     return {
         "success": True,
         "task_id": str(uuid.uuid4()),
@@ -1679,6 +1871,7 @@ def generate_cefr_simulations(
         topic_context=topic_context,
     )
     sim_id = str(sims[0].id) if sims else str(uuid.uuid4())
+    _broadcast_cefr_content_updated("simulations_generated", {"simulation_id": sim_id, "level": level, "topic": title or topic})
     return {"success": True, "task_id": str(uuid.uuid4()), "simulation_id": sim_id}
 
 
@@ -1796,6 +1989,27 @@ def upload_cefr_material(
                 "chunks_indexed": len(chunks),
             }
         )
+
+    # Dispara extração e pré-aquecimento de cache em background para que a seleção posterior seja instantânea
+    try:
+        import threading
+        from .generator import CEFRGeneratorService
+
+        new_ref_ids = [r["id"] for r in results if r.get("id")]
+
+        def _prewarm_topics():
+            try:
+                CEFRGeneratorService.extract_topics_from_references(new_ref_ids)
+                _invalidate_cefr_admin_caches()
+            except Exception as exc:
+                logger.warning(f"[CEFR Upload] Erro ao pré-cachear tópicos em background: {exc}")
+
+        if new_ref_ids:
+            threading.Thread(target=_prewarm_topics, daemon=True).start()
+    except Exception:
+        pass
+
+    _broadcast_cefr_content_updated("references_uploaded", {"count": len(results)})
     return {"success": True, "results": results}
 
 
@@ -1822,6 +2036,8 @@ def update_cefr_reference(
         ref.filename = body.filename.strip()
 
     ref.save()
+    _invalidate_cefr_admin_caches(str(ref.id))
+    _broadcast_cefr_content_updated("reference_updated", {"id": str(ref.id)})
     return {
         "success": True,
         "reference": {
@@ -1845,6 +2061,8 @@ def delete_cefr_reference(request: HttpRequest, reference_id: str):
     from .models import CEFRReference
 
     CEFRReference.objects.filter(id=reference_id).delete()
+    _invalidate_cefr_admin_caches(reference_id)
+    _broadcast_cefr_content_updated("reference_deleted", {"id": reference_id})
     return {"success": True, "message": "Reference deleted successfully."}
 
 
@@ -1891,6 +2109,7 @@ def toggle_publish_flashcard_group(
         qs = qs.filter(is_published=bool(eff_curr))
 
     updated = qs.update(is_published=bool(eff_pub))
+    _broadcast_cefr_content_updated("flashcard_group_updated", {"topic": eff_topic, "level": eff_level, "is_published": bool(eff_pub)})
     return {"success": True, "updated": updated}
 
 
@@ -1933,6 +2152,7 @@ def delete_flashcard_group(
         qs = qs.filter(is_published=bool(eff_curr))
 
     deleted = qs.delete()
+    _broadcast_cefr_content_updated("flashcard_group_deleted", {"topic": eff_topic, "level": eff_level})
     return {"success": True, "message": f"Deleted group {eff_topic}"}
 
 
@@ -2001,6 +2221,7 @@ def save_flashcard_group(request: HttpRequest, body: CEFRFlashcardGroupSaveSchem
                 f"[CEFR Admin] Erro ao notificar alunos de flashcards: {exc}"
             )
 
+    _broadcast_cefr_content_updated("flashcard_group_saved", {"topic": body.new_topic, "level": body.new_level.upper()})
     return {"success": True, "inserted": len(inserted)}
 
 
@@ -2042,6 +2263,7 @@ def update_single_cefr_flashcard(
     if "level" in data and str(data["level"] or "").strip():
         fc.level = str(data["level"]).strip().upper()
     fc.save()
+    _broadcast_cefr_content_updated("flashcard_updated", {"id": str(fc.id), "is_published": fc.is_published})
     return {"success": True, "id": str(fc.id), "is_published": fc.is_published}
 
 
@@ -2054,6 +2276,7 @@ def delete_single_cefr_flashcard(request: HttpRequest, card_id: str):
     from .models import Flashcard
 
     Flashcard.objects.filter(id=card_id).delete()
+    _broadcast_cefr_content_updated("flashcard_deleted", {"id": card_id})
     return {"success": True, "deleted": card_id}
 
 
@@ -2098,6 +2321,7 @@ def update_cefr_simulation(request: HttpRequest, sim_id: str, payload: dict):
         except Exception as exc:
             logger.warning(f"[CEFR Admin] Erro ao notificar alunos de simulação: {exc}")
 
+    _broadcast_cefr_content_updated("simulation_updated", {"id": str(cs.id), "is_published": cs.is_published})
     return {"success": True, "data": {"id": str(cs.id), "level": cs.level}}
 
 
@@ -2111,6 +2335,7 @@ def delete_cefr_simulation(request: HttpRequest, sim_id: str):
 
     clean_id = sim_id.replace("cefr_sim_", "")
     CEFRSimulation.objects.filter(id=clean_id).delete()
+    _broadcast_cefr_content_updated("simulation_deleted", {"id": clean_id})
     return {"success": True, "message": "Simulation deleted successfully."}
 
 

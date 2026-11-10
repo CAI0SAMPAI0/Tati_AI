@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   Upload,
@@ -30,10 +30,11 @@ import {
   PenLine,
   Check,
 } from 'lucide-vue-next';
-import { apiGet, apiPost, apiDelete, apiPut, apiPatch, apiUpload } from '@/api/client';
+import { apiGet, apiPost, apiDelete, apiPut, apiPatch, apiUpload, apiFetch } from '@/api/client';
 import { LEVEL_OPTIONS } from '@/constants/levels';
 import { useToast } from '@/composables/useToast';
 import { useBodyScrollLock } from '@/composables/useBodyScrollLock';
+import { peekActivityCache, setActivityCache, TTL_30_DAYS_MS } from '@/utils/activityCache';
 
 interface CefrReference {
   id: string;
@@ -45,6 +46,9 @@ interface CefrReference {
   chunks_indexed?: number;
   total_chunks?: number;
   storage_url?: string;
+  topics_cached?: boolean;
+  cached_topics_count?: number;
+  cached_topics?: any[];
 }
 
 interface ScheduleRow {
@@ -319,12 +323,32 @@ const totalDraftsCount = computed(() => {
 });
 
 // API Calls
-async function fetchReferences() {
-  loadingReferences.value = true;
+const CEFR_REFS_CACHE_KEY = 'cefr:admin_references_v2';
+const CEFR_ALL_CACHE_KEY = 'cefr:admin_all_v2';
+
+const extractionProgressMsg = ref('');
+
+async function fetchReferences(force = false) {
+  const cached = peekActivityCache<CefrReference[]>(CEFR_REFS_CACHE_KEY);
+  if (cached && cached.length > 0 && !force) {
+    references.value = cached;
+    loadingReferences.value = false;
+  } else {
+    loadingReferences.value = true;
+  }
+
   try {
-    const res = await apiGet<{ success: boolean; references: any[] }>(`/cefr/admin/references?_t=${Date.now()}`);
+    const query = force ? '?force=1' : '';
+    const res = await apiGet<{ success: boolean; references: CefrReference[] }>(`/cefr/admin/references${query}`);
     if (res && res.references) {
       references.value = res.references;
+      setActivityCache(CEFR_REFS_CACHE_KEY, res.references, TTL_30_DAYS_MS);
+      // Pre-populate per-reference topics cache when returned by backend
+      for (const r of res.references) {
+        if (Array.isArray(r.cached_topics) && r.cached_topics.length > 0) {
+          setActivityCache(`cefr:ref_topics:${r.id}`, r.cached_topics, TTL_30_DAYS_MS);
+        }
+      }
     }
   } catch (err) {
     console.error('Error fetching references:', err);
@@ -347,13 +371,27 @@ async function fetchSchedules() {
   }
 }
 
-async function fetchGeneratedContent(silent = false) {
-  if (!silent) loadingGenerated.value = true;
+async function fetchGeneratedContent(silent = false, force = false) {
+  const cached = peekActivityCache<{ flashcards: any[]; simulations: any[] }>(CEFR_ALL_CACHE_KEY);
+  if (cached && !force && generatedFlashcards.value.length === 0 && generatedSimulations.value.length === 0) {
+    generatedFlashcards.value = cached.flashcards || [];
+    generatedSimulations.value = cached.simulations || [];
+    loadingGenerated.value = false;
+  } else if (!silent) {
+    loadingGenerated.value = true;
+  }
+
   try {
-    const res = await apiGet<{ success: boolean; flashcards?: any[]; simulations?: any[] }>(`/cefr/admin/all?_t=${Date.now()}`);
+    const query = force ? '?force=1' : '';
+    const res = await apiGet<{ success: boolean; flashcards?: any[]; simulations?: any[] }>(`/cefr/admin/all${query}`);
     if (res) {
       generatedFlashcards.value = res.flashcards || [];
       generatedSimulations.value = res.simulations || [];
+      setActivityCache(
+        CEFR_ALL_CACHE_KEY,
+        { flashcards: generatedFlashcards.value, simulations: generatedSimulations.value },
+        TTL_30_DAYS_MS
+      );
     }
   } catch (err) {
     console.error('Error fetching generated content:', err);
@@ -459,16 +497,118 @@ async function handleExtractTopics() {
     toast.error('Please select at least one reference file from the library below.');
     return;
   }
+
+  // 1. Verifica se todos os arquivos selecionados já possuem tópicos no cache local / objeto reference
+  const cachedAll: any[] = [];
+  const missingRefIds: string[] = [];
+
+  for (const id of selectedRefIds.value) {
+    const refObj = references.value.find((r) => r.id === id);
+    const localCached =
+      (refObj && Array.isArray(refObj.cached_topics) && refObj.cached_topics.length > 0
+        ? refObj.cached_topics
+        : null) || peekActivityCache<any[]>(`cefr:ref_topics:${id}`);
+
+    if (localCached && localCached.length > 0) {
+      cachedAll.push(...localCached);
+    } else {
+      missingRefIds.push(id);
+    }
+  }
+
+  if (missingRefIds.length === 0 && cachedAll.length > 0) {
+    extractedTopics.value = cachedAll;
+    expandedTopicIdx.value = null;
+    selectedSubtopics.value = [];
+    showTopicSelector.value = true;
+    toast.success(`Loaded ${cachedAll.length} topics instantly from cache!`);
+    return;
+  }
+
   extractingTopics.value = true;
+  extractionProgressMsg.value = 'Starting topic extraction...';
+  if (cachedAll.length > 0) {
+    extractedTopics.value = [...cachedAll];
+    showTopicSelector.value = true;
+  }
+
   try {
-    const params = selectedRefIds.value.map((id) => `reference_ids=${id}`).join('&');
-    const res = await apiGet<any>(`/cefr/admin/extract-topics?${params}`);
-    if (res && res.topics && res.topics.length > 0) {
-      extractedTopics.value = res.topics;
+    const params = selectedRefIds.value.map((id) => `reference_ids=${encodeURIComponent(id)}`).join('&');
+    const resp = await apiFetch(`/cefr/admin/extract-topics/stream?${params}`);
+
+    if (!resp.ok || !resp.body) {
+      // Fallback para endpoint padrão com timeout estendido (90s)
+      const res = await apiGet<any>(`/cefr/admin/extract-topics?${params}`, { timeoutMs: 90000 });
+      if (res && res.topics && res.topics.length > 0) {
+        extractedTopics.value = res.topics;
+        expandedTopicIdx.value = null;
+        selectedSubtopics.value = [];
+        showTopicSelector.value = true;
+        toast.success(`Found ${res.topics.length} topics from selected materials!`);
+      } else {
+        toast.error('No topics found in selected materials.');
+      }
+      return;
+    }
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    const accumulatedTopics: any[] = [];
+    let completed = false;
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n\n');
+      buffer = lines.pop() || '';
+
+      for (const block of lines) {
+        const line = block.trim();
+        if (!line.startsWith('data:')) continue;
+        const jsonStr = line.replace(/^data:\s*/, '');
+        try {
+          const ev = JSON.parse(jsonStr);
+          if (ev.type === 'progress') {
+            extractionProgressMsg.value = `Processing ${ev.filename || 'file'} (${ev.current}/${ev.total})...`;
+          } else if (ev.type === 'file_done') {
+            if (Array.isArray(ev.topics) && ev.topics.length > 0) {
+              if (ev.reference_id) {
+                setActivityCache(`cefr:ref_topics:${ev.reference_id}`, ev.topics, TTL_30_DAYS_MS);
+                const targetRef = references.value.find((r) => r.id === ev.reference_id);
+                if (targetRef) {
+                  targetRef.topics_cached = true;
+                  targetRef.cached_topics_count = ev.topics.length;
+                  targetRef.cached_topics = ev.topics;
+                }
+              }
+              accumulatedTopics.push(...ev.topics);
+              extractedTopics.value = [...accumulatedTopics];
+              showTopicSelector.value = true;
+            }
+          } else if (ev.type === 'done') {
+            completed = true;
+            if (Array.isArray(ev.topics)) {
+              extractedTopics.value = ev.topics;
+            }
+          } else if (ev.type === 'error') {
+            throw new Error(ev.message || 'Error extracting topics');
+          }
+        } catch (parseErr: any) {
+          if (parseErr?.message && parseErr.message !== 'Unexpected end of JSON input') {
+            console.warn('SSE event warning:', parseErr);
+          }
+        }
+      }
+    }
+
+    if ((completed || extractedTopics.value.length > 0) && extractedTopics.value.length > 0) {
       expandedTopicIdx.value = null;
       selectedSubtopics.value = [];
       showTopicSelector.value = true;
-      toast.success(`Found ${res.topics.length} topics from selected materials!`);
+      setActivityCache(CEFR_REFS_CACHE_KEY, references.value, TTL_30_DAYS_MS);
+      toast.success(`Found ${extractedTopics.value.length} topics from selected materials!`);
     } else {
       toast.error('No topics found in selected materials.');
     }
@@ -476,6 +616,7 @@ async function handleExtractTopics() {
     toast.error(err?.message || 'Error extracting topics.');
   } finally {
     extractingTopics.value = false;
+    extractionProgressMsg.value = '';
   }
 }
 
@@ -501,9 +642,9 @@ async function handleGenerateFlashcards() {
       topic: genTopic.value.trim(),
       count: String(genCardCount.value),
     }).toString();
-    await apiPost(`/cefr/admin/generate-flashcards?${query}`, payload);
+    await apiPost(`/cefr/admin/generate-flashcards?${query}`, payload, { timeoutMs: 90000 });
     toast.success('Flashcards generated! Check AI Curator tab.');
-    await fetchGeneratedContent(true);
+    await fetchGeneratedContent(true, true);
     activeMainTab.value = 'curator';
     activeCuratorTab.value = 'flashcards';
   } catch (err: any) {
@@ -535,9 +676,9 @@ async function handleGenerateSimulations() {
       topic: genTopic.value.trim(),
       count: String(simulationCount.value),
     }).toString();
-    await apiPost(`/cefr/admin/generate-simulations?${query}`, payload);
+    await apiPost(`/cefr/admin/generate-simulations?${query}`, payload, { timeoutMs: 90000 });
     toast.success('Simulation generated! Check AI Curator tab.');
-    await fetchGeneratedContent(true);
+    await fetchGeneratedContent(true, true);
     activeMainTab.value = 'curator';
     activeCuratorTab.value = 'simulations';
   } catch (err: any) {
@@ -883,10 +1024,30 @@ async function handleLaunchSimulation(sim: any) {
   }
 }
 
+function handleDashboardWsEvent(e: Event) {
+  const detail = (e as CustomEvent).detail || {};
+  if (detail.section === 'cefr' || !detail.section) {
+    if (
+      detail.action === 'references_uploaded' ||
+      detail.action === 'reference_updated' ||
+      detail.action === 'reference_deleted'
+    ) {
+      fetchReferences(true);
+    } else {
+      fetchGeneratedContent(true, true);
+    }
+  }
+}
+
 onMounted(() => {
   fetchReferences();
   fetchSchedules();
   fetchGeneratedContent();
+  window.addEventListener('dashboard_updated', handleDashboardWsEvent);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('dashboard_updated', handleDashboardWsEvent);
 });
 </script>
 
@@ -1091,7 +1252,15 @@ onMounted(() => {
                       @change="toggleSelectReference(ref.id)" class="h-4 w-4 rounded accent-primary cursor-pointer" />
                   </td>
                   <td class="p-3 font-medium text-text max-w-xs truncate" :title="ref.filename">
-                    {{ ref.filename }}
+                    <div class="flex items-center gap-2">
+                      <span class="truncate">{{ ref.filename }}</span>
+                      <span
+                        v-if="ref.topics_cached || (ref.cached_topics && ref.cached_topics.length > 0)"
+                        class="shrink-0 px-1.5 py-0.5 text-[0.62rem] font-bold rounded-full bg-success/10 text-success border border-success/25"
+                        :title="`${ref.cached_topics_count || ref.cached_topics?.length || 0} topics cached for instant extraction`">
+                        ⚡ {{ ref.cached_topics_count || ref.cached_topics?.length }} topics cached
+                      </span>
+                    </div>
                   </td>
                   <td class="p-3">
                     <select :value="ref.cefr_level || ref.level"
@@ -1184,7 +1353,7 @@ onMounted(() => {
             class="px-4 py-2 bg-surface border border-border hover:border-primary/40 rounded-xl text-xs font-bold text-primary flex items-center gap-2 transition-all cursor-pointer shadow-xs">
             <RotateCw v-if="extractingTopics" class="w-3.5 h-3.5 animate-spin" />
             <Sparkles v-else class="w-3.5 h-3.5" />
-            <span>{{ extractingTopics ? 'Extracting All Topics & Subtopics...' : 'Extract Topics from Files' }}</span>
+            <span>{{ extractingTopics ? (extractionProgressMsg || 'Extracting All Topics & Subtopics...') : 'Extract Topics from Files' }}</span>
           </button>
         </div>
 

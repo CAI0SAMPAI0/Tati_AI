@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPatch, apiDelete } from './client';
+import { apiGet, apiPost, apiPatch, apiDelete, apiFetch } from './client';
 import { ENDPOINTS } from './endpoints';
 import type { Conversation, Message } from './types';
 
@@ -32,6 +32,8 @@ export interface SendMessageResponse {
   audio_b64?: string;
   correction?: string | null;
   conversation_id?: string;
+  id?: string;
+  user_message_id?: string;
 }
 
 export async function sendChatMessage(
@@ -50,6 +52,95 @@ export async function sendChatMessage(
     origin: origin || (audioB64 ? 'voice' : 'chat'),
     synthesize_audio: true,
   });
+}
+
+export async function streamChatMessage(
+  conversationId: string,
+  message: string,
+  onToken?: (token: string) => void,
+  audioB64?: string,
+  accent: string = 'en-US',
+  origin?: string
+): Promise<SendMessageResponse> {
+  const payload = {
+    conversation_id: conversationId,
+    message,
+    audio_b64: audioB64,
+    user_audio_b64: audioB64,
+    accent,
+    origin: origin || (audioB64 ? 'voice' : 'chat'),
+    synthesize_audio: true,
+  };
+
+  try {
+    const resp = await apiFetch(`${ENDPOINTS.CHAT_MESSAGE}/stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!resp.ok || !resp.body) {
+      return sendChatMessage(conversationId, message, audioB64, accent, origin);
+    }
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let finalRes: SendMessageResponse | null = null;
+    let accumulatedReply = '';
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const blocks = buffer.split('\n\n');
+      buffer = blocks.pop() || '';
+
+      for (const block of blocks) {
+        const line = block.trim();
+        if (!line.startsWith('data:')) continue;
+        const jsonStr = line.replace(/^data:\s*/, '');
+        try {
+          const ev = JSON.parse(jsonStr);
+          if (ev.type === 'token' && typeof ev.token === 'string') {
+            accumulatedReply += ev.token;
+            if (onToken) onToken(ev.token);
+          } else if (ev.type === 'done') {
+            finalRes = {
+              ok: true,
+              reply: ev.reply || accumulatedReply,
+              role: 'assistant',
+              audio: ev.audio_b64 || ev.audio,
+              audio_b64: ev.audio_b64 || ev.audio,
+              id: ev.id,
+              user_message_id: ev.user_message_id,
+              conversation_id: conversationId,
+            };
+          } else if (ev.type === 'error') {
+            throw new Error(ev.message || 'Stream error');
+          }
+        } catch (err: any) {
+          if (err?.message === 'Stream error') throw err;
+        }
+      }
+    }
+
+    if (finalRes) {
+      return finalRes;
+    }
+    if (accumulatedReply) {
+      return {
+        ok: true,
+        reply: accumulatedReply,
+        role: 'assistant',
+        conversation_id: conversationId,
+      };
+    }
+  } catch (err) {
+    console.warn('[Chat Stream] Fallback to standard POST:', err);
+  }
+
+  return sendChatMessage(conversationId, message, audioB64, accent, origin);
 }
 
 export async function editMessage(

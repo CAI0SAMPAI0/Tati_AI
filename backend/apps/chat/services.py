@@ -719,8 +719,9 @@ class AIService:
             raise HttpError(403, "Acesso não autorizado a esta conversa.")
 
         # 1. Salva mensagem do usuário com áudio da voz (se houver, e a menos que já tenha sido salva/editada)
+        user_msg_obj = None
         if not skip_create_user_msg:
-            Message.objects.create(
+            user_msg_obj = Message.objects.create(
                 session_id=conversation_id,
                 username=user.username,
                 role="user",
@@ -1036,6 +1037,7 @@ class AIService:
             "audio_b64": audio_b64,
             "audio": audio_b64,
             "id": str(msg.id),
+            "user_message_id": str(user_msg_obj.id) if user_msg_obj else None,
             "model": model_used,
             "document": generated_doc,
             "pdf_b64": generated_doc.get("pdf_b64", "") if generated_doc else "",

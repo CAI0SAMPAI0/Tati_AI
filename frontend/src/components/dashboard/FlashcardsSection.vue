@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   Layers,
@@ -31,6 +31,7 @@ import { apiGet, apiPost, apiPut, apiDelete, apiUpload } from '@/api/client';
 import { LEVEL_FILTER_OPTIONS, normalizeLevel } from '@/constants/levels';
 import { useToast } from '@/composables/useToast';
 import { useBodyScrollLock } from '@/composables/useBodyScrollLock';
+import { peekActivityCache, setActivityCache, TTL_1_DAY_MS } from '@/utils/activityCache';
 
 export interface Flashcard {
   front: string;
@@ -105,12 +106,23 @@ const filteredDecks = computed(() => {
   });
 });
 
-async function loadDecks() {
-  isLoading.value = true;
+const CACHE_DECKS_KEY = 'dashboard:flashcards_v1';
+
+async function loadDecks(silent = false) {
+  if (!silent) {
+    const cached = peekActivityCache<FlashcardDeck[]>(CACHE_DECKS_KEY);
+    if (cached && cached.length > 0) {
+      decks.value = cached;
+      isLoading.value = false;
+    } else {
+      isLoading.value = true;
+    }
+  }
   try {
     const res = await apiGet<any>('/dashboard/flashcards');
     const list = Array.isArray(res) ? res : res?.decks || res?.data || [];
     decks.value = list;
+    setActivityCache(CACHE_DECKS_KEY, list, TTL_1_DAY_MS);
   } catch (err) {
     console.error('Error loading decks:', err);
   } finally {
@@ -372,8 +384,22 @@ function handlePlayDeck(deck: FlashcardDeck) {
   router.push(`/flashcards/${deck.id}?from=${fromUrl}`);
 }
 
+function handleDashboardUpdated(event: any) {
+  const data = event?.detail || event;
+  if (!data?.section || data.section === 'flashcards' || data.section === 'cefr') {
+    loadDecks(true);
+  }
+}
+
 onMounted(() => {
   loadDecks();
+  window.addEventListener('dashboard_updated', handleDashboardUpdated);
+  window.addEventListener('dashboard-updated', handleDashboardUpdated);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('dashboard_updated', handleDashboardUpdated);
+  window.removeEventListener('dashboard-updated', handleDashboardUpdated);
 });
 </script>
 

@@ -123,14 +123,26 @@ def validate_flashcard_data(card: dict) -> tuple[bool, list[str]]:
 
 class CEFRGeneratorService:
     @staticmethod
+    def _get_groq_keys() -> List[str]:
+        raw = [
+            os.environ.get("GROQ_API_KEY"),
+            os.environ.get("GROQ_API_KEY_1"),
+            os.environ.get("GROQ_API_KEY_2"),
+            os.environ.get("GROQ_API_KEY_3"),
+        ]
+        seen = set()
+        keys = []
+        for k in raw:
+            if k and k.strip() and k.strip() not in seen:
+                seen.add(k.strip())
+                keys.append(k.strip())
+        return keys
+
+    @staticmethod
     def _get_groq_client() -> Optional[Groq]:
-        key = (
-            os.environ.get("GROQ_API_KEY")
-            or os.environ.get("GROQ_API_KEY_1")
-            or os.environ.get("GROQ_API_KEY_2")
-        )
-        if key:
-            return Groq(api_key=key)
+        keys = CEFRGeneratorService._get_groq_keys()
+        if keys:
+            return Groq(api_key=keys[0], max_retries=0)
         return None
 
     @classmethod
@@ -318,6 +330,7 @@ Return ONLY a JSON object:
             validated_cards.append(c)
 
         from .image_service import ImageResolverService
+        from concurrent.futures import ThreadPoolExecutor
 
         # Deduplicação rigorosa por front
         unique_cards = []
@@ -331,19 +344,30 @@ Return ONLY a JSON object:
                 seen_fronts.add(key)
                 unique_cards.append(c)
 
+        selected_cards = unique_cards[:count]
+
+        def _resolve_card_img(card_dict: Dict[str, Any]) -> str:
+            front = (card_dict.get("front") or "").strip()
+            search_query = (card_dict.get("image_search_query") or "").strip() or None
+            visual_prompt = (card_dict.get("image_prompt") or "").strip() or None
+            return ImageResolverService.resolve_image(
+                term=front,
+                topic=deck_title,
+                search_query=search_query,
+                visual_prompt=visual_prompt,
+            )
+
+        resolved_urls: List[str] = []
+        if selected_cards:
+            max_workers = min(6, len(selected_cards))
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                resolved_urls = list(executor.map(_resolve_card_img, selected_cards))
+
         created = []
         with transaction.atomic():
-            for c in unique_cards[:count]:
+            for idx, c in enumerate(selected_cards):
                 front = (c.get("front") or "").strip()
-                search_query = (c.get("image_search_query") or "").strip() or None
-                visual_prompt = (c.get("image_prompt") or "").strip() or None
-
-                img_url = ImageResolverService.resolve_image(
-                    term=front,
-                    topic=deck_title,
-                    search_query=search_query,
-                    visual_prompt=visual_prompt,
-                )
+                img_url = resolved_urls[idx] if idx < len(resolved_urls) else ""
                 fc, created_flag = Flashcard.objects.update_or_create(
                     level=lvl,
                     topic=deck_title,
@@ -453,19 +477,122 @@ Return ONLY a JSON object:
         return created
 
     @classmethod
+    def _get_cached_ref_topics(cls, ref_id: str) -> Optional[List[Dict[str, Any]]]:
+        """
+        Busca os tópicos extraídos no cache Redis ou na tabela cefr_documents (PostgreSQL).
+        """
+        from django.core.cache import cache
+        from django.db import connection
+        import json
+
+        cache_key = f"cefr_ref_topics_v3_{ref_id}"
+        try:
+            cached = cache.get(cache_key)
+            if isinstance(cached, list) and len(cached) > 0:
+                return cached
+        except Exception:
+            pass
+
+        try:
+            with connection.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT content FROM cefr_documents
+                    WHERE metadata->>'reference_id' = %s
+                      AND metadata->>'type' = 'extracted_topics_cache'
+                    ORDER BY created_at DESC
+                    LIMIT 1;
+                    """,
+                    (str(ref_id),),
+                )
+                row = cur.fetchone()
+                if row and row[0]:
+                    parsed = json.loads(row[0])
+                    if isinstance(parsed, list) and len(parsed) > 0:
+                        try:
+                            cache.set(cache_key, parsed, timeout=86400 * 30)
+                        except Exception:
+                            pass
+                        return parsed
+        except Exception as e:
+            logger.debug(f"[CEFR Generator] Falha ao ler cache DB de tópicos para {ref_id}: {e}")
+
+        return None
+
+    @classmethod
+    def _save_cached_ref_topics(cls, ref: Any, topics: List[Dict[str, Any]]) -> None:
+        """
+        Salva os tópicos extraídos tanto no Redis quanto de forma durável em cefr_documents.
+        """
+        if not topics:
+            return
+        from django.core.cache import cache
+        from django.db import connection
+        from psycopg2.extras import Json
+        import json
+        import uuid
+
+        ref_id_str = str(ref.id)
+        cache_key = f"cefr_ref_topics_v3_{ref_id_str}"
+        try:
+            cache.set(cache_key, topics, timeout=86400 * 30)
+        except Exception:
+            pass
+
+        try:
+            payload_json = json.dumps(topics, ensure_ascii=False)
+            with connection.cursor() as cur:
+                cur.execute(
+                    """
+                    DELETE FROM cefr_documents
+                    WHERE metadata->>'reference_id' = %s
+                      AND metadata->>'type' = 'extracted_topics_cache';
+                    """,
+                    (ref_id_str,),
+                )
+                cur.execute(
+                    """
+                    INSERT INTO cefr_documents (id, level, source_file, content, metadata, created_at)
+                    VALUES (%s, %s, %s, %s, %s, now());
+                    """,
+                    (
+                        str(uuid.uuid4()),
+                        (ref.cefr_level or "A1").strip().upper(),
+                        ref.filename,
+                        payload_json,
+                        Json(
+                            {
+                                "type": "extracted_topics_cache",
+                                "reference_id": ref_id_str,
+                                "original_name": ref.filename,
+                                "topics_count": len(topics),
+                            }
+                        ),
+                    ),
+                )
+        except Exception as e:
+            logger.warning(f"[CEFR Generator] Erro ao persistir cache de tópicos para {ref.filename}: {e}")
+
+    @classmethod
     def extract_topics_from_references(
-        cls, reference_ids: List[str], fallback_level: str = "A1"
+        cls,
+        reference_ids: List[str],
+        fallback_level: str = "A1",
+        force_refresh: bool = False,
+        on_progress: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """
         Extrai tópicos reais a partir do conteúdo textual de TODOS os arquivos de referência selecionados.
         Garante que:
-        1. Cada arquivo contribui com múltiplos tópicos pedagógicos relevantes (não limitando a 1 por arquivo).
-        2. A origem de cada tópico (source_file, reference_id) é preservada na consolidação.
-        3. Se os textos não estiverem no banco, extrai texto do PDF e divide em chunks.
+        1. Usa cache multi-camada (Redis + PostgreSQL cefr_documents) para resposta imediata (< 10ms) sem timeout.
+        2. Quando não está em cache, processa janelas de texto em paralelo (ThreadPoolExecutor) com timeout curto.
+        3. Cada arquivo contribui com múltiplos tópicos pedagógicos relevantes e todos os seus subtópicos/palavras.
+        4. Emite eventos de progresso opcionais via callback `on_progress` (usado por SSE).
         """
         from .models import CEFRReference
         from django.db import connection
         from psycopg2.extras import Json
+        from concurrent.futures import ThreadPoolExecutor, as_completed
         import uuid
         import json
 
@@ -478,27 +605,84 @@ Return ONLY a JSON object:
         )
 
         all_consolidated_topics: List[Dict[str, Any]] = []
-        client = cls._get_groq_client()
+        client = None
         groq_model = getattr(
             settings, "GROQ_MODEL", os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
         )
 
-        for ref in refs:
+        total_refs = len(refs)
+        for ref_idx, ref in enumerate(refs):
             ref_level = (ref.cefr_level or level).strip().upper()
+            ref_id_str = str(ref.id)
+
+            if callable(on_progress):
+                try:
+                    on_progress(
+                        {
+                            "type": "progress",
+                            "step": "checking_cache",
+                            "filename": ref.filename,
+                            "reference_id": ref_id_str,
+                            "current": ref_idx + 1,
+                            "total": total_refs,
+                        }
+                    )
+                except Exception:
+                    pass
+
+            # 0. Verifica cache (Redis + PostgreSQL) primeiro para evitar chamadas repetidas ao LLM e timeouts
+            if not force_refresh:
+                cached_topics = cls._get_cached_ref_topics(ref_id_str)
+                if cached_topics:
+                    enriched_cached = []
+                    for t in cached_topics:
+                        t_items = t.get("items") or t.get("subtopics") or []
+                        enriched = {
+                            "topic": str(t.get("topic", "General Topic")).strip(),
+                            "items": t_items,
+                            "subtopics": t_items,
+                            "count": len(t_items),
+                            "source_file": ref.filename,
+                            "reference_id": ref_id_str,
+                            "level": ref_level,
+                        }
+                        enriched_cached.append(enriched)
+                        all_consolidated_topics.append(enriched)
+
+                    if callable(on_progress):
+                        try:
+                            on_progress(
+                                {
+                                    "type": "file_done",
+                                    "cached": True,
+                                    "filename": ref.filename,
+                                    "reference_id": ref_id_str,
+                                    "topics": enriched_cached,
+                                    "current": ref_idx + 1,
+                                    "total": total_refs,
+                                }
+                            )
+                        except Exception:
+                            pass
+                    continue
+
             text_found = ""
 
-            # 1. Busca em cefr_documents
+            # 1. Busca em cefr_documents (excluindo registros de cache de tópicos)
             try:
                 with connection.cursor() as cur:
                     cur.execute(
                         """
                         SELECT content FROM cefr_documents
-                        WHERE metadata->>'original_name' = %s
-                           OR source_file ILIKE %s
-                           OR metadata->>'reference_id' = %s
+                        WHERE (
+                            metadata->>'original_name' = %s
+                            OR source_file ILIKE %s
+                            OR metadata->>'reference_id' = %s
+                        )
+                        AND COALESCE(metadata->>'type', '') != 'extracted_topics_cache'
                         ORDER BY id;
                         """,
-                        (ref.filename, f"%{ref.filename[:20]}%", str(ref.id)),
+                        (ref.filename, f"%{ref.filename[:20]}%", ref_id_str),
                     )
                     rows = cur.fetchall()
                     if rows:
@@ -532,10 +716,9 @@ Return ONLY a JSON object:
                         logger.info(
                             f"[CEFR Generator] Baixando e extraindo texto para {ref.filename} de {ref.storage_url[:50]}..."
                         )
-                        resp = requests.get(ref.storage_url, timeout=20)
+                        resp = requests.get(ref.storage_url, timeout=15)
                         if resp.status_code == 200:
                             raw_bytes = resp.content
-                            # Salva no volume para consultas futuras
                             try:
                                 os.makedirs(cefr_dir, exist_ok=True)
                                 with open(candidate_local[0], "wb") as sf:
@@ -574,7 +757,7 @@ Return ONLY a JSON object:
                                             Json(
                                                 {
                                                     "original_name": ref.filename,
-                                                    "reference_id": str(ref.id),
+                                                    "reference_id": ref_id_str,
                                                     "chunk_index": idx,
                                                 }
                                             ),
@@ -587,10 +770,12 @@ Return ONLY a JSON object:
                         f"[CEFR Generator] Falha ao extrair PDF para {ref.filename}: {e}"
                     )
 
-            # 3. Extrai TODOS os tópicos e subtópicos/palavras relacionadas deste arquivo de referência
+            # 3. Extrai TODOS os tópicos e subtópicos/palavras relacionadas deste arquivo de referência em paralelo
             ref_topics: List[Dict[str, Any]] = []
-            if client and text_found:
-                window_size = 24000
+            groq_keys = cls._get_groq_keys()
+
+            if groq_keys and text_found:
+                window_size = 9000
                 text_windows = [
                     text_found[i : i + window_size]
                     for i in range(0, len(text_found), window_size)
@@ -598,7 +783,7 @@ Return ONLY a JSON object:
                 ]
                 merged_by_topic: Dict[str, Dict[str, Any]] = {}
 
-                for win_idx, win_text in enumerate(text_windows):
+                def _extract_window(win_idx: int, win_text: str) -> List[Dict[str, Any]]:
                     prompt = f"""You are an expert ESL curriculum designer.
 Analyze the following pedagogical text from reference file '{ref.filename}' (CEFR Level {ref_level}, part {win_idx + 1} of {len(text_windows)}):
 ---
@@ -614,7 +799,7 @@ CRITICAL INSTRUCTIONS:
    - "items": The complete list of related words, subtopics, expressions, or phrases belonging to this topic.
    - "count": Number of items in the list.
 
-Format strictly as JSON:
+Return ONLY valid JSON with this structure:
 {{
   "topics": [
     {{
@@ -624,26 +809,72 @@ Format strictly as JSON:
     }}
   ]
 }}"""
-                    window_topics: List[Dict[str, Any]] = []
-                    for candidate_model in [groq_model, "openai/gpt-oss-120b", "qwen/qwen3.8-27b"]:
-                        try:
-                            res = client.chat.completions.create(
-                                model=candidate_model,
-                                messages=[{"role": "user", "content": prompt}],
-                                response_format={"type": "json_object"},
-                                temperature=0.15,
-                                max_tokens=4096,
-                            )
-                            parsed = json.loads(res.choices[0].message.content)
-                            if parsed and isinstance(parsed.get("topics"), list) and len(parsed["topics"]) > 0:
-                                window_topics = parsed["topics"]
-                                break
-                        except Exception as exc:
-                            logger.warning(
-                                f"[CEFR Generator] Falha ao extrair tópicos de {ref.filename} (janela {win_idx + 1}) com {candidate_model}: {exc}"
-                            )
+                    candidates = []
+                    for m in [groq_model, "openai/gpt-oss-120b", "openai/gpt-oss-20b"]:
+                        if m and m not in candidates:
+                            candidates.append(m)
 
-                    for wt in window_topics:
+                    # Rotates starting API key by window index to distribute TPM quota across keys
+                    rotated_keys = groq_keys[win_idx % len(groq_keys) :] + groq_keys[: win_idx % len(groq_keys)]
+
+                    for api_key in rotated_keys:
+                        win_client = Groq(api_key=api_key, max_retries=0, timeout=12.0)
+                        for candidate_model in candidates:
+                            try:
+                                res = win_client.chat.completions.create(
+                                    model=candidate_model,
+                                    messages=[{"role": "user", "content": prompt}],
+                                    response_format={"type": "json_object"},
+                                    temperature=0.15,
+                                    max_tokens=3000,
+                                    extra_body={"reasoning_format": "hidden"},
+                                )
+                                parsed = json.loads(res.choices[0].message.content)
+                                if parsed and isinstance(parsed.get("topics"), list) and len(parsed["topics"]) > 0:
+                                    return parsed["topics"]
+                            except Exception as exc:
+                                # Fallback sem response_format estrito se o erro for json_validate_failed
+                                try:
+                                    res2 = win_client.chat.completions.create(
+                                        model=candidate_model,
+                                        messages=[{"role": "user", "content": prompt}],
+                                        temperature=0.15,
+                                        max_tokens=3000,
+                                        extra_body={"reasoning_format": "hidden"},
+                                    )
+                                    raw_content = res2.choices[0].message.content or ""
+                                    start_idx = raw_content.find("{")
+                                    end_idx = raw_content.rfind("}")
+                                    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+                                        parsed2 = json.loads(raw_content[start_idx : end_idx + 1])
+                                        if parsed2 and isinstance(parsed2.get("topics"), list) and len(parsed2["topics"]) > 0:
+                                            return parsed2["topics"]
+                                except Exception:
+                                    pass
+                                logger.warning(
+                                    f"[CEFR Generator] Falha ao extrair tópicos de {ref.filename} (janela {win_idx + 1}) com {candidate_model}: {exc}"
+                                )
+                    return []
+
+                window_results: Dict[int, List[Dict[str, Any]]] = {}
+                if len(text_windows) == 1:
+                    window_results[0] = _extract_window(0, text_windows[0])
+                else:
+                    max_workers = min(4, len(text_windows))
+                    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                        future_to_idx = {
+                            executor.submit(_extract_window, idx, w_txt): idx
+                            for idx, w_txt in enumerate(text_windows)
+                        }
+                        for fut in as_completed(future_to_idx):
+                            idx = future_to_idx[fut]
+                            try:
+                                window_results[idx] = fut.result()
+                            except Exception:
+                                window_results[idx] = []
+
+                for win_idx in sorted(window_results.keys()):
+                    for wt in window_results[win_idx]:
                         if not isinstance(wt, dict):
                             continue
                         t_name = str(wt.get("topic") or wt.get("title") or "").strip()
@@ -677,6 +908,9 @@ Format strictly as JSON:
                             "count": len(entry["items"]),
                         }
                     )
+
+                if ref_topics:
+                    cls._save_cached_ref_topics(ref, ref_topics)
 
             # Fallback por arquivo caso o LLM não responda ou não haja texto
             if not ref_topics:
@@ -716,6 +950,7 @@ Format strictly as JSON:
                     ]
 
             # Enriquece cada tópico com a origem do arquivo de referência
+            enriched_file_topics = []
             for t in ref_topics:
                 t_items = t.get("items") or t.get("subtopics") or []
                 enriched = {
@@ -724,10 +959,27 @@ Format strictly as JSON:
                     "subtopics": t_items,
                     "count": len(t_items),
                     "source_file": ref.filename,
-                    "reference_id": str(ref.id),
+                    "reference_id": ref_id_str,
                     "level": ref_level,
                 }
+                enriched_file_topics.append(enriched)
                 all_consolidated_topics.append(enriched)
+
+            if callable(on_progress):
+                try:
+                    on_progress(
+                        {
+                            "type": "file_done",
+                            "cached": False,
+                            "filename": ref.filename,
+                            "reference_id": ref_id_str,
+                            "topics": enriched_file_topics,
+                            "current": ref_idx + 1,
+                            "total": total_refs,
+                        }
+                    )
+                except Exception:
+                    pass
 
         # 4. Fallback se nenhuma referência foi passada
         if not all_consolidated_topics:

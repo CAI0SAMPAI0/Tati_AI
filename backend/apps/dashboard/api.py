@@ -149,12 +149,53 @@ def get_student_activity_progress(request: HttpRequest, username: str):
 
 
 @dashboard_router.get("/students/{username}/insight", auth=auth_required)
-def get_student_insight(request: HttpRequest, username: str, lang: str = "en-US"):
+def get_student_insight(
+    request: HttpRequest,
+    username: str,
+    lang: str = "en-US",
+    force_refresh: bool = False,
+):
     """
     Gera parecer pedagógico com IA sobre a performance recente do aluno.
     """
     require_staff_user(request)
-    return DashboardService.get_student_insight(username, lang)
+    return DashboardService.get_student_insight(
+        username, lang, force_refresh=force_refresh
+    )
+
+
+@dashboard_router.get("/students/{username}/insight/stream", auth=auth_required)
+def stream_student_insight(
+    request: HttpRequest,
+    username: str,
+    lang: str = "en-US",
+    force_refresh: bool = False,
+):
+    """
+    Transmite parecer pedagógico em tempo real via Server-Sent Events (SSE)
+    ou retorna instantaneamente do cache Redis.
+    """
+    require_staff_user(request)
+    from django.http import StreamingHttpResponse
+
+    def event_generator():
+        yield f"data: {json.dumps({'type': 'start', 'username': username})}\n\n"
+        result = DashboardService.get_student_insight(
+            username, lang, force_refresh=force_refresh
+        )
+        insight_text = str(result.get("insight") or "")
+        chunk_size = 18
+        for idx in range(0, len(insight_text), chunk_size):
+            piece = insight_text[idx : idx + chunk_size]
+            yield f"data: {json.dumps({'type': 'token', 'delta': piece})}\n\n"
+        yield f"data: {json.dumps({'type': 'done', 'insight': insight_text})}\n\n"
+
+    response = StreamingHttpResponse(
+        event_generator(), content_type="text/event-stream"
+    )
+    response["Cache-Control"] = "no-cache"
+    response["X-Accel-Buffering"] = "no"
+    return response
 
 
 @dashboard_router.get("/students/{username}/grammar-errors", auth=auth_required)
@@ -805,7 +846,13 @@ def start_waha_session(request: HttpRequest):
     session_name = body.get("session") or (
         getattr(user, "username", "default") if user else "default"
     )
-    return WahaService.start_session(session_name)
+    res = WahaService.start_session(session_name)
+    try:
+        from apps.notifications.realtime import notify_teacher
+        notify_teacher("waha_session_updated", {"session": session_name, "action": "start"})
+    except Exception:
+        pass
+    return res
 
 
 @dashboard_router.post("/waha/session/restart", auth=auth_required)
@@ -826,7 +873,13 @@ def restart_waha_session(request: HttpRequest):
     session_name = body.get("session") or (
         getattr(user, "username", "default") if user else "default"
     )
-    return WahaService.restart_session(session_name)
+    res = WahaService.restart_session(session_name)
+    try:
+        from apps.notifications.realtime import notify_teacher
+        notify_teacher("waha_session_updated", {"session": session_name, "action": "restart"})
+    except Exception:
+        pass
+    return res
 
 
 @dashboard_router.post("/waha/session/stop", auth=auth_required)
@@ -847,7 +900,13 @@ def stop_waha_session(request: HttpRequest):
     session_name = body.get("session") or (
         getattr(user, "username", "default") if user else "default"
     )
-    return WahaService.stop_session(session_name)
+    res = WahaService.stop_session(session_name)
+    try:
+        from apps.notifications.realtime import notify_teacher
+        notify_teacher("waha_session_updated", {"session": session_name, "action": "stop"})
+    except Exception:
+        pass
+    return res
 
 
 @dashboard_router.get("/waha/session/qr")

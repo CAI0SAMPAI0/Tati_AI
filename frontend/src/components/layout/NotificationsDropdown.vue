@@ -48,19 +48,12 @@ function handleClickOutside(event: MouseEvent) {
   }
 }
 
-let pollInterval: any = null;
-
 onMounted(() => {
   document.addEventListener('mousedown', handleClickOutside);
-  notifStore.fetchNotifications();
-  pollInterval = setInterval(() => {
-    notifStore.fetchNotifications();
-  }, 45000);
 });
 
 onUnmounted(() => {
   document.removeEventListener('mousedown', handleClickOutside);
-  if (pollInterval) clearInterval(pollInterval);
 });
 </script>
 

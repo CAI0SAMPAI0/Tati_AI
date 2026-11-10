@@ -160,6 +160,19 @@ export const useNotificationStore = defineStore('notifications', () => {
     }
   }
 
+  function pushLiveNotification(n: AppNotification) {
+    if (!n || !n.id) return;
+    const idStr = String(n.id);
+    if (!notifications.value.some((item) => String(item.id) === idStr)) {
+      notifications.value = [n, ...notifications.value];
+    }
+    if (!n.is_read && !seenNotifIds.has(idStr)) {
+      seenNotifIds.add(idStr);
+      saveStoredSeenIds(seenNotifIds);
+      alertNotification(n);
+    }
+  }
+
   return {
     notifications,
     unreadCount,
@@ -167,5 +180,6 @@ export const useNotificationStore = defineStore('notifications', () => {
     fetchNotifications,
     markRead,
     markAllRead,
+    pushLiveNotification,
   };
 });

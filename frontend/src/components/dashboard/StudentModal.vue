@@ -15,12 +15,13 @@ import {
   Sparkles,
   Send,
 } from 'lucide-vue-next';
-import { apiGet, apiPut, apiPost, apiDelete } from '@/api/client';
+import { apiGet, apiPut, apiPost, apiDelete, apiFetch } from '@/api/client';
 import { CEFR_LEVELS, normalizeLevel } from '@/constants/levels';
 import { DEFAULT_AVATAR_URL } from '@/constants/user';
 import { useToast } from '@/composables/useToast';
 import { useBodyScrollLock } from '@/composables/useBodyScrollLock';
 import { formatDateTime, formatLastActive, isUserActiveNow } from '@/utils';
+import { peekActivityCache, setActivityCache, TTL_1_DAY_MS } from '@/utils/activityCache';
 
 const props = defineProps<{
   isOpen: boolean;
@@ -195,11 +196,20 @@ async function handleDelete() {
 }
 
 async function fetchAnalytics() {
-  if (!localStudent.value.username) return;
-  isFetchingAnalytics.value = true;
+  const uname = localStudent.value.username;
+  if (!uname) return;
+  const cacheKey = `student:analytics:${uname}`;
+  const cached = peekActivityCache<any>(cacheKey);
+  if (cached) {
+    analytics.value = cached;
+    isFetchingAnalytics.value = false;
+  } else {
+    isFetchingAnalytics.value = true;
+  }
   try {
-    const res = await apiGet<any>(`/dashboard/students/${encodeURIComponent(localStudent.value.username)}/analytics`);
+    const res = await apiGet<any>(`/dashboard/students/${encodeURIComponent(uname)}/analytics`);
     analytics.value = res;
+    setActivityCache(cacheKey, res, TTL_1_DAY_MS);
   } catch (err) {
     console.error('Error fetching analytics:', err);
   } finally {
@@ -209,13 +219,22 @@ async function fetchAnalytics() {
 
 
 async function fetchPronunciationPractice() {
-  if (!localStudent.value.username) return;
-  isFetchingPronunciation.value = true;
+  const uname = localStudent.value.username;
+  if (!uname) return;
+  const cacheKey = `student:pron:${uname}`;
+  const cached = peekActivityCache<any>(cacheKey);
+  if (cached) {
+    pronunciationData.value = cached;
+    isFetchingPronunciation.value = false;
+  } else {
+    isFetchingPronunciation.value = true;
+  }
   try {
     const res = await apiGet<any>(
-      `/dashboard/students/${encodeURIComponent(localStudent.value.username)}/pronunciation-practice`
+      `/dashboard/students/${encodeURIComponent(uname)}/pronunciation-practice`
     );
     pronunciationData.value = res;
+    setActivityCache(cacheKey, res, TTL_1_DAY_MS);
   } catch (err) {
     console.error('Error fetching pronunciation practice:', err);
   } finally {
@@ -223,11 +242,20 @@ async function fetchPronunciationPractice() {
   }
 }
 async function fetchActivityProgress() {
-  if (!localStudent.value.username) return;
-  isFetchingProgress.value = true;
+  const uname = localStudent.value.username;
+  if (!uname) return;
+  const cacheKey = `student:progress:${uname}`;
+  const cached = peekActivityCache<any>(cacheKey);
+  if (cached) {
+    activityProgress.value = cached;
+    isFetchingProgress.value = false;
+  } else {
+    isFetchingProgress.value = true;
+  }
   try {
-    const res = await apiGet<any>(`/dashboard/students/${encodeURIComponent(localStudent.value.username)}/activity-progress`);
+    const res = await apiGet<any>(`/dashboard/students/${encodeURIComponent(uname)}/activity-progress`);
     activityProgress.value = res;
+    setActivityCache(cacheKey, res, TTL_1_DAY_MS);
   } catch (err) {
     console.error('Error fetching activity progress:', err);
   } finally {
@@ -236,13 +264,67 @@ async function fetchActivityProgress() {
 }
 
 async function handleGenerateInsight() {
+  const uname = localStudent.value.username;
+  if (!uname) return;
+  const cacheKey = `student:insight:${uname}`;
+  const cached = peekActivityCache<string>(cacheKey);
+  const forceRefresh = Boolean(insight.value);
+  if (cached && !forceRefresh) {
+    insight.value = cached;
+    toast.success('Insight loaded from cache!');
+    return;
+  }
+
   isGenerating.value = true;
   try {
-    const res = await apiGet<{ insight: string }>(
-      `/dashboard/students/${encodeURIComponent(localStudent.value.username)}/insight?lang=en-US`
-    );
-    insight.value = res.insight;
-    toast.success('Insight generated successfully!');
+    const streamUrl = `/dashboard/students/${encodeURIComponent(uname)}/insight/stream?lang=en-US${forceRefresh ? '&force_refresh=true' : ''}`;
+    const response = await apiFetch(streamUrl, {
+      method: 'GET',
+      headers: { Accept: 'text/event-stream' },
+    });
+
+    if (response.ok && response.body) {
+      insight.value = '';
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let buffer = '';
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split('\n\n');
+        buffer = events.pop() || '';
+
+        for (const rawEvt of events) {
+          const line = rawEvt
+            .split('\n')
+            .find((l) => l.startsWith('data: '));
+          if (!line) continue;
+          try {
+            const payload = JSON.parse(line.slice(6).trim());
+            if (payload.type === 'token' && payload.delta) {
+              insight.value = (insight.value || '') + payload.delta;
+            } else if (payload.type === 'done' && payload.insight) {
+              insight.value = payload.insight;
+            }
+          } catch {
+            // ignore partial line
+          }
+        }
+      }
+      if (insight.value) {
+        setActivityCache(cacheKey, insight.value, TTL_1_DAY_MS);
+      }
+      toast.success('Insight generated successfully!');
+    } else {
+      const res = await apiGet<{ insight: string }>(
+        `/dashboard/students/${encodeURIComponent(uname)}/insight?lang=en-US${forceRefresh ? '&force_refresh=true' : ''}`
+      );
+      insight.value = res.insight;
+      if (res.insight) setActivityCache(cacheKey, res.insight, TTL_1_DAY_MS);
+      toast.success('Insight generated successfully!');
+    }
   } catch (err) {
     console.error('Error generating insight:', err);
     toast.error('Error generating insight.');

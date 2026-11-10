@@ -219,6 +219,14 @@ function handlePresenceSync(event: any) {
   }
 }
 
+function handleDashboardUpdated(event: any) {
+  const data = event?.detail || event;
+  const section = data?.section;
+  if (!section || section === 'students' || section === 'overview') {
+    loadDashboardData(true);
+  }
+}
+
 onMounted(() => {
   if (window.innerWidth < 768) {
     isSidebarOpen.value = false;
@@ -240,6 +248,8 @@ onMounted(() => {
   window.addEventListener('user-presence-changed', handlePresenceChanged);
   window.addEventListener('presence_sync', handlePresenceSync);
   window.addEventListener('presence-sync', handlePresenceSync);
+  window.addEventListener('dashboard_updated', handleDashboardUpdated);
+  window.addEventListener('dashboard-updated', handleDashboardUpdated);
 
   // Revalida imediatamente ao focar / reconectar / aba visível
   window.addEventListener('focus', handleRevalidate);
@@ -260,6 +270,8 @@ onUnmounted(() => {
   window.removeEventListener('user-presence-changed', handlePresenceChanged);
   window.removeEventListener('presence_sync', handlePresenceSync);
   window.removeEventListener('presence-sync', handlePresenceSync);
+  window.removeEventListener('dashboard_updated', handleDashboardUpdated);
+  window.removeEventListener('dashboard-updated', handleDashboardUpdated);
 });
 
 const filteredStudents = computed(() => {

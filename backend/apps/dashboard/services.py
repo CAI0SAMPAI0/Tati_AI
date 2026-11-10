@@ -66,6 +66,24 @@ def format_sp_time(dt_val) -> str:
     return format_sp_datetime(dt)
 
 
+def _notify_dashboard_section(
+    section: str, action: str = "updated", extra: Optional[dict] = None
+) -> None:
+    try:
+        cache.delete("cefr_admin_all_v2")
+    except Exception:
+        pass
+    try:
+        from apps.notifications.realtime import notify_teacher
+
+        payload = {"section": section, "action": action}
+        if extra:
+            payload.update(extra)
+        notify_teacher("dashboard_updated", payload)
+    except Exception as exc:
+        logger.debug(f"[DashboardService] Falha ao notificar secao {section}: {exc}")
+
+
 class DashboardService:
     @staticmethod
     def get_stats() -> dict:
@@ -490,6 +508,7 @@ class DashboardService:
                     f"[Dashboard] Erro ao notificar alunos de flashcards: {exc}"
                 )
 
+        _notify_dashboard_section("flashcards", "created", {"id": str(m.id)})
         return {
             "success": True,
             "id": str(m.id),
@@ -593,6 +612,7 @@ class DashboardService:
                     except Exception as exc:
                         logger.warning(f"[Dashboard] Erro ao notificar alunos: {exc}")
 
+                _notify_dashboard_section("flashcards", "updated", {"id": deck_id})
                 return {
                     "success": True,
                     "id": deck_id,
@@ -637,6 +657,7 @@ class DashboardService:
             except Exception as exc:
                 logger.warning(f"[Dashboard] Erro ao notificar alunos: {exc}")
 
+        _notify_dashboard_section("flashcards", "updated", {"id": str(m.id)})
         return {
             "success": True,
             "id": str(m.id),
@@ -668,12 +689,14 @@ class DashboardService:
                 if matched_cards:
                     matched_ids = [c.id for c in matched_cards]
                     Flashcard.objects.filter(id__in=matched_ids).delete()
+                    _notify_dashboard_section("flashcards", "deleted", {"id": deck_id})
                     return {"success": True, "deleted": deck_id}
             raise HttpError(404, "Baralho CEFR não encontrado.")
 
         m = Module.objects.filter(id=deck_id).first()
         if m:
             m.delete()
+            _notify_dashboard_section("flashcards", "deleted", {"id": deck_id})
             return {"success": True, "deleted": deck_id}
         raise HttpError(404, "Baralho não encontrado.")
 
@@ -832,6 +855,7 @@ class DashboardService:
                     f"[Dashboard] Erro ao notificar alunos de simulação: {exc}"
                 )
 
+        _notify_dashboard_section("simulations", "created", {"id": str(s.id)})
         return {"success": True, "id": str(s.id), "name": s.name}
 
     @staticmethod
@@ -864,6 +888,7 @@ class DashboardService:
                 except Exception as exc:
                     logger.warning(f"[Dashboard] Erro ao notificar alunos: {exc}")
 
+            _notify_dashboard_section("simulations", "updated", {"id": sim_id})
             return {"success": True, "id": sim_id}
 
         s = SimulationScenario.objects.filter(id=sim_id).first()
@@ -902,6 +927,7 @@ class DashboardService:
             except Exception as exc:
                 logger.warning(f"[Dashboard] Erro ao notificar alunos: {exc}")
 
+        _notify_dashboard_section("simulations", "created", {"id": str(s.id)})
         return {"success": True, "id": str(s.id), "name": s.name}
 
     @staticmethod
@@ -909,8 +935,10 @@ class DashboardService:
         if sim_id.startswith("cefr_sim_"):
             clean_id = sim_id.replace("cefr_sim_", "")
             CEFRSimulation.objects.filter(id=clean_id).delete()
+            _notify_dashboard_section("simulations", "deleted", {"id": sim_id})
             return {"success": True, "deleted": sim_id}
         SimulationScenario.objects.filter(id=sim_id).delete()
+        _notify_dashboard_section("simulations", "deleted", {"id": sim_id})
         return {"success": True, "deleted": sim_id}
 
     # Gerenciamento de jogos pedagógicos (Admin)
@@ -971,6 +999,7 @@ class DashboardService:
             except Exception as exc:
                 logger.warning(f"[Dashboard] Erro ao notificar alunos de game: {exc}")
 
+        _notify_dashboard_section("games", "created", {"id": str(g.id)})
         return {"success": True, "id": str(g.id), "title": g.title}
 
     @staticmethod
@@ -1005,6 +1034,7 @@ class DashboardService:
             except Exception as exc:
                 logger.warning(f"[Dashboard] Erro ao notificar alunos de game: {exc}")
 
+        _notify_dashboard_section("games", "created", {"id": str(g.id)})
         return {"success": True, "id": str(g.id), "title": g.title}
 
     @staticmethod
@@ -1012,6 +1042,7 @@ class DashboardService:
         g = Game.objects.filter(id=game_id).first()
         if g:
             g.delete()
+            _notify_dashboard_section("games", "deleted", {"id": game_id})
             return {"success": True, "deleted": game_id}
         raise HttpError(404, "Game não encontrado.")
 
@@ -1068,6 +1099,7 @@ class DashboardService:
                     f"[Dashboard] Erro ao notificar alunos de notícia: {exc}"
                 )
 
+        _notify_dashboard_section("news", "created", {"id": str(n.id)})
         return {"success": True, "id": str(n.id), "title": n.title}
 
     @staticmethod
@@ -1106,6 +1138,7 @@ class DashboardService:
                     f"[Dashboard] Erro ao notificar alunos de notícia: {exc}"
                 )
 
+        _notify_dashboard_section("news", "created", {"id": str(n.id)})
         return {"success": True, "id": str(n.id), "title": n.title}
 
     @staticmethod
@@ -1113,6 +1146,7 @@ class DashboardService:
         n = NewsItem.objects.filter(id=news_id).first()
         if n:
             n.delete()
+            _notify_dashboard_section("news", "deleted", {"id": news_id})
             return {"success": True, "deleted": news_id}
         raise HttpError(404, "Notícia não encontrada.")
 
@@ -1576,16 +1610,26 @@ class DashboardService:
         }
 
     @staticmethod
-    def get_student_insight(username: str, lang: str = "en-US") -> dict:
+    def get_student_insight(
+        username: str, lang: str = "en-US", force_refresh: bool = False
+    ) -> dict:
+        cache_key = f"student_insight_v1_{username}_{lang}"
+        if not force_refresh:
+            cached = cache.get(cache_key)
+            if isinstance(cached, dict) and cached.get("insight"):
+                return cached
+
         msgs = Message.objects.filter(username=username, role="user").only("id", "content").order_by(
             "-created_at"
         )[:15]
         user_texts = [m.content for m in msgs if m.content]
 
         if not user_texts:
-            return {
+            res = {
                 "insight": f"Student {username} has not sent enough messages yet to generate a full pedagogical analysis. Encourage them to practice conversation with Teacher Tati!"
             }
+            cache.set(cache_key, res, 900)
+            return res
 
         summary = " | ".join(user_texts)[:1000]
         prompt = (
@@ -1600,7 +1644,9 @@ class DashboardService:
             )
             if not insight_text:
                 raise ValueError("Empty reply")
-            return {"insight": insight_text}
+            res = {"insight": insight_text}
+            cache.set(cache_key, res, 3600)
+            return res
         except Exception:
             return {
                 "insight": f"Student {username} demonstrates active participation and positive engagement in conversational topics. Recommended next step: continue practicing complex sentence structures and vocabulary expansion."
@@ -1983,6 +2029,7 @@ class DashboardService:
         if clean_wa:
             wa_status = "active" if allow_wa else "disabled"
 
+        _notify_dashboard_section("students", "updated", {"username": u.username})
         return {
             "success": True,
             "username": u.username,
@@ -2131,6 +2178,7 @@ class DashboardService:
         Conversation.objects.filter(username=username).delete()
         ActivitySubmission.objects.filter(username=username).delete()
         u.delete()
+        _notify_dashboard_section("students", "deleted", {"username": username})
         return {"success": True, "deleted": username}
 
     @staticmethod
@@ -2165,10 +2213,11 @@ class DashboardService:
             content=message,
         )
 
-        # 2. Registra Notificação In-App
+        # 2. Registra Notificação In-App e envia via WebSocket em tempo real
         from apps.notifications.models import Notification
+        from apps.notifications.realtime import notify_user
 
-        Notification.objects.create(
+        notif = Notification.objects.create(
             id=uuid.uuid4(),
             username=username,
             category="nudge",
@@ -2176,6 +2225,23 @@ class DashboardService:
             body=message,
             is_read=False,
         )
+        try:
+            notify_user(
+                username,
+                "in_app_notification",
+                {
+                    "id": str(notif.id),
+                    "category": "nudge",
+                    "title": "Teacher Tati",
+                    "body": message,
+                    "message": message,
+                    "url": "/chat",
+                    "is_read": False,
+                    "created_at": notif.created_at.isoformat() if notif.created_at else "",
+                },
+            )
+        except Exception:
+            pass
 
         # 3. Dispara E-mail via Brevo/Resend/SMTP
         from apps.notifications.services import BrevoEmailService, WahaWhatsAppService

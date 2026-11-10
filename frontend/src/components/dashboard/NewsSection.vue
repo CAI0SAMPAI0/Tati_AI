@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import {
   Newspaper,
   Plus,
@@ -20,6 +20,7 @@ import { ENDPOINTS } from '@/api/endpoints';
 import { LEVEL_FILTER_OPTIONS, normalizeLevel } from '@/constants/levels';
 import { useToast } from '@/composables/useToast';
 import { useBodyScrollLock } from '@/composables/useBodyScrollLock';
+import { peekActivityCache, setActivityCache, TTL_1_DAY_MS } from '@/utils/activityCache';
 
 interface NewsRow {
   id: string;
@@ -71,11 +72,23 @@ const filteredNews = computed(() => {
   });
 });
 
-async function loadNews() {
-  isLoading.value = true;
+const CACHE_NEWS_KEY = 'dashboard:news_v1';
+
+async function loadNews(silent = false) {
+  if (!silent) {
+    const cached = peekActivityCache<NewsRow[]>(CACHE_NEWS_KEY);
+    if (cached && cached.length > 0) {
+      news.value = cached;
+      isLoading.value = false;
+    } else {
+      isLoading.value = true;
+    }
+  }
   try {
     const res = await apiGet<any>(ENDPOINTS.ADMIN_NEWS || '/dashboard/news');
-    news.value = Array.isArray(res) ? res : res?.data || res?.news || [];
+    const list = Array.isArray(res) ? res : res?.data || res?.news || [];
+    news.value = list;
+    setActivityCache(CACHE_NEWS_KEY, list, TTL_1_DAY_MS);
   } catch (err) {
     console.error('Error loading news:', err);
   } finally {
@@ -227,8 +240,22 @@ async function handleBulkDelete() {
   }
 }
 
+function handleDashboardUpdated(event: any) {
+  const data = event?.detail || event;
+  if (!data?.section || data.section === 'news') {
+    loadNews(true);
+  }
+}
+
 onMounted(() => {
   loadNews();
+  window.addEventListener('dashboard_updated', handleDashboardUpdated);
+  window.addEventListener('dashboard-updated', handleDashboardUpdated);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('dashboard_updated', handleDashboardUpdated);
+  window.removeEventListener('dashboard-updated', handleDashboardUpdated);
 });
 </script>
 

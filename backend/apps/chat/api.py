@@ -277,7 +277,77 @@ async def send_chat_message(request: HttpRequest, payload: SendMessageInput):
         "role": "assistant",
         "audio": audio_b64,
         "audio_b64": audio_b64,
+        "id": res.get("id") if isinstance(res, dict) else None,
+        "user_message_id": res.get("user_message_id") if isinstance(res, dict) else None,
     }
+
+
+@chat_router.post("/message/stream", auth=auth_required)
+def send_chat_message_stream(request: HttpRequest, payload: SendMessageInput):
+    """
+    Endpoint SSE (Server-Sent Events) que transmite a resposta da Teacher Tati token por token
+    em tempo real, seguido pelo áudio sintetizado (TTS) e os IDs definitivos do banco,
+    eliminando esperas bloqueantes e recarregamentos extras do histórico.
+    """
+    from django.http import StreamingHttpResponse
+    import queue
+    import threading
+
+    user = request.auth
+
+    def event_stream():
+        q: "queue.Queue[Optional[dict]]" = queue.Queue()
+
+        def on_token(tok: str):
+            if tok:
+                q.put({"type": "token", "token": tok})
+
+        def worker():
+            try:
+                res = AIService.generate_reply(
+                    user=user,
+                    conversation_id=payload.conversation_id,
+                    user_text=payload.message,
+                    difficulty=payload.current_difficulty,
+                    accent=getattr(payload, "accent", None),
+                    user_audio_b64=getattr(payload, "user_audio_b64", None),
+                    on_token=on_token,
+                )
+                reply_text = res.get("reply") if isinstance(res, dict) else str(res)
+                audio_b64 = res.get("audio_b64") if isinstance(res, dict) else ""
+                q.put(
+                    {
+                        "type": "done",
+                        "ok": True,
+                        "reply": reply_text,
+                        "role": "assistant",
+                        "audio": audio_b64,
+                        "audio_b64": audio_b64,
+                        "id": res.get("id") if isinstance(res, dict) else None,
+                        "user_message_id": res.get("user_message_id") if isinstance(res, dict) else None,
+                    }
+                )
+            except Exception as exc:
+                q.put({"type": "error", "message": str(exc)})
+            finally:
+                q.put(None)
+
+        t = threading.Thread(target=worker, daemon=True)
+        t.start()
+
+        while True:
+            try:
+                item = q.get(timeout=2.5)
+                if item is None:
+                    break
+                yield f"data: {json.dumps(item, ensure_ascii=False)}\n\n"
+            except queue.Empty:
+                yield f"data: {json.dumps({'type': 'ping'})}\n\n"
+
+    response = StreamingHttpResponse(event_stream(), content_type="text/event-stream")
+    response["Cache-Control"] = "no-cache"
+    response["X-Accel-Buffering"] = "no"
+    return response
 
 
 from pydantic import BaseModel

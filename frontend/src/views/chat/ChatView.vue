@@ -7,6 +7,7 @@ import {
   getMessages,
   createConversation,
   sendChatMessage,
+  streamChatMessage,
   editMessage,
   startLeveling,
 } from '@/api/chat';
@@ -141,25 +142,54 @@ async function handleSend(text: string) {
   };
   messages.value.push(userMsg);
 
+  const assistantMsg: Message = {
+    id: `assistant-temp-${Date.now()}`,
+    conversation_id: convId,
+    role: 'assistant',
+    content: '',
+    created_at: new Date().toISOString(),
+  };
+  messages.value.push(assistantMsg);
+  const assistantIndex = messages.value.length - 1;
+  const userIndex = messages.value.length - 2;
+
   isSending.value = true;
   try {
-    const res = await sendChatMessage(convId, text, undefined, accent.value || 'en-US');
+    const res = await streamChatMessage(
+      convId,
+      text,
+      (token) => {
+        if (messages.value[assistantIndex]) {
+          messages.value[assistantIndex].content += token;
+        }
+      },
+      undefined,
+      accent.value || 'en-US'
+    );
     if (res && res.reply) {
-      const assistantMsg: Message = {
-        id: `assistant-${Date.now()}`,
-        conversation_id: convId,
-        role: 'assistant',
-        content: res.reply,
-        audio_b64: res.audio_b64 || res.audio,
-        created_at: new Date().toISOString(),
-      };
-      messages.value.push(assistantMsg);
+      if (messages.value[assistantIndex]) {
+        messages.value[assistantIndex].content = res.reply;
+        messages.value[assistantIndex].audio_b64 = res.audio_b64 || res.audio;
+        if (res.id) {
+          messages.value[assistantIndex].id = res.id;
+        }
+      }
+      if (res.user_message_id && messages.value[userIndex]) {
+        messages.value[userIndex].id = res.user_message_id;
+      }
       memoryMessagesCache.set(convId, [...messages.value]);
       saveMessagesLocal(convId, messages.value).catch(() => {});
+    } else if (!messages.value[assistantIndex]?.content) {
+      messages.value.splice(assistantIndex, 1);
     }
-    // Sincroniza os identificadores UUID do banco de dados para todas as mensagens
-    loadConversationMessages(convId);
+    // Só recarrega do banco se os IDs UUID não vieram no evento final do SSE
+    if (!res?.id || !res?.user_message_id) {
+      loadConversationMessages(convId);
+    }
   } catch (err: any) {
+    if (messages.value[assistantIndex] && !messages.value[assistantIndex].content) {
+      messages.value.splice(assistantIndex, 1);
+    }
     console.error('Error sending message:', err);
     toast.error('Failed to send message. Please try again.');
   } finally {

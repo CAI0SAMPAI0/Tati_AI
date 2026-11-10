@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import {
   Gamepad2,
   Plus,
@@ -19,6 +19,7 @@ import { ENDPOINTS } from '@/api/endpoints';
 import { LEVEL_FILTER_OPTIONS, normalizeLevel } from '@/constants/levels';
 import { useToast } from '@/composables/useToast';
 import { useBodyScrollLock } from '@/composables/useBodyScrollLock';
+import { peekActivityCache, setActivityCache, TTL_1_DAY_MS } from '@/utils/activityCache';
 
 interface GameRow {
   id: string;
@@ -67,11 +68,23 @@ const filteredGames = computed(() => {
   });
 });
 
-async function loadGames() {
-  isLoading.value = true;
+const CACHE_GAMES_KEY = 'dashboard:games_v1';
+
+async function loadGames(silent = false) {
+  if (!silent) {
+    const cached = peekActivityCache<GameRow[]>(CACHE_GAMES_KEY);
+    if (cached && cached.length > 0) {
+      games.value = cached;
+      isLoading.value = false;
+    } else {
+      isLoading.value = true;
+    }
+  }
   try {
     const res = await apiGet<any>(ENDPOINTS.ADMIN_GAMES || '/dashboard/games');
-    games.value = Array.isArray(res) ? res : res?.data || res?.games || [];
+    const list = Array.isArray(res) ? res : res?.data || res?.games || [];
+    games.value = list;
+    setActivityCache(CACHE_GAMES_KEY, list, TTL_1_DAY_MS);
   } catch (err) {
     console.error('Error loading games:', err);
   } finally {
@@ -220,8 +233,22 @@ async function handleBulkDelete() {
   }
 }
 
+function handleDashboardUpdated(event: any) {
+  const data = event?.detail || event;
+  if (!data?.section || data.section === 'games') {
+    loadGames(true);
+  }
+}
+
 onMounted(() => {
   loadGames();
+  window.addEventListener('dashboard_updated', handleDashboardUpdated);
+  window.addEventListener('dashboard-updated', handleDashboardUpdated);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('dashboard_updated', handleDashboardUpdated);
+  window.removeEventListener('dashboard-updated', handleDashboardUpdated);
 });
 </script>
 
