@@ -183,6 +183,9 @@ class FlashcardService:
                         {
                             "id": str(c.id),
                             "front": c.front,
+                            "back": c.back or "",
+                            "explanation": c.explanation or "",
+                            "options": c.options if isinstance(c.options, list) else [],
                             "image_url": c.image_url or "",
                         }
                         for c in matched
@@ -215,8 +218,12 @@ class FlashcardService:
                     image_url = str(
                         item.get("image_url") or item.get("imageUrl") or item.get("image") or ""
                     ).strip()
+                    raw_opts = item.get("options") if isinstance(item.get("options"), list) else []
                     card_payload = {
                         "front": front,
+                        "back": str(item.get("back") or "").strip(),
+                        "explanation": str(item.get("explanation") or "").strip(),
+                        "options": [str(o).strip() for o in raw_opts if str(o).strip()],
                         "image_url": image_url,
                     }
                     if item.get("id"):

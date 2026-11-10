@@ -584,6 +584,11 @@ def generate_dashboard_flashcards_ai(request: HttpRequest, payload: FlashcardAIG
 
     results = []
     seen = set()
+    fallback_pool = [
+        "Airport", "Restaurant", "Kitchen", "Doctor", "Passport",
+        "Luggage", "Sunny", "Schedule", "Breakfast", "Coffee",
+        "Mountain", "Computer", "Guitar", "Living room", "Jacket",
+    ]
     for item in raw_items:
         if not isinstance(item, dict):
             continue
@@ -599,13 +604,30 @@ def generate_dashboard_flashcards_ai(request: HttpRequest, payload: FlashcardAIG
         if front.lower() in seen:
             continue
         seen.add(front.lower())
+        raw_distractors = item.get("distractors") or item.get("options") or []
+        distractors = [
+            str(d).strip()
+            for d in (raw_distractors if isinstance(raw_distractors, list) else [])
+            if str(d).strip() and str(d).strip().lower() != front.lower()
+        ][:3]
+        for cand in fallback_pool:
+            if len(distractors) >= 3:
+                break
+            if cand.lower() != front.lower() and all(cand.lower() != d.lower() for d in distractors):
+                distractors.append(cand)
+        options = [front] + distractors[:3]
         img_url = ImageResolverService.resolve_image(
             term=front,
             topic=theme,
             search_query=(clean_candidate.get("image_search_query") or "").strip() or None,
             visual_prompt=(clean_candidate.get("image_prompt") or "").strip() or None,
         )
-        results.append({"front": front, "image_url": img_url})
+        results.append({
+            "front": front,
+            "image_url": img_url,
+            "options": options,
+            "distractors": distractors[:3],
+        })
         if len(results) >= count:
             break
 

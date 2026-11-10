@@ -152,3 +152,7 @@ export function invalidateActivityCache(prefix = ''): void {
     toDelete.forEach((k) => window.localStorage.removeItem(k));
   } catch {}
 }
+
+export function removeActivityCache(key: string): void {
+  invalidateActivityCache(key);
+}

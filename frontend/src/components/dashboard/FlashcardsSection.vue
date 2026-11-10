@@ -24,6 +24,7 @@ import {
   Crown,
   ChevronRight,
   ChevronLeft,
+  RotateCw,
   X,
   ExternalLink,
 } from 'lucide-vue-next';
@@ -31,12 +32,15 @@ import { apiGet, apiPost, apiPut, apiDelete, apiUpload } from '@/api/client';
 import { LEVEL_FILTER_OPTIONS, normalizeLevel } from '@/constants/levels';
 import { useToast } from '@/composables/useToast';
 import { useBodyScrollLock } from '@/composables/useBodyScrollLock';
-import { peekActivityCache, setActivityCache, TTL_1_DAY_MS } from '@/utils/activityCache';
+import { peekActivityCache, setActivityCache, removeActivityCache, TTL_1_DAY_MS } from '@/utils/activityCache';
+import { getSemanticDistractors } from '@/utils/flashcardDistractors';
 
 export interface Flashcard {
   front: string;
   image_url?: string;
   back?: string;
+  options?: string[];
+  distractors?: [string, string, string];
 }
 
 export interface FlashcardDeck {
@@ -130,6 +134,71 @@ async function loadDecks(silent = false) {
   }
 }
 
+function buildCardDistractors(
+  rawCard: any,
+  allRawCards: any[] = [],
+  deckTitle: string = ''
+): [string, string, string] {
+  const front = String(rawCard?.front || '').trim();
+  const rawList: string[] = Array.isArray(rawCard?.distractors)
+    ? rawCard.distractors
+    : Array.isArray(rawCard?.options)
+      ? rawCard.options
+      : [];
+
+  const cleaned = rawList
+    .map((o: any) => String(o || '').trim())
+    .filter((o: string) => Boolean(o) && o.toLowerCase() !== front.toLowerCase());
+
+  if (cleaned.length < 3 && front) {
+    const otherWords = allRawCards
+      .map((c: any) => String(c?.front || '').trim())
+      .filter((w: string) => Boolean(w) && w.toLowerCase() !== front.toLowerCase());
+    const generated = getSemanticDistractors(front, deckTitle, [...otherWords, ...cleaned]);
+    for (const g of generated) {
+      if (cleaned.length >= 3) break;
+      if (!cleaned.some((x) => x.toLowerCase() === g.toLowerCase())) {
+        cleaned.push(g);
+      }
+    }
+  }
+
+  return [cleaned[0] || '', cleaned[1] || '', cleaned[2] || ''];
+}
+
+function handleRegenerateCardDistractors(index: number) {
+  const card = formData.value.flashcards[index];
+  if (!card) return;
+  const front = (card.front || '').trim();
+  const currentDistractors = (card.distractors || []).filter(Boolean);
+  const otherWords = formData.value.flashcards
+    .map((c, idx) => (idx !== index ? (c.front || '').trim() : ''))
+    .filter(Boolean);
+  const fresh = getSemanticDistractors(
+    front || formData.value.title || 'Vocabulary',
+    formData.value.title || formData.value.ai_theme || '',
+    [...otherWords, ...currentDistractors]
+  );
+  card.distractors = [fresh[0] || '', fresh[1] || '', fresh[2] || ''];
+}
+
+function handleCardFrontBlur(index: number) {
+  const card = formData.value.flashcards[index];
+  if (!card) return;
+  const front = (card.front || '').trim();
+  if (!front) return;
+  const hasAllDistractors =
+    Array.isArray(card.distractors) &&
+    card.distractors.filter((d) => String(d || '').trim().length > 0).length === 3;
+  if (!hasAllDistractors) {
+    card.distractors = buildCardDistractors(
+      card,
+      formData.value.flashcards,
+      formData.value.title || formData.value.ai_theme || ''
+    );
+  }
+}
+
 function handleOpenNew() {
   editingDeck.value = null;
   activeStep.value = 1;
@@ -143,8 +212,8 @@ function handleOpenNew() {
     ai_theme: '',
     ai_with_images: true,
     flashcards: [
-      { front: '', image_url: '' },
-      { front: '', image_url: '' },
+      { front: '', image_url: '', distractors: ['', '', ''] },
+      { front: '', image_url: '', distractors: ['', '', ''] },
     ],
   };
   isModalOpen.value = true;
@@ -166,6 +235,7 @@ function handleOpenEdit(deck: FlashcardDeck) {
     flashcards: rawCards.map((c: any) => ({
       front: c.front || '',
       image_url: c.image_url || '',
+      distractors: buildCardDistractors(c, rawCards, deck.title || ''),
       ...(c.back ? { back: c.back } : {}),
     })),
   };
@@ -183,7 +253,7 @@ function handleToggleLevel(code: string) {
 }
 
 function handleAddCard() {
-  formData.value.flashcards.push({ front: '', image_url: '' });
+  formData.value.flashcards.push({ front: '', image_url: '', distractors: ['', '', ''] });
 }
 
 function handleRemoveCard(index: number) {
@@ -209,6 +279,7 @@ async function handleGenerateAI() {
       formData.value.flashcards = cards.map((c: any) => ({
         front: c.front || '',
         image_url: c.image_url || '',
+        distractors: buildCardDistractors(c, cards, formData.value.ai_theme),
       }));
       if (!formData.value.title) {
         formData.value.title = `Vocabulary: ${formData.value.ai_theme}`;
@@ -251,11 +322,23 @@ async function handleSaveDeck() {
 
   const validCards = formData.value.flashcards
     .filter((c) => c.front.trim())
-    .map((c) => ({
-      front: c.front.trim(),
-      image_url: c.image_url?.trim() || '',
-      ...(c.back ? { back: c.back } : {}),
-    }));
+    .map((c) => {
+      const front = c.front.trim();
+      const distractors = buildCardDistractors(
+        c,
+        formData.value.flashcards,
+        formData.value.title.trim()
+      )
+        .map((d) => d.trim())
+        .filter((d) => Boolean(d) && d.toLowerCase() !== front.toLowerCase());
+      const options = [front, ...distractors].slice(0, 4);
+      return {
+        front,
+        image_url: c.image_url?.trim() || '',
+        options,
+        ...(c.back ? { back: c.back } : {}),
+      };
+    });
   if (validCards.length === 0) {
     toast.error('Deck must have at least one valid card (front word/phrase).');
     activeStep.value = 2;
@@ -276,6 +359,10 @@ async function handleSaveDeck() {
 
     if (editingDeck.value) {
       await apiPut(`/dashboard/flashcards/${editingDeck.value.id}`, payload);
+      removeActivityCache(`tati_flashcard_deck_${editingDeck.value.id}`);
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(`tati_flashcard_progress_${editingDeck.value.id}`);
+      }
       toast.success('Deck updated successfully!');
     } else {
       await apiPost('/dashboard/flashcards', payload);
@@ -806,15 +893,54 @@ onUnmounted(() => {
 
                 <div class="space-y-3">
                   <div>
-                    <label class="block text-[0.65rem] font-bold text-text-muted uppercase mb-1">
-                      Front (English Word / Phrase) *
+                    <label class="block text-[0.65rem] font-bold text-success uppercase mb-1">
+                      ✓ Correct Answer (Front — English Word / Phrase) *
                     </label>
                     <input
                       v-model="card.front"
                       type="text"
                       placeholder="e.g. Departure Gate"
-                      class="w-full px-3 py-2 rounded-xl bg-surface border border-border text-xs text-text outline-none focus:border-primary"
+                      @blur="handleCardFrontBlur(idx)"
+                      class="w-full px-3 py-2 rounded-xl bg-surface border border-success/40 text-xs text-text outline-none focus:border-success font-semibold"
                     />
+                  </div>
+
+                  <!-- 3 Incorrect Options (Distractors) -->
+                  <div v-if="card.distractors" class="p-3 rounded-xl bg-surface/60 border border-border/80 space-y-2">
+                    <div class="flex items-center justify-between gap-2">
+                      <label class="block text-[0.65rem] font-bold text-danger uppercase">
+                        ✕ Incorrect Answers (3 Quiz Distractors — Edit or Replace AI Choices)
+                      </label>
+                      <button
+                        type="button"
+                        @click="handleRegenerateCardDistractors(idx)"
+                        class="text-[0.65rem] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                        title="Generate 3 different incorrect options"
+                      >
+                        <RotateCw class="w-3 h-3" />
+                        <span>Swap AI Options</span>
+                      </button>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <input
+                        v-model="card.distractors[0]"
+                        type="text"
+                        placeholder="Wrong answer 1"
+                        class="w-full px-3 py-1.5 rounded-lg bg-bg border border-border text-xs text-text outline-none focus:border-primary"
+                      />
+                      <input
+                        v-model="card.distractors[1]"
+                        type="text"
+                        placeholder="Wrong answer 2"
+                        class="w-full px-3 py-1.5 rounded-lg bg-bg border border-border text-xs text-text outline-none focus:border-primary"
+                      />
+                      <input
+                        v-model="card.distractors[2]"
+                        type="text"
+                        placeholder="Wrong answer 3"
+                        class="w-full px-3 py-1.5 rounded-lg bg-bg border border-border text-xs text-text outline-none focus:border-primary"
+                      />
+                    </div>
                   </div>
 
                   <div>

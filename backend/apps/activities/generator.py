@@ -279,6 +279,7 @@ class CEFRGeneratorService:
         validated_cards = []
         for raw_c in cards_data:
             c = dict(raw_c)
+            raw_distractors = c.pop("distractors", None) or c.pop("options", None) or []
             is_valid, errors = validate_flashcard_data(c)
             retry_count = 0
 
@@ -327,6 +328,12 @@ Return ONLY a JSON object:
                 )
                 continue
 
+            if isinstance(raw_distractors, list):
+                c["_distractors"] = [
+                    str(d).strip()
+                    for d in raw_distractors
+                    if str(d).strip() and str(d).strip().lower() != str(c.get("front", "")).strip().lower()
+                ][:3]
             validated_cards.append(c)
 
         from .image_service import ImageResolverService
@@ -364,10 +371,29 @@ Return ONLY a JSON object:
                 resolved_urls = list(executor.map(_resolve_card_img, selected_cards))
 
         created = []
+        fallback_distractor_pool = [
+            "Sunny", "Cloudy", "Airport", "Restaurant", "Kitchen", "Living room",
+            "Doctor", "Engineer", "Jacket", "Breakfast", "Coffee", "Mountain",
+            "Happy", "Computer", "Guitar", "Schedule", "Luggage", "Passport",
+        ]
+        all_deck_fronts = {(c.get("front") or "").strip().lower() for c in selected_cards}
+
         with transaction.atomic():
             for idx, c in enumerate(selected_cards):
                 front = (c.get("front") or "").strip()
                 img_url = resolved_urls[idx] if idx < len(resolved_urls) else ""
+                distractors = list(c.get("_distractors") or [])
+                for cand in fallback_distractor_pool:
+                    if len(distractors) >= 3:
+                        break
+                    if (
+                        cand.lower() != front.lower()
+                        and cand.lower() not in all_deck_fronts
+                        and all(cand.lower() != d.lower() for d in distractors)
+                    ):
+                        distractors.append(cand)
+                card_options = [front] + distractors[:3]
+
                 fc, created_flag = Flashcard.objects.update_or_create(
                     level=lvl,
                     topic=deck_title,
@@ -376,7 +402,7 @@ Return ONLY a JSON object:
                         "back": "",
                         "explanation": "",
                         "image_url": img_url,
-                        "options": [],
+                        "options": card_options,
                         "is_published": False,
                     },
                 )

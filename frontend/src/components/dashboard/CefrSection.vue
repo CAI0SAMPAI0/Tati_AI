@@ -34,7 +34,8 @@ import { apiGet, apiPost, apiDelete, apiPut, apiPatch, apiUpload, apiFetch } fro
 import { LEVEL_OPTIONS } from '@/constants/levels';
 import { useToast } from '@/composables/useToast';
 import { useBodyScrollLock } from '@/composables/useBodyScrollLock';
-import { peekActivityCache, setActivityCache, TTL_30_DAYS_MS } from '@/utils/activityCache';
+import { peekActivityCache, setActivityCache, removeActivityCache, TTL_30_DAYS_MS } from '@/utils/activityCache';
+import { getSemanticDistractors } from '@/utils/flashcardDistractors';
 
 interface CefrReference {
   id: string;
@@ -800,10 +801,77 @@ async function handleDeleteSingleCard(card: any) {
   }
 }
 
-function handleOpenEditFlashcardGroup(group: any) {
+function buildCefrCardDistractors(
+  rawCard: any,
+  allRawCards: any[] = [],
+  deckTopic: string = ''
+): [string, string, string] {
+  const front = String(rawCard?.front || '').trim();
+  const rawList: string[] = Array.isArray(rawCard?.distractors)
+    ? rawCard.distractors
+    : Array.isArray(rawCard?.options)
+      ? rawCard.options
+      : [];
+
+  const cleaned = rawList
+    .map((o: any) => String(o || '').trim())
+    .filter((o: string) => Boolean(o) && o.toLowerCase() !== front.toLowerCase());
+
+  if (cleaned.length < 3 && front) {
+    const otherWords = allRawCards
+      .map((c: any) => String(c?.front || '').trim())
+      .filter((w: string) => Boolean(w) && w.toLowerCase() !== front.toLowerCase());
+    const generated = getSemanticDistractors(front, deckTopic, [...otherWords, ...cleaned]);
+    for (const g of generated) {
+      if (cleaned.length >= 3) break;
+      if (!cleaned.some((x) => x.toLowerCase() === g.toLowerCase())) {
+        cleaned.push(g);
+      }
+    }
+  }
+
+  return [cleaned[0] || '', cleaned[1] || '', cleaned[2] || ''];
+}
+
+function getCardPreviewDistractors(card: any, group: any): string[] {
+  return buildCefrCardDistractors(card, group?.cards || [], group?.topic || '').filter(Boolean);
+}
+
+function handleRegenerateCefrCardDistractors(idx: number) {
+  const cards = editForm.value?.cards || [];
+  const card = cards[idx];
+  if (!card) return;
+  const front = String(card.front || '').trim();
+  const currentDistractors = (card.distractors || []).filter(Boolean);
+  const otherWords = cards
+    .map((c: any, i: number) => (i !== idx ? String(c?.front || '').trim() : ''))
+    .filter(Boolean);
+  const fresh = getSemanticDistractors(
+    front || editForm.value?.topic || 'Vocabulary',
+    editForm.value?.topic || '',
+    [...otherWords, ...currentDistractors]
+  );
+  card.distractors = [fresh[0] || '', fresh[1] || '', fresh[2] || ''];
+}
+
+function handleCefrCardFrontBlur(idx: number) {
+  const cards = editForm.value?.cards || [];
+  const card = cards[idx];
+  if (!card) return;
+  const front = String(card.front || '').trim();
+  if (!front) return;
+  const hasAll =
+    Array.isArray(card.distractors) &&
+    card.distractors.filter((d: any) => String(d || '').trim().length > 0).length === 3;
+  if (!hasAll) {
+    card.distractors = buildCefrCardDistractors(card, cards, editForm.value?.topic || '');
+  }
+}
+
+function handleOpenEditFlashcardGroup(group: any, initialStep: 1 | 2 = 1) {
   editingType.value = 'flashcard';
   editingItem.value = group;
-  activeEditStep.value = 1;
+  activeEditStep.value = initialStep;
   editForm.value = {
     old_level: group.level,
     old_topic: group.topic,
@@ -811,14 +879,18 @@ function handleOpenEditFlashcardGroup(group: any) {
     level: group.level,
     topic: group.topic,
     is_published: group.is_published,
-    cards: group.cards.map((c: any) => ({
-      id: c.id,
-      front: c.front || '',
-      back: c.back || '',
-      image_url: c.image_url || '',
-      explanation: c.explanation || '',
-      options: Array.isArray(c.options) && c.options.length === 4 ? [...c.options] : [c.front || '', '', '', ''],
-    })),
+    cards: group.cards.map((c: any) => {
+      const distractors = buildCefrCardDistractors(c, group.cards, group.topic || '');
+      return {
+        id: c.id,
+        front: c.front || '',
+        back: c.back || '',
+        image_url: c.image_url || '',
+        explanation: c.explanation || '',
+        distractors,
+        options: [c.front || '', ...distractors],
+      };
+    }),
   };
   isEditModalOpen.value = true;
 }
@@ -832,6 +904,7 @@ function handleAddCardToEditForm() {
     back: '',
     image_url: '',
     explanation: '',
+    distractors: ['', '', ''],
     options: ['', '', '', ''],
   });
 }
@@ -871,11 +944,27 @@ async function handleSaveEditModal() {
         new_level: editForm.value.level,
         new_topic: editForm.value.topic,
         is_published: editForm.value.is_published,
-        cards: validCards.map((c: any) => ({
-          ...c,
-          options: Array.isArray(c.options) ? c.options.map((o: any) => String(o || '').trim()).filter(Boolean) : [],
-        })),
+        cards: validCards.map((c: any) => {
+          const front = String(c.front || '').trim();
+          const distractors = buildCefrCardDistractors(c, validCards, editForm.value.topic || '')
+            .map((d) => d.trim())
+            .filter((d) => Boolean(d) && d.toLowerCase() !== front.toLowerCase());
+          return {
+            ...c,
+            front,
+            options: [front, ...distractors].slice(0, 4),
+          };
+        }),
       });
+      if (editingItem.value?.deckId) {
+        removeActivityCache(`tati_flashcard_deck_${editingItem.value.deckId}`);
+        const baseId = String(editingItem.value.deckId).replace(/__draft$/, '');
+        removeActivityCache(`tati_flashcard_deck_${baseId}`);
+        if (typeof window !== 'undefined') {
+          window.localStorage.removeItem(`tati_flashcard_progress_${editingItem.value.deckId}`);
+          window.localStorage.removeItem(`tati_flashcard_progress_${baseId}`);
+        }
+      }
       toast.success('Flashcard deck saved!');
     } else if (editingType.value === 'simulation') {
       await apiPut(`/cefr/admin/simulations/${editForm.value.id}`, {
@@ -1752,14 +1841,22 @@ onUnmounted(() => {
                   <ImageIcon class="w-4 h-4 opacity-50" />
                 </div>
                 <div class="min-w-0 flex-1">
-                  <div class="font-bold text-xs text-text truncate" :title="card.front">{{ card.front }}</div>
-                  <div v-if="card.back || card.explanation" class="text-[0.68rem] text-text-muted truncate mt-0.5" :title="card.back || card.explanation">
+                  <div class="font-bold text-xs text-text truncate" :title="card.front">✓ {{ card.front }}</div>
+                  <div class="text-[0.65rem] text-text-muted truncate mt-0.5" :title="`Wrong options: ${getCardPreviewDistractors(card, group).join(', ')}`">
+                    ✕ {{ getCardPreviewDistractors(card, group).join(' · ') }}
+                  </div>
+                  <div v-if="card.back || card.explanation" class="text-[0.65rem] text-text-muted/80 truncate mt-0.5" :title="card.back || card.explanation">
                     {{ card.back || card.explanation }}
                   </div>
                 </div>
               </div>
 
               <div class="flex items-center gap-1 shrink-0 opacity-80 group-hover/card:opacity-100 transition-opacity">
+                <button type="button" @click="handleOpenEditFlashcardGroup(group, 2)"
+                  class="p-1.5 rounded-lg border border-border bg-surface text-text-muted hover:text-primary transition-colors cursor-pointer"
+                  title="Edit card & incorrect options">
+                  <PenLine class="w-3.5 h-3.5 text-primary" />
+                </button>
                 <button type="button" @click="handleTogglePublishSingleCard(card)"
                   class="p-1.5 rounded-lg border border-border bg-surface text-text-muted hover:text-text transition-colors cursor-pointer"
                   :title="card.is_published ? 'Move card to drafts' : 'Publish card'">
@@ -1929,14 +2026,53 @@ onUnmounted(() => {
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label class="block text-[0.7rem] font-bold text-text-muted mb-1">Front (Target Word/Phrase) *</label>
+                    <label class="block text-[0.7rem] font-bold text-success mb-1">✓ Correct Answer (Front — Target Word/Phrase) *</label>
                     <input v-model="c.front" type="text"
-                      class="w-full px-3 py-2 rounded-xl bg-surface border border-border text-xs text-text outline-none focus:border-primary" />
+                      @blur="handleCefrCardFrontBlur(Number(idx))"
+                      class="w-full px-3 py-2 rounded-xl bg-surface border border-success/40 text-xs text-text outline-none focus:border-success font-semibold" />
                   </div>
                   <div>
                     <label class="block text-[0.7rem] font-bold text-text-muted mb-1">Image URL</label>
                     <input v-model="c.image_url" type="text" placeholder="https://..."
                       class="w-full px-3 py-2 rounded-xl bg-surface border border-border text-xs text-text outline-none focus:border-primary" />
+                  </div>
+                </div>
+
+                <!-- 3 Incorrect Options (Distractors) -->
+                <div v-if="c.distractors" class="p-3 rounded-xl bg-surface border border-border/80 space-y-2">
+                  <div class="flex items-center justify-between gap-2">
+                    <label class="block text-[0.68rem] font-bold text-danger uppercase">
+                      ✕ Incorrect Answers (3 Quiz Distractors — Edit or Replace AI Choices)
+                    </label>
+                    <button
+                      type="button"
+                      @click="handleRegenerateCefrCardDistractors(Number(idx))"
+                      class="text-[0.68rem] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                      title="Generate 3 different incorrect options"
+                    >
+                      <RotateCw class="w-3 h-3" />
+                      <span>Swap AI Options</span>
+                    </button>
+                  </div>
+                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <input
+                      v-model="c.distractors[0]"
+                      type="text"
+                      placeholder="Wrong answer 1"
+                      class="w-full px-3 py-1.5 rounded-lg bg-bg border border-border text-xs text-text outline-none focus:border-primary"
+                    />
+                    <input
+                      v-model="c.distractors[1]"
+                      type="text"
+                      placeholder="Wrong answer 2"
+                      class="w-full px-3 py-1.5 rounded-lg bg-bg border border-border text-xs text-text outline-none focus:border-primary"
+                    />
+                    <input
+                      v-model="c.distractors[2]"
+                      type="text"
+                      placeholder="Wrong answer 3"
+                      class="w-full px-3 py-1.5 rounded-lg bg-bg border border-border text-xs text-text outline-none focus:border-primary"
+                    />
                   </div>
                 </div>
 

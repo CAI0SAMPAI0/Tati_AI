@@ -12,15 +12,17 @@ CRITICAL RULES:
    - The BACK displays ONLY a real corresponding photograph resolved from your visual generation inputs.
    - NEVER generate translations, definitions, "back" text, "explanation" sentences, 4 multiple-choice "options", or fake/invented image URLs.
 3. "front": A UNIQUE, visually concrete English target word, expression, or short phrase (1-4 words, >= 2 characters) suited for CEFR Level {lvl}. NEVER repeat words or phrases. If target items/vocabulary are provided in the context, prioritize them.
-4. "image_search_query": 2-5 concrete, physical, real-world English words describing the exact object, scene, or action that visually illustrates "front" for stock photo retrieval (Unsplash/Pexels). Strictly NEVER use abstract metaphors or symbolic objects (NEVER use trophies, medals, awards, shelves, shrines, altars, oratories, puzzle pieces, or cliparts). For food/diet topics, use "fresh healthy food salad meal", NEVER doctors or stethoscopes. NEVER output a URL here.
-5. "image_prompt": A specific, direct, realistic photographic description clearly depicting the concrete scene or object for "front", natural lighting, documentary style, strictly NO visible text, NO letters, NO words, NO signage, NO labels, NO typography, NO watermark (so the image never gives away the written word). NEVER output a URL here.
-6. All items must be completely distinct from one another.
+4. "distractors": An array of EXACTLY 3 plausible but INCORRECT English words or short phrases from the same semantic category/level {lvl} that do NOT match "front" and do NOT duplicate other cards in the deck.
+5. "image_search_query": 2-5 concrete, physical, real-world English words describing the exact object, scene, or action that visually illustrates "front" for stock photo retrieval (Unsplash/Pexels). Strictly NEVER use abstract metaphors or symbolic objects (NEVER use trophies, medals, awards, shelves, shrines, altars, oratories, puzzle pieces, or cliparts). For food/diet topics, use "fresh healthy food salad meal", NEVER doctors or stethoscopes. NEVER output a URL here.
+6. "image_prompt": A specific, direct, realistic photographic description clearly depicting the concrete scene or object for "front", natural lighting, documentary style, strictly NO visible text, NO letters, NO words, NO signage, NO labels, NO typography, NO watermark (so the image never gives away the written word). NEVER output a URL here.
+7. All items must be completely distinct from one another.
 
 Return ONLY a JSON object in this exact format:
 {
   "flashcards": [
     {
       "front": "target word or short phrase in English",
+      "distractors": ["incorrect option 1", "incorrect option 2", "incorrect option 3"],
       "image_search_query": "concrete physical nouns and action representing the exact card subject",
       "image_prompt": "A realistic photo of the exact object or scene, natural lighting, documentary style, no text, no letters, no watermark"
     }
